@@ -1,17 +1,28 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { ArrowRight, Code } from 'lucide-react';
 interface HeroSectionProps {
   onLearnMore?: () => void;
   onExploreServices?: () => void;
 }
-
 const HeroSection: React.FC<HeroSectionProps> = ({
   onLearnMore,
   onExploreServices
 }) => {
   return (
-    <section id="home" className="relative px-6 py-20">
-      <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-12 items-center">
+    <section id="home" className="relative px-6 py-20 overflow-hidden"> 
+      {/* Background Video */}
+      <video
+        className="absolute inset-0 w-full h-full object-cover z-0"
+        src="/bg.mp4"
+        autoPlay
+        loop
+        muted
+        playsInline
+      />
+      {/* Overlay for readability */}
+      <div className="absolute inset-0 bg-black/50 z-0" />
+      <div className="relative max-w-7xl mx-auto grid md:grid-cols-2 gap-12 items-center z-10">
         {/* Left Column - Text Content */}
         <div className="space-y-6">
           <h1 className="text-5xl md:text-6xl font-bold leading-tight">

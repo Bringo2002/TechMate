@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 
 const navLinks = [
-  { name: 'Home', href: '#home' },
-  { name: 'About', href: '#about' },
-  { name: 'Services', href: '#services' },
-  { name: 'Portfolio', href: '#portfolio' },
-  { name: 'Contact', href: '#contact' },
-  { name: 'Blog', href: '#blog' },
+  { name: 'Home', to: '/' },
+  { name: 'About', to: '/about' },
+  { name: 'Services', to: '/#services' },
+  { name: 'Portfolio', to: '/#portfolio' },
+  { name: 'Contact', to: '/contact' },
+  { name: 'Blog', to: '/#blog' },
 ];
 
 const NavBar: React.FC = () => {
@@ -48,20 +49,20 @@ const NavBar: React.FC = () => {
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center space-x-10">
           {navLinks.map((link) => (
-            <a
+            <Link
               key={link.name}
-              href={link.href}
+              to={link.to}
               className="hover:text-blue-300 text-lg font-bold transition-colors"
             >
               {link.name}
-            </a>
+            </Link>
           ))}
-          <a
-            href="#quote"
+          <Link
+            to="/#quote"
             className="bg-blue-500 hover:bg-blue-600 text-white text-lg font-bold py-2 px-6 rounded-full transition-all shadow-md"
           >
             Get a Quote
-          </a>
+          </Link>
         </div>
 
         {/* Mobile Hamburger Button */}
@@ -90,15 +91,14 @@ const NavBar: React.FC = () => {
       {isOpen && (
         <div className="md:hidden bg-blue-800 px-6 py-4 flex flex-col space-y-4">
           {navLinks.map((link) => (
-
-            <a
+            <Link
               key={link.name}
-              href={link.href}
+              to={link.to}
               className="text-white text-lg font-bold hover:text-blue-300 transition-colors"
               onClick={() => setIsOpen(false)}
             >
               {link.name}
-            </a>
+            </Link>
           ))}
         </div>
       )}
