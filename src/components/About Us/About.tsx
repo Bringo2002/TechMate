@@ -2,6 +2,8 @@ import React from 'react';
 import { useLocation } from 'react-router-dom';
 
 const About = () => {
+  const location = useLocation();
+  
   return (
     <section className="bg-slate-900 text-white px-6 md:px-20 py-20 space-y-16">
       {/* Hero */}

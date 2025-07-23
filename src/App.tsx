@@ -29,12 +29,9 @@ const Home: React.FC = () => (
     <div className="pt-24">
       <Hero />
     </div>
-    <div className="max-w-7xl mx-auto grid md:grid-cols-3 gap-16 px-4 mt-20">
+    <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-16 px-4 mt-20">
       <div className="md:col-span-1">
         <AboutUs />
-      </div>
-      <div className="md:col-span-1">
-        <ServicesSection />
       </div>
       <div className="md:col-span-1 flex flex-col gap-12">
         <PortfolioSection />
@@ -52,6 +49,22 @@ const ContactPage: React.FC = () => (
   </>
 );
 
+const AboutPage: React.FC = () => (
+  <>
+    <Header />
+    <AboutUs />
+    <Footer />
+  </>
+);
+
+const ServicesPage: React.FC = () => (
+  <>
+    <Header />
+    <ServicesSection />
+    <Footer />
+  </>
+);
+
 const App: React.FC = () => {
   return (
     <>
@@ -59,6 +72,7 @@ const App: React.FC = () => {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/about" element={<AboutUs />} />
+        <Route path="/services" element={<ServicesPage />} />
         <Route path="/contact" element={<ContactPage />} />
       </Routes>
     </>

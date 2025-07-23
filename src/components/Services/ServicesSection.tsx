@@ -1,8 +1,20 @@
 import React from 'react';
 
 const ServicesSection: React.FC = () => (
-<section id="services" className="py-16 px-4 md:px-0">
-    <div className="max-w-7xl mx-auto">
+
+  
+
+<section id="services" className="relative py-20 px-6 overflow-hidden">
+    <div className="relative max-w-7xl mx-auto z-10">
+      {/* Background Video */}
+      <video
+        autoPlay
+        loop
+        muted
+        playsInline
+        className="absolute inset-0 w-full h-full object-cover z-0 opacity-30 pointer-events-none"
+        src= "/service-bg.mp4"
+      />
       <h2 className="text-2xl font-bold mb-2">Our Services</h2>
       <p className="text-gray-600 mb-4 max-w-md">Our services are designed to help your business grow and thrive in the digital age. We offer a wide range of solutions tailored to your needs.</p>
       <div className="flex flex-col md:flex-row gap-8 mt-6">
