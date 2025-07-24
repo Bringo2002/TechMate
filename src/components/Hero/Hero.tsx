@@ -1,14 +1,17 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { ArrowRight, Code } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 interface HeroSectionProps {
   onLearnMore?: () => void;
-  onExploreServices?: () => void;
+  
 }
 const HeroSection: React.FC<HeroSectionProps> = ({
   onLearnMore,
-  onExploreServices
 }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   return (
     <section id="home" className="relative px-6 py-20 overflow-hidden"> 
       {/* Background Video */}
@@ -47,7 +50,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
             </button>
             
             <button 
-              onClick={onExploreServices}
+              onClick={() => navigate('/services')} // 🌐 Navigate to Services page
               className="border border-gray-400 hover:border-white px-8 py-3 rounded-full transition-all duration-200 hover:bg-white/10"
             >
               Explore Services

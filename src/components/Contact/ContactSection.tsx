@@ -64,14 +64,38 @@ interface GlassCardProps {
   detail: string;
 }
 
-const GlassCard: React.FC<GlassCardProps> = ({ icon, title, detail }) => (
-  <div className="flex items-center bg-blue-950/60 border border-blue-900/30 backdrop-blur-md rounded-xl p-4 transition hover:bg-blue-900/40">
-    <div className="w-8 h-8 mr-4 text-blue-300">{icon}</div>
-    <div>
-      <p className="text-sm text-blue-300">{title}</p>
-      <p className="font-medium text-white">{detail}</p>
+const GlassCard: React.FC<GlassCardProps> = ({ icon, title, detail }) => {
+  let link: string | null = null;
+
+  if (title.toLowerCase().includes("email")) {
+    link = `mailto:${detail}`;
+  } else if (title.toLowerCase().includes("call")) {
+    const cleanedNumber = detail.replace(/[^+\d]/g, '');
+    link = `tel:${cleanedNumber}`;
+  } else if (title.toLowerCase().includes("location")) {
+    link = `https://www.google.com/maps/search/${encodeURIComponent(detail)}`;
+  }
+
+  return (
+    <div className="flex items-center bg-blue-950/60 border border-blue-900/30 backdrop-blur-md rounded-xl p-4 transition hover:bg-blue-900/40">
+      <div className="w-8 h-8 mr-4 text-blue-300">{icon}</div>
+      <div>
+        <p className="text-sm text-blue-300">{title}</p>
+        {link ? (
+          <a
+            href={link}
+            className="font-medium text-white underline hover:text-blue-300"
+            target={title.toLowerCase().includes("location") ? "_blank" : undefined}
+            rel={title.toLowerCase().includes("location") ? "noopener noreferrer" : undefined}
+          >
+            {detail}
+          </a>
+        ) : (
+          <p className="font-medium text-white">{detail}</p>
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 export default ContactSection;

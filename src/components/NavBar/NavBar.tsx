@@ -61,7 +61,7 @@ const NavBar: React.FC = () => {
             to="/#quote"
             className="bg-blue-500 hover:bg-blue-600 text-white text-lg font-bold py-2 px-6 rounded-full transition-all shadow-md"
           >
-            Get a Quote
+            Get Started
           </Link>
         </div>
 
