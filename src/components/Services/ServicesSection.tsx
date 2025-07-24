@@ -5,7 +5,9 @@ const ServicesSection: React.FC = () => (
   
 
 <section id="services" className="relative py-20 px-6 overflow-hidden">
-    <div className="relative max-w-7xl mx-auto z-10">
+   <div className="relative w-full max-w-screen-2xl mx-auto grid md:grid-cols-2 gap-16 px-8 items-center z-10">
+
+
       {/* Background Video */}
       <video
         autoPlay
