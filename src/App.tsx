@@ -10,6 +10,8 @@ import PortfolioSection from './components/Portfolio/PortfolioSection';
 import Contact from './components/Contact/Contact';
 import Footer from './components/Footer/Footer';
 import Quote from './pages/Quote'; 
+import Blog from './pages/Blog';
+import BlogPost from './pages/BlogPost'; 
 
 // Scroll to top and update title on route change
 const ScrollToTopAndTitle: React.FC = () => {
@@ -67,6 +69,23 @@ const ServicesPage: React.FC = () => (
   </>
 );
 
+const BlogPage: React.FC = () => (
+  <>
+    <Header />
+    <Blog />
+    <Footer />
+  </>
+);
+
+const BlogPostPage: React.FC = () => (
+    <>
+      <Header />
+      <BlogPost />
+      <Footer />
+    </>
+  );
+
+
 const App: React.FC = () => {
   return (
     <>
@@ -77,6 +96,8 @@ const App: React.FC = () => {
         <Route path="/services" element={<ServicesPage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/quote" element={<Quote />} />
+        <Route path="/blog" element={<BlogPage />} />
+        <Route path="/blog/:slug" element={<BlogPostPage />} />
       </Routes>
     </>
   );
