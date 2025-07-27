@@ -1,7 +1,10 @@
 import React from 'react';
 import { Mail, Phone, MapPin } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const ContactSection: React.FC = () => {
+  const navigate = useNavigate();
+
   return (
     <section
       id="contact"
@@ -27,6 +30,16 @@ const ContactSection: React.FC = () => {
             <GlassCard icon={<Phone />} title="Call us" detail="(254) 759449324" />
             <GlassCard icon={<MapPin />} title="Our location" detail="Kilimani, Nairobi, Kenya" />
           </div>
+
+          {/* Request a Quote Button */}
+         <div className="mt-8">
+  <button
+    onClick={() => navigate('/quote')}
+    className="px-6 py-3 bg-blue-700 hover:bg-blue-800 text-white rounded-lg transition duration-200 w-full md:w-auto"
+  >
+    Request a Quote
+  </button>
+</div>
         </div>
 
         {/* Right Side Form */}
@@ -67,12 +80,12 @@ interface GlassCardProps {
 const GlassCard: React.FC<GlassCardProps> = ({ icon, title, detail }) => {
   let link: string | null = null;
 
-  if (title.toLowerCase().includes("email")) {
+  if (title.toLowerCase().includes('email')) {
     link = `mailto:${detail}`;
-  } else if (title.toLowerCase().includes("call")) {
+  } else if (title.toLowerCase().includes('call')) {
     const cleanedNumber = detail.replace(/[^+\d]/g, '');
     link = `tel:${cleanedNumber}`;
-  } else if (title.toLowerCase().includes("location")) {
+  } else if (title.toLowerCase().includes('location')) {
     link = `https://www.google.com/maps/search/${encodeURIComponent(detail)}`;
   }
 
@@ -85,8 +98,8 @@ const GlassCard: React.FC<GlassCardProps> = ({ icon, title, detail }) => {
           <a
             href={link}
             className="font-medium text-white underline hover:text-blue-300"
-            target={title.toLowerCase().includes("location") ? "_blank" : undefined}
-            rel={title.toLowerCase().includes("location") ? "noopener noreferrer" : undefined}
+            target={title.toLowerCase().includes('location') ? '_blank' : undefined}
+            rel={title.toLowerCase().includes('location') ? 'noopener noreferrer' : undefined}
           >
             {detail}
           </a>

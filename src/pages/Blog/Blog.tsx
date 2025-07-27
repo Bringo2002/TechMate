@@ -1,8 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { blogPosts } from '../data/blogPosts';
-import Header from '../components/Header/Header';
-import Footer from '../components/Footer/Footer';
+import { blogPosts } from '../../data/blogPosts';
+import Header from '../../components/Header/Header';
+import Footer from '../../components/Footer/Footer';
 const Blog: React.FC = () => {
   return (
       <div className="min-h-screen bg-[#0D1117] text-white px-6 py-20">
