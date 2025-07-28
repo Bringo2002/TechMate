@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 
 import Header from './components/Header/Header';
-import Hero from './components/Hero/Hero';
+import Hero from './pages/Home/Home';
 import AboutUs from './pages/About/About';
 import './index.css';
 import ServicesSection from './pages/Services/ServicesPage';
@@ -32,11 +32,6 @@ const Home: React.FC = () => (
     <Header />
     <div className="pt-24">
       <Hero />
-    </div>
-    <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-16 px-4 mt-20">
-      <div className="md:col-span-1 flex flex-col gap-12">
-        <PortfolioSection />
-      </div>
     </div>
     <Footer />
   </>
