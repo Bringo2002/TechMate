@@ -2,7 +2,7 @@ import React from 'react';
 import { Mail, Phone, MapPin } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-const ContactSection: React.FC = () => {
+const ContactPage: React.FC = () => {
   const navigate = useNavigate();
 
   return (
@@ -31,15 +31,6 @@ const ContactSection: React.FC = () => {
             <GlassCard icon={<MapPin />} title="Our location" detail="Kilimani, Nairobi, Kenya" />
           </div>
 
-          {/* Request a Quote Button */}
-         <div className="mt-8">
-  <button
-    onClick={() => navigate('/quote')}
-    className="px-6 py-3 bg-blue-700 hover:bg-blue-800 text-white rounded-lg transition duration-200 w-full md:w-auto"
-  >
-    Request a Quote
-  </button>
-</div>
         </div>
 
         {/* Right Side Form */}
@@ -67,6 +58,17 @@ const ContactSection: React.FC = () => {
           </button>
         </form>
       </div>
+
+      
+          {/* Request a Quote Button */}
+         <div className="mt-8">
+  <button
+    onClick={() => navigate('/quote')}
+    className="px-6 py-3 bg-blue-700 hover:bg-blue-800 text-white rounded-lg transition duration-200 w-full md:w-auto"
+  >
+    Request a Quote
+  </button>
+</div>
     </section>
   );
 };
@@ -111,4 +113,4 @@ const GlassCard: React.FC<GlassCardProps> = ({ icon, title, detail }) => {
   );
 };
 
-export default ContactSection;
+export default ContactPage;
