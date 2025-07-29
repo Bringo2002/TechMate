@@ -238,15 +238,16 @@ const Home: React.FC = () => {
         </button>
       </motion.section>
 
-      {/* Live Chat Widget */}
-      <div className="fixed bottom-6 right-6 z-50">
-        <button
-          onClick={() => alert('Chat with us!')}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full shadow-lg"
-        >
-          <MessageCircle size={20} /> Chat with Us
-        </button>
-      </div>
+    {/* Live Chat Widget */}
+<div className="fixed bottom-6 right-6 z-50">
+  <button
+    onClick={() => window.open('https://wa.me/+254759449324', '_blank')} // Or Telegram URL
+    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full shadow-lg transition transform hover:scale-105"
+  >
+    <MessageCircle size={20} /> Chat with Us
+  </button>
+</div>
+
     </main>
   );
 };
