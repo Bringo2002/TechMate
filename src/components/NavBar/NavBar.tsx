@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react'; 
 import { Link } from 'react-router-dom';
 
 const navLinks = [
@@ -41,7 +41,7 @@ const NavBar: React.FC = () => {
     >
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         {/* Logo */}
-        <div className="text-3xl font-extrabold tracking-tight flex items-center gap-1">
+        <div className="text-3xl font-extrabold tracking-tight flex items-center gap-1 cursor-pointer">
           <span className="text-white">Tech</span>
           <span className="text-blue-300">Mate</span>
         </div>
@@ -57,11 +57,18 @@ const NavBar: React.FC = () => {
               {link.name}
             </Link>
           ))}
+          {/* Auth Buttons */}
           <Link
-            to="/#quote"
-            className="bg-blue-500 hover:bg-blue-600 text-white text-lg font-bold py-2 px-6 rounded-full transition-all shadow-md"
+            to="/login"
+            className="hover:text-blue-300 text-lg font-bold transition-colors"
           >
-            Get Started
+            Login
+          </Link>
+          <Link
+            to="/signup"
+            className="bg-blue-500 hover:bg-blue-600 text-white text-lg font-bold py-2 px-4 rounded-full transition-all shadow-md"
+          >
+            Sign Up
           </Link>
         </div>
 
@@ -100,6 +107,21 @@ const NavBar: React.FC = () => {
               {link.name}
             </Link>
           ))}
+          {/* Auth Buttons */}
+          <Link
+            to="/login"
+            className="text-white text-lg font-bold hover:text-blue-300 transition-colors"
+            onClick={() => setIsOpen(false)}
+          >
+            Login
+          </Link>
+          <Link
+            to="/signup"
+            className="bg-blue-500 hover:bg-blue-600 text-white text-lg font-bold py-2 px-4 rounded-full transition-all shadow-md text-center"
+            onClick={() => setIsOpen(false)}
+          >
+            Sign Up
+          </Link>
         </div>
       )}
     </nav>

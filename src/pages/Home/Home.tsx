@@ -43,20 +43,21 @@ const Home: React.FC = () => {
               From websites to apps, we deliver digital products that perform, convert, and scale.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
-              <button
-                onClick={handleLearnMore}
-                className="bg-blue-600 hover:bg-blue-700 px-8 py-3 rounded-full transition-all duration-200 transform hover:scale-105 flex items-center gap-2 group"
-              >
-                Learn More
-                <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
-              </button>
-              <button
-                onClick={() => navigate('/services')}
-                className="border border-gray-400 hover:border-white px-8 py-3 rounded-full transition-all duration-200 hover:bg-white/10"
-              >
-                Explore Services
-              </button>
-            </div>
+  <button
+    onClick={handleLearnMore}
+    className="bg-blue-600 hover:bg-blue-700 px-8 py-3 rounded-full transition-all duration-200 transform hover:scale-105 flex items-center gap-2 group"
+  >
+    Learn More
+    <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+  </button>
+  <button
+    onClick={() => navigate('/services')}
+    className="border border-gray-400 hover:border-white px-8 py-3 rounded-full transition-all duration-200 hover:bg-white/10"
+  >
+    Explore Services
+  </button>
+</div>
+
           </motion.div>
           <motion.div className="relative" {...fadeIn(0.2)}>
             <div className="relative z-10 transform hover:scale-105 transition-transform duration-300">

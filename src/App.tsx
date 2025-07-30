@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
-
+import { Routes, Route, useLocation, BrowserRouter } from 'react-router-dom';
 import Header from './components/Header/Header';
 import Hero from './pages/Home/Home';
 import AboutUs from './pages/About/About';
@@ -13,6 +12,9 @@ import Quote from './pages/Quote/Quote';
 import Blog from './pages/Blog/Blog';
 import BlogPost from './pages/BlogPost/BlogPost'; 
 import NotFoundPage from './pages/NotFoundPage';
+import LoginPage from './pages/LoginPage';
+import SignupPage from './pages/SignupPage';
+import Dashboard from './pages/Dashboard'; // Dummy Dashboard page
 
 // Scroll to top and update title on route change
 const ScrollToTopAndTitle: React.FC = () => {
@@ -99,6 +101,9 @@ const App: React.FC = () => {
         <Route path="/blog/:slug" element={<BlogPostPage />} />
         <Route path="*" element={<NotFoundPage />} />
         <Route path="/quote" element={<QuotePage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
+        <Route path="/dashboard" element={<Dashboard />} />
       </Routes>
     </>
   );
