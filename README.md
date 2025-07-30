@@ -53,10 +53,19 @@ TechMate is currently under active development. Future features may include:
 
 ---
 
-## 📄 License
+# All Rights Reserved
 
-This project is licensed under the **MIT License**.  
-Feel free to use, modify, and distribute with attribution.
+Copyright (c) 2025 Brian MacArthur
+
+This software and its source code are the exclusive property of the author.
+Unauthorized copying, distribution, modification, reuse, or reverse engineering
+of any portion of this software is strictly prohibited.
+
+This project is proprietary and confidential. No rights or licenses are granted
+by implication or otherwise. All use must be expressly authorized in writing
+by the owner.
+
+For licensing inquiries, partnerships, or commercial use contact: <brianmacarthur13@gmail.com>
 
 ---
 
