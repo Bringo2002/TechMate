@@ -62,7 +62,7 @@ Feel free to use, modify, and distribute with attribution.
 
 ## 🧑‍💻 Contact & Support
 
-- 📧 Email: your-email@example.com  
+- 📧 Email: brianmacarthur13@gmail.com 
 - 🌐 Website: [TechMate.dev](https://techmate.dev)  
 - 💬 WhatsApp: [+254759449324](https://wa.me/254759449324)
 
