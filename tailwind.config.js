@@ -15,6 +15,15 @@ export default {
         "dark-green": "#6dc26d",
         "button-gradient-start": "#FFA500",
         "button-gradient-end": "#FF4500",
+
+         // New TechMate-inspired colors
+         dashboard: {
+         background: "#0D1B2A",
+         accentGreen: "#00FF9F",
+         accentBlue: "#2979FF",
+         accentOrange: "#FFB347",
+         accentPurple: "#C084FC",
+         },
       },
       keyframes: {
         marquee: {
