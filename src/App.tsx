@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Routes, Route, useLocation, BrowserRouter } from 'react-router-dom';
+import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import Header from './components/Header/Header';
 import Hero from './pages/Home/Home';
 import AboutUs from './pages/About/About';
@@ -14,9 +14,10 @@ import BlogPost from './pages/BlogPost/BlogPost';
 import NotFoundPage from './pages/NotFoundPage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
-import Dashboard from './pages/Dashboard'; // Dummy Dashboard page
-import Terms  from './pages/Terms';
+import Terms from './pages/Terms';
 import Privacy from './pages/Privacy';
+import DashboardPage from './pages/Dashboard';
+import { useAuth } from './hooks/useAuth';
 
 // Scroll to top and update title on route change
 const ScrollToTopAndTitle: React.FC = () => {
@@ -31,63 +32,31 @@ const ScrollToTopAndTitle: React.FC = () => {
   return null;
 };
 
-const Home: React.FC = () => (
+// Layout wrappers for pages
+const PageLayout: React.FC<{children: React.ReactNode}> = ({ children }) => (
   <>
     <Header />
-    <div className="pt-24">
-      <Hero />
-    </div>
+    {children}
     <Footer />
   </>
 );
 
-const ContactPage: React.FC = () => (
-  <>
-    <Header />
-    <Contact />
-    <Footer />
-  </>
-);
+const HomePage = () => <PageLayout><Hero /></PageLayout>;
+const ContactPage = () => <PageLayout><Contact /></PageLayout>;
+const AboutPage = () => <PageLayout><AboutUs /></PageLayout>;
+const ServicesPage = () => <PageLayout><ServicesSection /></PageLayout>;
+const BlogPage = () => <PageLayout><Blog /></PageLayout>;
+const BlogPostPage = () => <PageLayout><BlogPost /></PageLayout>;
+const QuotePage = () => <PageLayout><Quote /></PageLayout>;
 
-const AboutPage: React.FC = () => (
-  <>
-    <Header />
-    <AboutUs />
-    <Footer />
-  </>
-);
+// ProtectedRoute wrapper
+const ProtectedRoute: React.FC<{children: React.ReactNode}> = ({ children }) => {
+  const { isAuthenticated, loading } = useAuth();
 
-const ServicesPage: React.FC = () => (
-  <>
-    <Header />
-    <ServicesSection />
-    <Footer />
-  </>
-);
+  if (loading) return <p className="text-center mt-20 text-white">Checking authentication...</p>;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
 
-const BlogPage: React.FC = () => (
-  <>
-    <Header />
-    <Blog />
-    <Footer />
-  </>
-);
-
-const BlogPostPage: React.FC = () => (
-    <>
-      <Header />
-      <BlogPost />
-      <Footer />
-    </>
-  );
-const QuotePage: React.FC = () => {
-  return (
-    <>
-      <Header />
-      <Quote />
-      <Footer />
-    </>
-  );
+  return <>{children}</>;
 };
 
 const App: React.FC = () => {
@@ -95,19 +64,29 @@ const App: React.FC = () => {
     <>
       <ScrollToTopAndTitle />
       <Routes>
-        <Route path="/" element={<Home />} />
+        {/* Public Routes */}
+        <Route path="/" element={<HomePage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/services" element={<ServicesPage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/blog" element={<BlogPage />} />
         <Route path="/blog/:slug" element={<BlogPostPage />} />
-        <Route path="*" element={<NotFoundPage />} />
         <Route path="/quote" element={<QuotePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
-        <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/privacy" element={<Privacy />} />
+        <Route path="*" element={<NotFoundPage />} />
+
+        {/* Protected Dashboard Route */}
+        <Route 
+          path="/dashboard" 
+          element={
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          } 
+        />
       </Routes>
     </>
   );
