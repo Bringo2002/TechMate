@@ -1,117 +1,143 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { FcGoogle } from 'react-icons/fc';
-import { useAuth } from '../hooks/useAuth';
-import { validateEmail, validatePassword } from '../utils/validateForm';
+import React, { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { FcGoogle } from "react-icons/fc";
+import { FiEye, FiEyeOff } from "react-icons/fi";
+import { motion } from "framer-motion";
+import { useAuth } from "../hooks/useAuth";
+import { validateEmail, validatePassword } from "../utils/validateForm";
+import AuthLayout from "../layouts/AuthLayout";
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
-  const [formData, setFormData] = useState({ email: '', password: '' });
+  const [formData, setFormData] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    if (loading) return;
+    setError("");
 
     const emailError = validateEmail(formData.email);
-    if (emailError) {
-      setError(emailError);
-      return;
-    }
+    if (emailError) return setError(emailError);
+
     const passwordError = validatePassword(formData.password);
-    if (passwordError) {
-      setError(passwordError);
-      return;
-    }
+    if (passwordError) return setError(passwordError);
 
     setLoading(true);
     try {
       await login(formData.email, formData.password);
-      navigate('/dashboard');
+      navigate("/dashboard");
     } catch (err: any) {
-      setError(err.message || 'Login failed. Try again.');
+      setError(err.message || "Invalid email or password.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleLogin = () => {
-    alert('Google login not implemented yet.');
-  };
-
   return (
-    <div className="min-h-screen bg-[#0D1117] flex items-center justify-center px-4">
-      <div className="bg-white/10 backdrop-blur-md p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-700">
-        <h2 className="text-3xl font-bold text-blue-400 mb-6 text-center">Login</h2>
+    <AuthLayout
+      title="Login"
+      description="Login securely to TechMate and manage your tech solutions with futuristic ease."
+      canonical="https://yourdomain.com/login"
+      heading="Welcome Back"
+    >
+      {error && (
+        <p role="alert" className="text-red-500 text-sm mb-4 text-center font-medium">
+          {error}
+        </p>
+      )}
 
-        {error && <p className="text-red-500 text-sm mb-4 text-center">{error}</p>}
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Email */}
+        <input
+          type="email"
+          name="email"
+          placeholder="Email Address"
+          value={formData.email}
+          onChange={handleChange}
+          required
+          autoComplete="email"
+          aria-label="Email Address"
+          className="w-full p-3 rounded-xl bg-slate-800 text-white border border-slate-600 
+                     focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all"
+        />
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Password */}
+        <div className="relative">
           <input
-            type="email"
-            name="email"
-            placeholder="Email Address"
-            value={formData.email}
-            onChange={handleChange}
-            required
-            className="w-full p-3 rounded-lg bg-slate-800 text-white border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
-          <input
-            type="password"
+            type={showPassword ? "text" : "password"}
             name="password"
             placeholder="Password"
             value={formData.password}
             onChange={handleChange}
             required
-            className="w-full p-3 rounded-lg bg-slate-800 text-white border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            autoComplete="current-password"
+            aria-label="Password"
+            className="w-full p-3 rounded-xl bg-slate-800 text-white border border-slate-600 
+                       focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all pr-10"
           />
-
-          <div className="flex justify-left">
-            <button
-              type="button"
-              onClick={() => alert('Password recovery not yet implemented')}
-              className="text-blue-400 text-sm hover:underline"
-            >
-              Forgot Password?
-            </button>
-          </div>
-
           <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg transition-all duration-200 disabled:opacity-50"
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-3 top-3 text-gray-400 hover:text-white focus:outline-none"
+            aria-label={showPassword ? "Hide password" : "Show password"}
           >
-            {loading ? 'Logging in...' : 'Login'}
+            {showPassword ? <FiEyeOff size={20} /> : <FiEye size={20} />}
           </button>
-        </form>
-
-        <p className="text-center text-gray-300 mt-4">
-          Don’t have an account?{' '}
-          <Link to="/signup" className="text-blue-400 hover:underline">
-            Sign Up
-          </Link>
-        </p>
-
-        <div className="flex items-center gap-4 my-6">
-          <hr className="flex-grow border-slate-600" />
-          <span className="text-slate-400">or</span>
-          <hr className="flex-grow border-slate-600" />
         </div>
 
+        {/* Forgot Password */}
+        <div className="flex justify-end">
+          <Link to="/forgot-password" className="text-sm text-blue-400 hover:underline">
+            Forgot Password?
+          </Link>
+        </div>
+
+        {/* Login Button */}
         <button
-          onClick={handleGoogleLogin}
-          className="w-full flex items-center justify-center gap-2 bg-white text-black py-3 rounded-lg shadow hover:shadow-md transition-all font-semibold mb-6"
+          type="submit"
+          disabled={loading}
+          className="w-full bg-indigo-600 hover:bg-indigo-900 text-white font-bold py-3 rounded-xl 
+                     transition-all duration-200 disabled:opacity-50 flex justify-center items-center"
         >
-          <FcGoogle size={24} /> Login with Google
+          {loading ? (
+            <motion.div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          ) : (
+            "Login"
+          )}
         </button>
+      </form>
+
+      {/* Signup Link */}
+      <p className="text-center text-gray-300 mt-4">
+        Don’t have an account?{" "}
+        <Link to="/signup" className="text-blue-400 hover:underline">
+          Sign Up
+        </Link>
+      </p>
+
+      {/* Divider */}
+      <div className="flex items-center gap-4 my-6">
+        <hr className="flex-grow border-slate-600" />
+        <span className="text-slate-400">or</span>
+        <hr className="flex-grow border-slate-600" />
       </div>
-    </div>
+
+      {/* Google login */}
+      <button
+        onClick={() => alert("Google login not implemented yet.")}
+        className="w-full flex items-center justify-center gap-2 bg-white text-black py-3 rounded-xl 
+                   shadow hover:shadow-lg transition-all font-semibold mb-6"
+      >
+        <FcGoogle size={24} /> Login with Google
+      </button>
+    </AuthLayout>
   );
 };
 

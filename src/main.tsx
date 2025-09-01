@@ -4,13 +4,16 @@ import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.tsx'
 import { FormspreeProvider } from '@formspree/react'
+import { HelmetProvider } from "react-helmet-async";
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter>
-      <FormspreeProvider project="xkgzrwnz">
-        <App />
-      </FormspreeProvider>
-    </BrowserRouter>
+    <HelmetProvider>
+      <BrowserRouter>
+        <FormspreeProvider project="xkgzrwnz">
+          <App />
+        </FormspreeProvider>
+      </BrowserRouter>
+    </HelmetProvider>
   </StrictMode>,
 );

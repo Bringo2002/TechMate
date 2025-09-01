@@ -5,7 +5,6 @@ import Hero from './pages/Home/Home';
 import AboutUs from './pages/About/About';
 import './index.css';
 import ServicesSection from './pages/Services/ServicesPage';
-import PortfolioSection from './components/Portfolio/PortfolioSection';
 import Contact from './pages/Contact/Contact';
 import Footer from './components/Footer/Footer';
 import Quote from './pages/Quote/Quote'; 
@@ -18,6 +17,8 @@ import Terms from './pages/Terms';
 import Privacy from './pages/Privacy';
 import DashboardPage from './pages/Dashboard';
 import { useAuth } from './hooks/useAuth';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import Cookies from './pages/Cookies';
 
 // Scroll to top and update title on route change
 const ScrollToTopAndTitle: React.FC = () => {
@@ -76,7 +77,10 @@ const App: React.FC = () => {
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/privacy" element={<Privacy />} />
+        <Route path="/cookies" element={<Cookies />} />
         <Route path="*" element={<NotFoundPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+
 
         {/* Protected Dashboard Route */}
         <Route 
