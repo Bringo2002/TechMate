@@ -1,7 +1,4 @@
-// src/services/authService.ts
-import axios from "axios";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+import supabase from "../lib/supabaseClient";
 
 interface User {
   id: string;
@@ -10,7 +7,6 @@ interface User {
 }
 
 interface AuthResponse {
-  token: string;
   user?: User;
 }
 
@@ -22,13 +18,22 @@ interface MessageResponse {
 
 // Login user
 const login = async (email: string, password: string): Promise<AuthResponse> => {
-  try {
-    const res = await axios.post(`${API_URL}/auth/login`, { email, password });
-    return res.data;
-  } catch (err: any) {
-    console.error("Login error:", err.response?.data || err.message);
-    throw new Error(err.response?.data?.message || "Login failed");
-  }
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error) throw new Error(error.message);
+
+  return {
+    user: data.user
+      ? {
+          id: data.user.id,
+          name: data.user.user_metadata?.full_name || "",
+          email: data.user.email || "",
+        }
+      : undefined,
+  };
 };
 
 // Signup user
@@ -37,69 +42,65 @@ const signup = async (
   email: string,
   password: string
 ): Promise<AuthResponse> => {
-  try {
-    const res = await axios.post(`${API_URL}/auth/signup`, { name, email, password });
-    return res.data;
-  } catch (err: any) {
-    console.error("Signup error:", err.response?.data || err.message);
-    throw new Error(err.response?.data?.message || "Signup failed");
-  }
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: { full_name: name }, // ✅ standard key
+    },
+  });
+
+  if (error) throw new Error(error.message);
+
+  return {
+    user: data.user
+      ? {
+          id: data.user.id,
+          name: data.user.user_metadata?.full_name || name,
+          email: data.user.email || "",
+        }
+      : undefined,
+  };
+};
+
+/* ========== PASSWORD RESET ========== */
+const requestPasswordReset = async (email: string): Promise<MessageResponse> => {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/reset-password`,
+  });
+
+  if (error) throw new Error(error.message);
+
+  return { message: "Password reset email sent successfully" };
+};
+
+const confirmPasswordReset = async (
+  newPassword: string
+): Promise<MessageResponse> => {
+  const { error } = await supabase.auth.updateUser({
+    password: newPassword,
+  });
+
+  if (error) throw new Error(error.message);
+
+  return { message: "Password updated successfully" };
 };
 
 // Logout user
 const logout = async (): Promise<void> => {
-  try {
-    // Optional: notify backend if needed
-    // await axios.post(`${API_URL}/auth/logout`);
-    localStorage.removeItem("authToken");
-  } catch (err: any) {
-    console.warn("Logout error:", err.response?.data || err.message);
-  }
+  await supabase.auth.signOut();
 };
 
-// Verify JWT token
-const verifyToken = async (token: string): Promise<boolean> => {
-  try {
-    const res = await axios.get(`${API_URL}/auth/verify`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    return res.data.valid === true;
-  } catch (err: any) {
-    console.warn("Token verification failed:", err.response?.data || err.message);
+// Verify session token
+const verifyToken = async (): Promise<boolean> => {
+  const { data, error } = await supabase.auth.getSession();
+  if (error || !data.session) {
+    await supabase.auth.signOut(); // ✅ force logout if session invalid
     return false;
   }
+  return true;
 };
 
-/* ========== PASSWORD RESET ========== */
-
-// Step 1: Request password reset email
-const requestPasswordReset = async (email: string): Promise<MessageResponse> => {
-  try {
-    const res = await axios.post(`${API_URL}/auth/reset-password`, { email });
-    return res.data;
-  } catch (err: any) {
-    console.error("Password reset request error:", err.response?.data || err.message);
-    throw new Error(err.response?.data?.message || "Password reset request failed");
-  }
-};
-
-// Step 2: Confirm reset with token + new password
-const confirmPasswordReset = async (
-  token: string,
-  newPassword: string
-): Promise<MessageResponse> => {
-  try {
-    const res = await axios.post(`${API_URL}/auth/reset-password/${token}`, {
-      newPassword,
-    });
-    return res.data;
-  } catch (err: any) {
-    console.error("Password reset confirm error:", err.response?.data || err.message);
-    throw new Error(err.response?.data?.message || "Password reset confirmation failed");
-  }
-};
-
-/* ========== EXPORTS ========== */
 export default {
   login,
   signup,

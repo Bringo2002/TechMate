@@ -1,4 +1,4 @@
-// src/pages/SignupPage.tsx
+
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { FcGoogle } from "react-icons/fc";
@@ -6,19 +6,23 @@ import { FiEye, FiEyeOff } from "react-icons/fi";
 import { motion } from "framer-motion";
 import { useAuth } from "../hooks/useAuth";
 import { validateEmail, validatePassword } from "../utils/validateForm";
+import supabase from "../lib/supabaseClient"; 
 import AuthLayout from "../layouts/AuthLayout";
 
 const SignupPage: React.FC = () => {
   const navigate = useNavigate();
-  const { signup } = useAuth();
+  const { signup, login } = useAuth();
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
     confirmPassword: "",
   });
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [successMsg, setSuccessMsg] = useState(""); // ✅ new state for confirmation message
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -27,9 +31,11 @@ const SignupPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (loading) return; // prevent double-submit
+    if (loading) return;
     setError("");
+    setSuccessMsg("");
 
+    // ✅ Frontend validation
     if (!formData.name.trim()) return setError("Name is required.");
 
     const emailError = validateEmail(formData.email);
@@ -44,16 +50,34 @@ const SignupPage: React.FC = () => {
 
     setLoading(true);
     try {
-      await signup(formData.name, formData.email, formData.password);
-      navigate("/dashboard");
+      const { session } = await signup(
+        formData.name,
+        formData.email,
+        formData.password
+      );
+
+      if (!session) {
+        // ✅ No session returned → email confirmation likely required
+        setSuccessMsg(
+          "✅ Account created. Please check your email and confirm before logging in."
+        );
+        return;
+      }
+
+      // ✅ Auto-login fallback
+      try {
+        await login(formData.email, formData.password);
+      } catch {
+        console.warn("Auto-login after signup failed, redirecting manually.");
+      }
+
+      navigate("/dashboard", { replace: true });
     } catch (err: any) {
       setError(err?.message || "Signup failed. Please try again.");
     } finally {
       setLoading(false);
     }
   };
-
-  const handleGoogleSignup = () => alert("Google signup not implemented yet.");
 
   return (
     <AuthLayout
@@ -62,15 +86,20 @@ const SignupPage: React.FC = () => {
       canonical="https://yourdomain.com/signup"
       heading="Create Account"
     >
+      {/* Show error or success messages */}
       {error && (
         <p role="alert" className="text-red-500 text-sm mb-4 text-center font-medium">
           {error}
         </p>
       )}
+      {successMsg && (
+        <p role="status" className="text-green-500 text-sm mb-4 text-center font-medium">
+          {successMsg}
+        </p>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Name */}
-        <label htmlFor="name" className="sr-only">Full Name</label>
         <input
           id="name"
           name="name"
@@ -81,11 +110,11 @@ const SignupPage: React.FC = () => {
           required
           autoComplete="name"
           aria-label="Full Name"
-          className="w-full p-3 rounded-xl bg-slate-800 text-white border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all"
+          className="w-full p-3 rounded-xl bg-slate-800 text-white border border-slate-600 
+                     focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all"
         />
 
         {/* Email */}
-        <label htmlFor="email" className="sr-only">Email Address</label>
         <input
           id="email"
           name="email"
@@ -96,12 +125,12 @@ const SignupPage: React.FC = () => {
           required
           autoComplete="email"
           aria-label="Email Address"
-          className="w-full p-3 rounded-xl bg-slate-800 text-white border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all"
+          className="w-full p-3 rounded-xl bg-slate-800 text-white border border-slate-600 
+                     focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all"
         />
 
         {/* Password */}
         <div className="relative">
-          <label htmlFor="password" className="sr-only">Password</label>
           <input
             id="password"
             name="password"
@@ -112,7 +141,8 @@ const SignupPage: React.FC = () => {
             required
             autoComplete="new-password"
             aria-label="Password"
-            className="w-full p-3 rounded-xl bg-slate-800 text-white border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all pr-10"
+            className="w-full p-3 rounded-xl bg-slate-800 text-white border border-slate-600 
+                       focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all pr-10"
           />
           <button
             type="button"
@@ -126,7 +156,6 @@ const SignupPage: React.FC = () => {
 
         {/* Confirm Password */}
         <div className="relative">
-          <label htmlFor="confirmPassword" className="sr-only">Confirm Password</label>
           <input
             id="confirmPassword"
             name="confirmPassword"
@@ -137,23 +166,29 @@ const SignupPage: React.FC = () => {
             required
             autoComplete="new-password"
             aria-label="Confirm Password"
-            className="w-full p-3 rounded-xl bg-slate-800 text-white border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all pr-10"
+            className="w-full p-3 rounded-xl bg-slate-800 text-white border border-slate-600 
+                       focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all pr-10"
           />
           <button
             type="button"
-            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+            onClick={() =>
+              setShowConfirmPassword(!showConfirmPassword)
+            }
             className="absolute right-3 top-3 text-gray-400 hover:text-white focus:outline-none"
-            aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+            aria-label={
+              showConfirmPassword ? "Hide confirm password" : "Show confirm password"
+            }
           >
             {showConfirmPassword ? <FiEyeOff size={20} /> : <FiEye size={20} />}
           </button>
         </div>
 
-        {/* Sign Up Button */}
+        {/* Submit Button */}
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-indigo-600 hover:bg-indigo-900 text-white font-bold py-3 rounded-xl transition-all duration-200 disabled:opacity-50 flex justify-center items-center"
+          className="w-full bg-indigo-600 hover:bg-indigo-900 text-white font-bold py-3 rounded-xl 
+                     transition-all duration-200 disabled:opacity-50 flex justify-center items-center"
         >
           {loading ? (
             <motion.div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -166,7 +201,9 @@ const SignupPage: React.FC = () => {
       {/* Login Link */}
       <p className="text-center text-gray-300 mt-4">
         Already have an account?{" "}
-        <Link to="/login" className="text-blue-400 hover:underline">Login</Link>
+        <Link to="/login" className="text-blue-400 hover:underline">
+          Login
+        </Link>
       </p>
 
       {/* Divider */}
@@ -176,13 +213,30 @@ const SignupPage: React.FC = () => {
         <hr className="flex-grow border-slate-600" />
       </div>
 
-      {/* Google signup */}
-      <button
-        onClick={handleGoogleSignup}
-        className="w-full flex items-center justify-center gap-2 bg-white text-black py-3 rounded-xl shadow hover:shadow-lg transition-all font-semibold mb-6"
-      >
-        <FcGoogle size={24} /> Sign Up with Google
-      </button>
+      {/* Google Signup */}
+<button
+  onClick={async () => {
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      if (error) throw error;
+      // User will be redirected to Google and then back to your /auth/callback page
+    } catch (err: any) {
+      console.error("Google signup error:", err);
+      alert(err.message || "Google signup failed. Please try again.");
+    }
+  }}
+  className="w-full flex items-center justify-center gap-2 bg-white text-black py-3 rounded-xl 
+             shadow hover:shadow-lg transition-all font-semibold mb-6"
+>
+  <FcGoogle size={24} /> Sign Up with Google
+</button>
+
     </AuthLayout>
   );
 };

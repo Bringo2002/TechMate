@@ -1,22 +1,23 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import authService from "../services/authService";
+import supabase from "../lib/supabaseClient";
+
+interface SignupResult {
+  session: any | null;
+  user: any | null;
+}
 
 interface AuthHook {
   isAuthenticated: boolean;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (name: string, email: string, password: string) => Promise<void>;
-  logout: () => void;
+  signup: (name: string, email: string, password: string) => Promise<SignupResult>;
+  logout: () => Promise<void>;
   verifyToken: () => Promise<boolean>;
-
-  // Password reset flow
   requestPasswordReset: (email: string) => Promise<void>;
   confirmPasswordReset: (token: string, newPassword: string) => Promise<void>;
-
-  // Optional social login/signup
-  loginWithGoogle?: () => void;
-  signupWithGoogle?: () => void;
+  loginWithGoogle?: () => Promise<void>;
+  signupWithGoogle?: () => Promise<void>;
 }
 
 export const useAuth = (): AuthHook => {
@@ -24,40 +25,68 @@ export const useAuth = (): AuthHook => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Initialize auth state
+  // 🔄 Keep auth state in sync with Supabase
   useEffect(() => {
     const initAuth = async () => {
       await verifyToken();
       setLoading(false);
     };
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setIsAuthenticated(!!session);
+      }
+    );
+
     initAuth();
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
-  // Login
+  // ✅ Login with email + password
   const login = useCallback(async (email: string, password: string) => {
     setLoading(true);
     try {
-      const { token } = await authService.login(email, password);
-      localStorage.setItem("authToken", token);
-      setIsAuthenticated(true);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw new Error(error.message);
+      setIsAuthenticated(!!data.session);
     } catch (err: any) {
-      console.error("Login failed:", err);
+      console.error("Login failed:", err.message);
       throw err;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Signup
+  // ✅ Signup with email + password (returns session + user)
   const signup = useCallback(
-    async (name: string, email: string, password: string) => {
+    async (name: string, email: string, password: string): Promise<SignupResult> => {
       setLoading(true);
       try {
-        const { token } = await authService.signup(name, email, password);
-        localStorage.setItem("authToken", token);
-        setIsAuthenticated(true);
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { full_name: name }, // store user name in metadata
+          },
+        });
+
+        if (error) throw new Error(error.message);
+
+        setIsAuthenticated(!!data.session);
+
+        return {
+          session: data.session,
+          user: data.user,
+        };
       } catch (err: any) {
-        console.error("Signup failed:", err);
+        console.error("Signup failed:", err.message);
         throw err;
       } finally {
         setLoading(false);
@@ -66,63 +95,82 @@ export const useAuth = (): AuthHook => {
     []
   );
 
-  // Request password reset
-  const requestPasswordReset = useCallback(async (email: string) => {
-    setLoading(true);
+  // ✅ Logout
+  const logout = useCallback(async () => {
     try {
-      await authService.requestPasswordReset(email);
+      const { error } = await supabase.auth.signOut();
+      if (error) throw new Error(error.message);
+
+      setIsAuthenticated(false);
+      navigate("/login");
     } catch (err: any) {
-      console.error("Request password reset failed:", err);
-      throw err;
-    } finally {
-      setLoading(false);
+      console.warn("Logout error:", err.message);
     }
-  }, []);
-
-  // Confirm password reset
-  const confirmPasswordReset = useCallback(
-    async (token: string, newPassword: string) => {
-      setLoading(true);
-      try {
-        await authService.confirmPasswordReset(token, newPassword);
-      } catch (err: any) {
-        console.error("Confirm password reset failed:", err);
-        throw err;
-      } finally {
-        setLoading(false);
-      }
-    },
-    []
-  );
-
-  // Logout
-  const logout = useCallback(() => {
-    localStorage.removeItem("authToken");
-    setIsAuthenticated(false);
-    navigate("/login");
   }, [navigate]);
 
-  // Verify token
+  // ✅ Verify current session
   const verifyToken = useCallback(async (): Promise<boolean> => {
-    const token = localStorage.getItem("authToken");
-    if (!token) {
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) throw new Error(error.message);
+
+      const isValid = !!data.session;
+      setIsAuthenticated(isValid);
+      return isValid;
+    } catch (err: any) {
+      console.warn("Session check failed:", err.message);
       setIsAuthenticated(false);
       return false;
     }
-    try {
-      await authService.verifyToken(token);
-      setIsAuthenticated(true);
-      return true;
-    } catch (err) {
-      console.warn("Invalid token, logging out.");
-      logout();
-      return false;
-    }
-  }, [logout]);
+  }, []);
 
-  // Placeholder Google login/signup
-  const loginWithGoogle = () => alert("Google login not implemented yet.");
-  const signupWithGoogle = () => alert("Google signup not implemented yet.");
+  // ✅ Request password reset
+  const requestPasswordReset = useCallback(async (email: string) => {
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + "/reset-password",
+      });
+      if (error) throw new Error(error.message);
+    } catch (err: any) {
+      console.error("Request password reset failed:", err.message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // ✅ Confirm password reset
+  const confirmPasswordReset = useCallback(
+    async (_token: string, newPassword: string) => {
+      setLoading(true);
+      try {
+        const { error } = await supabase.auth.updateUser({
+          password: newPassword,
+        });
+        if (error) throw new Error(error.message);
+      } catch (err: any) {
+        console.error("Confirm password reset failed:", err.message);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  // (Optional) Google OAuth login
+  const loginWithGoogle = useCallback(async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin,
+      },
+    });
+    if (error) throw new Error(error.message);
+  }, []);
+
+  const signupWithGoogle = loginWithGoogle;
 
   return {
     isAuthenticated,

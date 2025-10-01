@@ -19,6 +19,7 @@ import DashboardPage from './pages/Dashboard';
 import { useAuth } from './hooks/useAuth';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import Cookies from './pages/Cookies';
+import AuthCallback from './pages/AuthCallback';
 
 // Scroll to top and update title on route change
 const ScrollToTopAndTitle: React.FC = () => {
@@ -80,6 +81,7 @@ const App: React.FC = () => {
         <Route path="/cookies" element={<Cookies />} />
         <Route path="*" element={<NotFoundPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
 
 
         {/* Protected Dashboard Route */}

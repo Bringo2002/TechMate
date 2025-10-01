@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { FcGoogle } from "react-icons/fc";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import { motion } from "framer-motion";
@@ -9,20 +9,23 @@ import AuthLayout from "../layouts/AuthLayout";
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const location = useLocation();
+  const { login, loginWithGoogle } = useAuth();
+
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) =>
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
     setError("");
 
+    // ✅ Validate input before starting request
     const emailError = validateEmail(formData.email);
     if (emailError) return setError(emailError);
 
@@ -32,11 +35,33 @@ const LoginPage: React.FC = () => {
     setLoading(true);
     try {
       await login(formData.email, formData.password);
-      navigate("/dashboard");
+
+      // ✅ Redirect to where user came from, fallback to dashboard
+      const redirectPath =
+        (location.state as any)?.from?.pathname || "/dashboard";
+      navigate(redirectPath, { replace: true });
     } catch (err: any) {
-      setError(err.message || "Invalid email or password.");
+      console.error("Login failed:", err);
+
+      // ✅ More intelligent error messages
+      if (err.message?.toLowerCase().includes("email not confirmed")) {
+        setError("Please confirm your email before logging in. Check your inbox.");
+      } else if (err.message?.toLowerCase().includes("invalid login")) {
+        setError("Invalid email or password. Please try again.");
+      } else {
+        setError(err.message || "Unable to log in. Please try again later.");
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    try {
+      await loginWithGoogle?.();
+    } catch (err: any) {
+      console.error("Google login failed:", err);
+      setError("Google login failed. Please try again.");
     }
   };
 
@@ -48,7 +73,10 @@ const LoginPage: React.FC = () => {
       heading="Welcome Back"
     >
       {error && (
-        <p role="alert" className="text-red-500 text-sm mb-4 text-center font-medium">
+        <p
+          role="alert"
+          className="text-red-500 text-sm mb-4 text-center font-medium"
+        >
           {error}
         </p>
       )}
@@ -84,7 +112,7 @@ const LoginPage: React.FC = () => {
           />
           <button
             type="button"
-            onClick={() => setShowPassword(!showPassword)}
+            onClick={() => setShowPassword((prev) => !prev)}
             className="absolute right-3 top-3 text-gray-400 hover:text-white focus:outline-none"
             aria-label={showPassword ? "Hide password" : "Show password"}
           >
@@ -94,7 +122,10 @@ const LoginPage: React.FC = () => {
 
         {/* Forgot Password */}
         <div className="flex justify-end">
-          <Link to="/forgot-password" className="text-sm text-blue-400 hover:underline">
+          <Link
+            to="/forgot-password"
+            className="text-sm text-blue-400 hover:underline"
+          >
             Forgot Password?
           </Link>
         </div>
@@ -131,7 +162,7 @@ const LoginPage: React.FC = () => {
 
       {/* Google login */}
       <button
-        onClick={() => alert("Google login not implemented yet.")}
+        onClick={handleGoogleLogin}
         className="w-full flex items-center justify-center gap-2 bg-white text-black py-3 rounded-xl 
                    shadow hover:shadow-lg transition-all font-semibold mb-6"
       >
