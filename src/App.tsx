@@ -87,9 +87,9 @@ const App: React.FC = () => {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/dashboard" element={<DashboardLayout><Overview /></DashboardLayout>} />
-        <Route path="/dashboard/analytics" element={<DashboardLayout><Analytics /></DashboardLayout>} />
-        <Route path="/dashboard/clients" element={<DashboardLayout><Clients /></DashboardLayout>} />
-        <Route path="/dashboard/settings" element={<DashboardLayout><Settings /></DashboardLayout>} />
+        <Route path="/dashboard/analytics" element={<ProtectedRoute><DashboardLayout><Analytics /></DashboardLayout></ProtectedRoute>} />
+        <Route path="/dashboard/clients" element={<ProtectedRoute><DashboardLayout><Clients /></DashboardLayout></ProtectedRoute>} />
+        <Route path="/dashboard/settings" element={<ProtectedRoute><DashboardLayout><Settings /></DashboardLayout></ProtectedRoute>} />
 
 
         {/* Protected Dashboard Route */}
