@@ -20,7 +20,7 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import Cookies from './pages/Cookies';
 import AuthCallback from './pages/AuthCallback';
 import DashboardLayout from "./layouts/DashboardLayout";
-import Overview from "./pages/dashboard/overview";
+import Overview from "./pages/dashboard/Overview";
 import Analytics from "./pages/dashboard/Analytics";
 import Clients from "./pages/dashboard/Clients";
 import Settings from "./pages/dashboard/Settings";
