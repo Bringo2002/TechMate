@@ -1,11 +1,10 @@
 // src/components/dashboard/DashboardNav.tsx
-// Sidebar navigation for TechMate dashboard with active state styling
+// Futuristic sidebar navigation with active highlight and glow effects
 
-import React from "react";
+import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { BarChart3, Activity, Users, Settings } from "lucide-react";
+import { BarChart3, Activity, Users, Settings, ChevronLeft, ChevronRight } from "lucide-react";
 
-// Navigation items with icons and route paths
 const navItems = [
   { id: "overview", label: "Overview", icon: <BarChart3 className="w-5 h-5" />, path: "/dashboard" },
   { id: "analytics", label: "Analytics", icon: <Activity className="w-5 h-5" />, path: "/dashboard/analytics" },
@@ -15,22 +14,32 @@ const navItems = [
 
 export const DashboardNav: React.FC = () => {
   const location = useLocation();
+  const [collapsed, setCollapsed] = useState(false);
 
   return (
-   <aside className="w-64 bg-[#01062d] text-white min-h-screen border-r border-dashboard-accentWhite p-4 flex flex-col justify-between">
-
-      
+    <aside
+      className={`${
+        collapsed ? "w-20" : "w-64"
+      } bg-[#01062d] text-white min-h-screen border-r border-dashboard-accentWhite p-4 flex flex-col justify-between transition-all duration-300`}
+    >
       {/* Brand / Logo */}
-<div className="mb-8">
-  <h1 className="text-2xl font-bold tracking-wide">
-    <span className="text-white">Tech</span>
-    <span className="text-blue-500">Mate</span>
-  </h1>
-</div>
-
+      <div className="mb-8 flex items-center justify-between">
+        {!collapsed && (
+          <h1 className="text-2xl font-bold tracking-wide">
+            <span className="text-white">Tech</span>
+            <span className="text-blue-500">Mate</span>
+          </h1>
+        )}
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="text-gray-400 hover:text-white transition"
+        >
+          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+        </button>
+      </div>
 
       {/* Navigation links */}
-      <nav className="flex-1 space-y-2">
+      <nav className="flex-1 space-y-2 relative">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
 
@@ -38,25 +47,31 @@ export const DashboardNav: React.FC = () => {
             <Link
               key={item.id}
               to={item.path}
-              className={`flex items-center px-3 py-2 rounded-lg transition-all duration-200 ${
+              className={`group relative flex items-center px-3 py-2 rounded-lg transition-all duration-200 ${
                 isActive
                   ? "bg-[#2979FF] text-black shadow-md"
-                  : "text-gray-400 hover:bg-[#2979FF] hover:text-white"
+                  : "text-gray-400 hover:bg-[#1a2d6b] hover:text-white"
               }`}
             >
+              {/* Active glow bar */}
+              {isActive && (
+                <span className="absolute left-0 top-0 h-full w-1 bg-blue-400 rounded-r-md shadow-glow animate-pulse"></span>
+              )}
               {item.icon}
-              <span className="ml-3 font-medium">{item.label}</span>
+              {!collapsed && <span className="ml-3 font-medium">{item.label}</span>}
             </Link>
           );
         })}
       </nav>
 
-      {/* Footer status indicator — can be extended for versioning or environment */}
-      <div className="text-xs text-gray-400 mt-4">
-        <div className="flex items-center">
-          <span className="w-2 h-2 bg-dashboard-accentGreen rounded-full mr-2 animate-pulse"></span>
-          <span>DWIS 10</span>
-        </div>
+      {/* Footer status indicator */}
+      <div className="text-xs text-gray-400 mt-4 flex items-center justify-between">
+        {!collapsed && (
+          <div className="flex items-center">
+            <span className="w-2 h-2 bg-dashboard-accentGreen rounded-full mr-2 animate-pulse"></span>
+            <span>v1.0.0 • Online</span>
+          </div>
+        )}
       </div>
     </aside>
   );

@@ -15,11 +15,15 @@ import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import Terms from './pages/Terms';
 import Privacy from './pages/Privacy';
-import DashboardPage from './pages/Dashboard';
 import { useAuth } from './hooks/useAuth';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import Cookies from './pages/Cookies';
 import AuthCallback from './pages/AuthCallback';
+import DashboardLayout from "./layouts/DashboardLayout";
+import Overview from "./pages/dashboard/overview";
+import Analytics from "./pages/dashboard/Analytics";
+import Clients from "./pages/dashboard/Clients";
+import Settings from "./pages/dashboard/Settings";
 
 // Scroll to top and update title on route change
 const ScrollToTopAndTitle: React.FC = () => {
@@ -82,6 +86,10 @@ const App: React.FC = () => {
         <Route path="*" element={<NotFoundPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/dashboard" element={<DashboardLayout><Overview /></DashboardLayout>} />
+        <Route path="/dashboard/analytics" element={<DashboardLayout><Analytics /></DashboardLayout>} />
+        <Route path="/dashboard/clients" element={<DashboardLayout><Clients /></DashboardLayout>} />
+        <Route path="/dashboard/settings" element={<DashboardLayout><Settings /></DashboardLayout>} />
 
 
         {/* Protected Dashboard Route */}
@@ -89,7 +97,10 @@ const App: React.FC = () => {
           path="/dashboard" 
           element={
             <ProtectedRoute>
-              <DashboardPage />
+              <Overview/>
+              <Analytics/>
+              <Clients/>
+              <Settings/>
             </ProtectedRoute>
           } 
         />

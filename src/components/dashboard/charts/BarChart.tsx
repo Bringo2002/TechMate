@@ -1,25 +1,30 @@
 // src/components/dashboard/charts/BarChart.tsx
-// Responsive, dark-themed bar chart using SVG for TechMate dashboard
+// Futuristic glowing animated bar chart for TechMate dashboard
 
 import React from "react";
+import { motion } from "framer-motion";
 
-// Props interface for bar chart data
 export interface BarChartProps {
   data: { month: string; value: number }[];
+    futuristic?: boolean;
 }
 
 export const BarChart: React.FC<BarChartProps> = ({ data }) => {
-  // Determine the highest value for vertical scaling
-  const maxValue = Math.max(...data.map(d => d.value));
+  const maxValue = Math.max(...data.map((d) => d.value));
 
   return (
-    <div className="bg-gray-900 rounded-xl p-4 border border-gray-700 shadow-md">
-      {/* Chart title */}
-      <h3 className="text-white text-lg font-semibold mb-4">Monthly Volume</h3>
+    <div className="relative bg-white/5 backdrop-blur-md rounded-2xl p-6 border border-white/10 shadow-lg overflow-hidden">
+      {/* Neon aura background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-cyan-400/10 via-blue-500/5 to-purple-500/10 blur-2xl rounded-2xl pointer-events-none" />
 
-      {/* SVG container for bar chart */}
-      <svg viewBox="0 0 100 100" className="w-full h-48">
-        {/* Background grid lines for reference */}
+      {/* Chart title */}
+      <h3 className="text-lg font-semibold text-cyan-400 mb-4 drop-shadow-md">
+        Monthly Volume
+      </h3>
+
+      {/* SVG Chart */}
+      <svg viewBox="0 0 100 100" className="w-full h-56 relative z-10">
+        {/* Glowing grid lines */}
         {[20, 40, 60, 80].map((y, i) => (
           <line
             key={i}
@@ -27,37 +32,57 @@ export const BarChart: React.FC<BarChartProps> = ({ data }) => {
             y1={y}
             x2="100"
             y2={y}
-            stroke="#4B5563"
-            strokeDasharray="2,2"
-            strokeWidth={0.5}
+            stroke="url(#gridGradient)"
+            strokeWidth={0.3}
           />
         ))}
 
-        {/* Bars for each data point */}
+        {/* Gradient defs */}
+        <defs>
+          <linearGradient id="barGradient" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.9} />
+            <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.6} />
+          </linearGradient>
+
+          <linearGradient id="gridGradient" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0%" stopColor="#38bdf8" stopOpacity={0.2} />
+            <stop offset="100%" stopColor="#a78bfa" stopOpacity={0.2} />
+          </linearGradient>
+        </defs>
+
+        {/* Bars */}
         {data.map((d, i) => {
-          const barWidth = 100 / data.length - 4; // spacing between bars
-          const x = i * (100 / data.length) + 2; // horizontal position
+          const barWidth = 100 / data.length - 4;
+          const x = i * (100 / data.length) + 2;
           const height = (d.value / maxValue) * 100;
           const y = 100 - height;
 
           return (
-            <rect
+            <motion.rect
               key={i}
               x={x}
               y={y}
               width={barWidth}
+              initial={{ height: 0, y: 100 }}
+              animate={{ height, y }}
+              transition={{ duration: 0.8, delay: i * 0.1, ease: "easeOut" }}
               height={height}
-              fill="#10B981" // emerald accent
-              className="transition-all duration-300 hover:opacity-80"
+              fill="url(#barGradient)"
+              rx="1"
+              className="cursor-pointer"
+              whileHover={{
+                scale: 1.05,
+                filter: "brightness(1.3)",
+              }}
             />
           );
         })}
       </svg>
 
-      {/* Month labels below bars */}
-      <div className="flex justify-between mt-4 text-xs text-gray-400">
+      {/* Labels */}
+      <div className="flex justify-between mt-4 text-xs text-cyan-300 font-mono relative z-10">
         {data.map((d, i) => (
-          <span key={i} className="w-1/12 text-center truncate">
+          <span key={i} className="truncate w-1/12">
             {d.month}
           </span>
         ))}
