@@ -82,6 +82,10 @@ const config: Config = {
           "0%": { backgroundPosition: "-200% 0" },
           "100%": { backgroundPosition: "200% 0" },
         },
+        "gradient-x": {
+          "0%, 100%": { backgroundPosition: "0% 50%" },
+          "50%": { backgroundPosition: "100% 50%" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -89,6 +93,7 @@ const config: Config = {
         gradientShift: "gradientShift 20s ease infinite",
         scanlineSweep: "scanlineSweep 0.8s ease forwards",
         shimmer: "shimmer 3s linear infinite",
+        "gradient-x": "gradient-x 12s ease infinite",
       },
       boxShadow: {
         "neon-glow":
@@ -102,7 +107,7 @@ const config: Config = {
     require("flowbite/plugin"),
 
     // ⚡ Custom utilities
-    plugin(function ({ addComponents }) {
+    plugin(function ({ addComponents, addUtilities }) {
       addComponents({
         // Scanline effect
         ".scanline": {
@@ -151,6 +156,14 @@ const config: Config = {
           fontWeight: "700",
         },
       });
+
+      // Add gradient-x utility class
+      addUtilities({
+        ".animate-gradient-x": {
+          "background-size": "200% 200%",
+          animation: "gradient-x 12s ease infinite",
+        },
+      });
     }),
   ],
   daisyui: {
@@ -170,7 +183,7 @@ const config: Config = {
         },
       },
       "cupcake",
-    "light"
+      "light"
     ],
   },
 };

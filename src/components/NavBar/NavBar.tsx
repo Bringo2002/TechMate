@@ -125,42 +125,93 @@ const NavBar: React.FC = () => {
         </button>
       </div>
 
-      {/* Mobile Menu */}
-      <AnimatePresence>
-        {isOpen && (
+     {/* Mobile Menu */}
+<AnimatePresence>
+  {isOpen && (
+    <motion.div
+      initial={{ y: -250, opacity: 0, scale: 0.9 }}
+      animate={{
+        y: 0,
+        opacity: 1,
+        scale: 1,
+        transition: {
+          type: "spring",
+          stiffness: 120,
+          damping: 14,
+          bounce: 0.35,
+          staggerChildren: 0.12,
+        },
+      }}
+      exit={{
+        y: -200,
+        opacity: 0,
+        scale: 0.95,
+        transition: { duration: 0.35 },
+      }}
+      className="relative md:hidden mx-4 mt-4 rounded-2xl overflow-hidden px-6 py-6 flex flex-col space-y-5"
+    >
+      {/* Animated Gradient Background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/30 via-purple-500/20 to-blue-700/20 animate-gradient-x blur-3xl" />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl" />
+
+      {/* Menu Content */}
+      <div className="relative z-10 flex flex-col space-y-5">
+        {navLinks.map((link, i) => (
           <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="md:hidden bg-blue-800/95 backdrop-blur-lg px-6 py-4 flex flex-col space-y-4"
+            key={link.name}
+            initial={{ x: -50, opacity: 0, scale: 0.85 }}
+            animate={{
+              x: 0,
+              opacity: 1,
+              scale: 1,
+              transition: {
+                type: "spring",
+                stiffness: 200,
+                damping: 12,
+                delay: i * 0.1,
+              },
+            }}
           >
-            {navLinks.map((link) => (
-              <Link
-                key={link.name}
-                to={link.to}
-                onClick={() => setIsOpen(false)}
-                className="text-white text-lg font-bold hover:text-cyan-400 transition-colors"
-              >
-                {link.name}
-              </Link>
-            ))}
             <Link
-              to="/login"
+              to={link.to}
               onClick={() => setIsOpen(false)}
-              className="text-white text-lg font-bold hover:text-cyan-400 transition-colors"
+              className="block text-white text-lg font-bold tracking-wide hover:text-cyan-400 hover:drop-shadow-[0_0_8px_#00ffff] transition-all"
             >
-              Login
-            </Link>
-            <Link
-              to="/signup"
-              onClick={() => setIsOpen(false)}
-              className="bg-cyan-500 hover:bg-cyan-600 text-white text-lg font-bold py-2 px-5 rounded-full shadow-md text-center transition-all hover:scale-105"
-            >
-              Sign Up
+              {link.name}
             </Link>
           </motion.div>
-        )}
-      </AnimatePresence>
+        ))}
+
+        {/* Login + Sign Up */}
+        <motion.div
+          initial={{ scale: 0.6, opacity: 0 }}
+          animate={{
+            scale: 1,
+            opacity: 1,
+            transition: { type: "spring", stiffness: 180, damping: 12, delay: 0.7 },
+          }}
+          className="pt-3 border-t border-white/20"
+        >
+          <Link
+            to="/login"
+            onClick={() => setIsOpen(false)}
+            className="block text-white text-lg font-bold hover:text-cyan-400 hover:drop-shadow-[0_0_8px_#00ffff] mb-4 transition-all"
+          >
+            Login
+          </Link>
+          <Link
+            to="/signup"
+            onClick={() => setIsOpen(false)}
+            className="block bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white text-lg font-bold py-2 px-5 rounded-full shadow-lg text-center transition-all hover:scale-110 hover:shadow-cyan-500/40"
+          >
+            Sign Up
+          </Link>
+        </motion.div>
+      </div>
+    </motion.div>
+  )}
+</AnimatePresence>
+
     </motion.nav>
   );
 };
