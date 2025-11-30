@@ -18,7 +18,7 @@ const Footer: React.FC = () => {
         {/* Brand */}
         <div>
           <h2 className="text-2xl font-bold tracking-widest bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent">
-            TechMate
+            NyxDev
           </h2>
           <p className="text-gray-400 mt-2 text-sm">
             Building the future, one line of code at a time.

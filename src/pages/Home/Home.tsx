@@ -16,7 +16,7 @@ import * as THREE from 'three';
 async function fetchAiMessage() {
   const messages = [
     "Initializing modules...",
-    "Connecting to TechMate Cloud AI...",
+    "Connecting to NyxDev Cloud AI...",
     "Loading Web Development Suite...",
     "Running Security Protocols...",
     "Optimizing Server Response...",

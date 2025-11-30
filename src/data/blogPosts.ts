@@ -14,13 +14,13 @@ export interface BlogPostType {
 
 export const blogPosts: BlogPostType[] = [
   {
-    slug: 'techmate-vision-2100',
-    title: 'TechMate Vision — Building The Future, Today',
+    slug: 'nyxdev-vision-2100',
+    title: 'NyxDev Vision — Building The Future, Today',
     date: '2025-09-01',
     excerpt:
-      'How TechMate combines human craftsmanship and AI orchestration to deliver production-grade tech solutions faster, safer, and more human.',
+      'How NyxDev combines human craftsmanship and AI orchestration to deliver production-grade tech solutions faster, safer, and more human.',
     content: `Why this matters
-TechMate is a platform for founders and teams who need production outcomes, not prototypes. We combine design, engineering, and AI-assisted automation so you ship faster while staying reliable.
+NyxDev is a platform for founders and teams who need production outcomes, not prototypes. We combine design, engineering, and AI-assisted automation so you ship faster while staying reliable.
 
 What we deliver
 - Rapid prototype -> validated MVP -> production hardened
@@ -31,7 +31,7 @@ How we work with clients
 We treat your product like a long-lived system. Every deliverable includes observability, runbooks, and a roadmap for iterative improvement.
     `,
     tags: ['company', 'vision', 'process'],
-    author: 'TechMate Team',
+    author: 'NyxDev Team',
     featured: true,
   },
   {
@@ -51,14 +51,14 @@ Patterns that work
 Business outcome
 Shorter lead times, fewer repetitive tasks, more time for product thinking and architecture.`,
     tags: ['ai', 'engineering', 'workflow'],
-    author: 'Lead Engineer @ TechMate',
+    author: 'Lead Engineer @ NyxDev',
   },
   {
     slug: 'secure-by-default-ops',
     title: 'Secure-by-Default: Ops That Don’t Get Ignored',
     date: '2025-05-30',
     excerpt:
-      'Security and reliability are features — here’s the practical checklist TechMate runs with every engagement.',
+      'Security and reliability are features — here’s the practical checklist NyxDev runs with every engagement.',
     content: `Core principles
 - Minimal blast radius: least privilege layered everywhere
 - Observable defaults: telemetry and runbooks shipped alongside features
@@ -85,7 +85,7 @@ Early investment in ops reduces incidents, reduces team churn, and makes scaling
 - Tokenized loyalty programs: auditable and flexible reward flows
 - Micro-DAOs for community governance: pilot lightweight governance for product communities
 
-How TechMate helps
+How NyxDev helps
 We prototype token flows, audit smart contracts, and integrate seamless UX so your customers interact with blockchain without friction.`,
     tags: ['web3', 'business', 'product'],
     author: 'Product Strategy',

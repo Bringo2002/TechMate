@@ -75,13 +75,13 @@ const BlogPost: React.FC = () => {
         >
           <h2 className="text-3xl font-bold mb-4">Want More Insights Like This?</h2>
           <p className="text-gray-300 mb-6">
-            Stay ahead with cutting-edge strategies, AI-driven tools, and the latest from TechMate’s futuristic innovations.
+            Stay ahead with cutting-edge strategies, AI-driven tools, and the latest from NyxDev’s futuristic innovations.
           </p>
           <Link
             to="/subscribe"
             className="px-8 py-4 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-400 text-black font-semibold hover:opacity-90 transition"
           >
-            Subscribe to TechMate Future Feed
+            Subscribe to NyxDev Future Feed
           </Link>
         </motion.div>
       </div>

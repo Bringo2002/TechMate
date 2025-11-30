@@ -199,7 +199,7 @@ const Card: React.FC<{ post: BlogPostType }> = ({ post }) => {
             {new Date(post.date).toLocaleDateString()}
           </time>
           <span aria-hidden>•</span>
-          <span>{post.author ?? 'TechMate'}</span>
+          <span>{post.author ?? 'NyxDev'}</span>
         </div>
 
         <p className="mt-4 text-slate-300 line-clamp-3">{post.excerpt}</p>
@@ -281,7 +281,7 @@ const Blog: React.FC = () => {
               transition={{ duration: 0.6 }}
               className="text-5xl md:text-6xl font-extrabold tracking-widest bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-indigo-400 to-purple-500"
             >
-              TechMate Archives
+              NyxDev Archives
             </motion.h1>
             <motion.p
               initial={{ opacity: 0 }}
