@@ -119,7 +119,7 @@ const About: React.FC = () => {
           We Build the Tech You Imagine
         </h1>
         <p className="text-lg md:text-xl max-w-3xl mx-auto text-slate-300 mt-6">
-          TechMate is your futuristic partner in crafting websites, apps, desktop, and cloud software with unparalleled precision.
+          NyxDev is your futuristic partner in crafting websites, apps, desktop, and cloud software with unparalleled precision.
         </p>
       </motion.div>
 
@@ -189,7 +189,7 @@ const About: React.FC = () => {
         <h2 className="text-3xl font-bold text-center text-blue-400">Trusted by Clients Worldwide</h2>
         <div className="grid md:grid-cols-2 gap-6">
           <blockquote className="bg-slate-700 p-6 rounded-xl shadow-lg italic text-slate-200">
-            “TechMate built our MVP faster than expected, exceeding our vision.”
+            “NyxDev built our MVP faster than expected, exceeding our vision.”
             <span className="block mt-4 text-sm text-slate-400 font-medium">— Brian Harrington, Startup Founder</span>
           </blockquote>
           <blockquote className="bg-slate-700 p-6 rounded-xl shadow-lg italic text-slate-200">
