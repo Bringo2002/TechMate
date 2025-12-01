@@ -193,7 +193,7 @@ const About: React.FC = () => {
             <span className="block mt-4 text-sm text-slate-400 font-medium">— Brian Harrington, Startup Founder</span>
           </blockquote>
           <blockquote className="bg-slate-700 p-6 rounded-xl shadow-lg italic text-slate-200">
-            “Rare to find a dev team that *gets it*—TechMate delivered exactly what we needed.”
+            “Rare to find a dev team that *gets it*—NyxDev delivered exactly what we needed.”
             <span className="block mt-4 text-sm text-slate-400 font-medium">— Brian Harrington, CEO of EliteX.com</span>
           </blockquote>
         </div>

@@ -1,6 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { Github, Linkedin } from "lucide-react";
+import { Github, Linkedin, Instagram } from "lucide-react";
 import { SiX } from "react-icons/si"; // for the new X (Twitter) icon
 
 const Footer: React.FC = () => {
@@ -73,15 +73,29 @@ const Footer: React.FC = () => {
             {/* X */}
             <motion.a
               whileHover={{ scale: 1.2 }}
-              href="https://x.com"
+              href="https://x.com/NyxDev4"
               target="_blank"
               rel="noopener noreferrer"
-              className="relative group"
+              className="social-icon"
               title="X"
             >
               <SiX className="w-6 h-6 text-gray-400 group-hover:text-white transition" />
               <span className="absolute inset-0 rounded-full bg-purple-500/20 blur-md opacity-0 group-hover:opacity-100 transition"></span>
               <span className="sr-only">X</span>
+            </motion.a>
+
+            {/* Instagram */}
+            <motion.a
+              whileHover={{ scale: 1.2 }}
+              href="https://instagram.com/nyxdev2025"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="relative group"
+              title="Instagram"
+            >
+              <Instagram className="w-6 h-6 text-gray-400 group-hover:text-white transition" />
+              <span className="absolute inset-0 rounded-full bg-pink-500/20 blur-md opacity-0 group-hover:opacity-100 transition"></span>
+              <span className="sr-only">Instagram</span>
             </motion.a>
 
             {/* LinkedIn */}
