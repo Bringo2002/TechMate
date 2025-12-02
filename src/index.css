@@ -1,7 +1,23 @@
 /* src/index.css */
+
+/* Montserrat */
+@import "@fontsource/montserrat/700.css"; /* Bold */
+@import "@fontsource/montserrat/800.css"; /* ExtraBold */
+
+/* Poppins */
+@import "@fontsource/poppins/700.css";
+@import "@fontsource/poppins/800.css";
+
+/* Orbitron */
+@import "@fontsource/orbitron/700.css";
+@import "@fontsource/orbitron/900.css";
+
+
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
 
 
 

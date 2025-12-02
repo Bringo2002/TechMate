@@ -7,7 +7,6 @@ const navLinks = [
   { name: 'Home', to: '/' },
   { name: 'About Us', to: '/about' },
   { name: 'Services', to: '/services' },
-  // { name: 'Portfolio', to: '/#portfolio' },
   { name: 'Contact', to: '/contact' },
   { name: 'Blog', to: '/blog' },
 ];
@@ -80,10 +79,11 @@ const NavBar: React.FC = () => {
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         {/* Logo & Live AI Greeting */}
         <div className="flex flex-col md:flex-row items-start md:items-center gap-1">
-          <div className="text-3xl font-extrabold tracking-tight flex items-center gap-1 cursor-pointer select-none">
-            <span className="text-white glow-text">Nyx</span>
-            <span className="text-cyan-400 glow-text">Dev</span>
-          </div>
+         <div className="text-3xl font-extrabold tracking-tight flex items-center gap-1 cursor-pointer select-none font-poppins">
+         <span className="bg-gradient-to-r from-cyan-300 to-blue-500 bg-clip-text text-transparent">nyx</span>
+  <span className="bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">dev</span>
+        </div>
+
           <span
             className="ml-0 md:ml-4 text-sm text-cyan-300 font-semibold animate-pulse"
             style={{ color: colorShift }}

@@ -14,6 +14,15 @@ importers:
       '@cloudinary/url-gen':
         specifier: ^1.19.0
         version: 1.22.0
+      '@fontsource/montserrat':
+        specifier: ^5.2.8
+        version: 5.2.8
+      '@fontsource/orbitron':
+        specifier: ^5.2.8
+        version: 5.2.8
+      '@fontsource/poppins':
+        specifier: ^5.2.7
+        version: 5.2.7
       '@formspree/react':
         specifier: ^3.0.0
         version: 3.0.0(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
@@ -1141,6 +1150,15 @@ packages:
 
   '@floating-ui/utils@0.2.10':
     resolution: {integrity: sha512-aGTxbpbg8/b5JfU1HXSrbH3wXZuLPJcNEcZQFMxLs3oSzgtVu6nFPkbbGGUvBcUjKV2YyB9Wxxabo+HEH9tcRQ==}
+
+  '@fontsource/montserrat@5.2.8':
+    resolution: {integrity: sha512-xTjLxSbSfCycDB0pwmNsfNvdfWPaDaRQ2LC6yt/ZI7SdvXG52zHnzNYC/09mzuAuWNJyShkteutfCoDgym56hQ==}
+
+  '@fontsource/orbitron@5.2.8':
+    resolution: {integrity: sha512-ruzrDl5vnqNykk5DZWY0Ezj4aeFZSbCnwJTc/98ojNJHSsHhlhT2r7rwQrA5sptmF8JtB8TQTAvlfRvcV28RPw==}
+
+  '@fontsource/poppins@5.2.7':
+    resolution: {integrity: sha512-6uQyPmseo4FgI97WIhA4yWRlNaoLk4vSDK/PyRwdqqZb5zAEuc+Kunt8JTMcsHYUEGYBtN15SNkMajMdqUSUmg==}
 
   '@formspree/core@4.0.0':
     resolution: {integrity: sha512-geNlUut5nME1Ztej5Pzx1BrlQ1fFIcJYIqmF+Vm0jaUbpZxjXvt7SDOGeQVkuxn80QJiIHlwBGGjSBFjPX/KDw==}
@@ -6166,6 +6184,12 @@ snapshots:
       tabbable: 6.2.0
 
   '@floating-ui/utils@0.2.10': {}
+
+  '@fontsource/montserrat@5.2.8': {}
+
+  '@fontsource/orbitron@5.2.8': {}
+
+  '@fontsource/poppins@5.2.7': {}
 
   '@formspree/core@4.0.0':
     dependencies:

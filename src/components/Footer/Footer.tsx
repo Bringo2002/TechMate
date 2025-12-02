@@ -17,7 +17,7 @@ const Footer: React.FC = () => {
       <div className="relative max-w-7xl mx-auto px-6 py-12 grid grid-cols-1 md:grid-cols-3 gap-8 z-10">
         {/* Brand */}
         <div>
-          <h2 className="text-2xl font-bold tracking-widest bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent">
+          <h2 className="text-2xl font-bold tracking-widest bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent font-poppins">
             NyxDev
           </h2>
           <p className="text-gray-400 mt-2 text-sm">
@@ -125,7 +125,7 @@ const Footer: React.FC = () => {
 
       {/* Bottom */}
       <div className="relative text-center text-gray-500 text-xs py-6 z-10">
-        © {new Date().getFullYear()} TechMate  
+        © {new Date().getFullYear()} NyxDev  . All rights reserved.
       </div>
     </footer>
   );
