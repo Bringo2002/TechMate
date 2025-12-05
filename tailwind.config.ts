@@ -104,6 +104,9 @@ const config: Config = {
         poppins: ['Poppins', 'sans-serif'],
         orbitron: ['Orbitron', 'sans-serif'],
       },
+      backgroundImage: {
+        'not-found': 'url("/404-blue.png")',
+      },
     },
   },
   plugins: [
