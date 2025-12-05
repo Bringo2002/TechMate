@@ -12,30 +12,55 @@ const AuthCallback: React.FC = () => {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        // ✅ 1. Get the session from the URL hash (email confirmation or magic link)
+        // 1️⃣ Get the session (contains user)
         const { data, error } = await supabase.auth.getSession();
-
-        if (error || !data.session) {
-          console.error("No session found:", error);
+        if (error || !data.session || !data.session.user) {
           setStatus("error");
-          setMessage(
-            "Verification link is invalid or expired. Please try signing up again."
-          );
+          setMessage("Verification link is invalid or expired. Please try signing up again.");
           return;
         }
 
-        // ✅ 2. Store session automatically handled by supabase-js
-        setStatus("success");
-        setMessage("Your email has been confirmed! Redirecting you...");
+        const user = data.session.user;
 
-        // ✅ 3. Redirect after short delay
+        // 2️⃣ Check if profile exists
+        const { data: profileData, error: profileError } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .single();
+
+        if (profileError && profileError.code !== "PGRST116") {
+          // unexpected error
+          throw profileError;
+        }
+
+        // 3️⃣ Insert profile if first-time Google signup
+        let role = "user"; // default
+        if (!profileData) {
+          const { error: insertError } = await supabase.from("profiles").insert({
+            id: user.id,
+            email: user.email,
+            role: role,
+            name: user.user_metadata?.full_name || user.user_metadata?.name || "",
+          });
+
+          if (insertError) throw insertError;
+        } else {
+          role = profileData.role;
+        }
+
+        // 4️⃣ Redirect based on role
+        setStatus("success");
+        setMessage("Your account is verified! Redirecting you...");
+
         setTimeout(() => {
-          navigate("/dashboard", { replace: true });
-        }, 2000);
-      } catch (err) {
-        console.error("Callback error:", err);
+          if (role === "admin") navigate("/dashboard", { replace: true });
+          else navigate("/user", { replace: true });
+        }, 1500);
+      } catch (err: any) {
+        console.error("Auth callback error:", err);
         setStatus("error");
-        setMessage("Something went wrong during verification. Please try again.");
+        setMessage(err.message || "Something went wrong during verification.");
       }
     };
 

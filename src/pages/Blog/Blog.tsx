@@ -106,7 +106,7 @@ const TagPill: React.FC<{
   <button
     type="button"
     onClick={onClick}
-    aria-pressed={active ? "true" : "false"}
+aria-pressed={active ? "true" : "false"}
     className={`px-3 py-1 rounded-full text-xs transition
       ${
         active
@@ -279,9 +279,12 @@ const Blog: React.FC = () => {
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
+              
               className="text-5xl md:text-6xl font-extrabold tracking-widest bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-indigo-400 to-purple-500"
             >
-              NyxDev Archives
+            <div className="text-3xl font-extrabold tracking-tight flex items-center gap-1 cursor-pointer select-none font-poppins"></div>
+              nyxdev Archives
+    
             </motion.h1>
             <motion.p
               initial={{ opacity: 0 }}

@@ -1,16 +1,15 @@
+// src/pages/LoginPage.tsx
 import React, { useState } from "react";
-import { useNavigate, useLocation, Link } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { FcGoogle } from "react-icons/fc";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import { motion } from "framer-motion";
-import { useAuth } from "../hooks/useAuth";
 import { validateEmail, validatePassword } from "../utils/validateForm";
+import supabase from "../lib/supabaseClient";
 import AuthLayout from "../layouts/AuthLayout";
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { login, loginWithGoogle } = useAuth();
 
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
@@ -25,7 +24,6 @@ const LoginPage: React.FC = () => {
     if (loading) return;
     setError("");
 
-    // ✅ Validate input before starting request
     const emailError = validateEmail(formData.email);
     if (emailError) return setError(emailError);
 
@@ -34,16 +32,31 @@ const LoginPage: React.FC = () => {
 
     setLoading(true);
     try {
-      await login(formData.email, formData.password);
+      // 1️⃣ Sign in with email/password
+      const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
+      });
+      if (loginError) throw loginError;
 
-      // ✅ Redirect to where user came from, fallback to dashboard
-      const redirectPath =
-        (location.state as any)?.from?.pathname || "/dashboard";
-      navigate(redirectPath, { replace: true });
+      // 2️⃣ Fetch user role from profiles
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", loginData.user?.id)
+        .single();
+      if (profileError) throw profileError;
+
+      const role = profileData?.role;
+
+      // 3️⃣ Redirect based on role
+      if (role === "admin") {
+        navigate("/dashboard", { replace: true });
+      } else {
+        navigate("/user", { replace: true });
+      }
     } catch (err: any) {
       console.error("Login failed:", err);
-
-      // ✅ More intelligent error messages
       if (err.message?.toLowerCase().includes("email not confirmed")) {
         setError("Please confirm your email before logging in. Check your inbox.");
       } else if (err.message?.toLowerCase().includes("invalid login")) {
@@ -58,7 +71,13 @@ const LoginPage: React.FC = () => {
 
   const handleGoogleLogin = async () => {
     try {
-      await loginWithGoogle?.();
+      await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      // Redirect handled by AuthCallback
     } catch (err: any) {
       console.error("Google login failed:", err);
       setError("Google login failed. Please try again.");
@@ -73,10 +92,7 @@ const LoginPage: React.FC = () => {
       heading="Welcome Back"
     >
       {error && (
-        <p
-          role="alert"
-          className="text-red-500 text-sm mb-4 text-center font-medium"
-        >
+        <p role="alert" className="text-red-500 text-sm mb-4 text-center font-medium">
           {error}
         </p>
       )}
@@ -92,7 +108,7 @@ const LoginPage: React.FC = () => {
           required
           autoComplete="email"
           aria-label="Email Address"
-          className="w-full p-3 rounded-xl bg-slate-800 text-white border border-slate-600 
+          className="w-full p-3 rounded-xl bg-slate-800 text-white border border-slate-600
                      focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all"
         />
 
@@ -107,7 +123,7 @@ const LoginPage: React.FC = () => {
             required
             autoComplete="current-password"
             aria-label="Password"
-            className="w-full p-3 rounded-xl bg-slate-800 text-white border border-slate-600 
+            className="w-full p-3 rounded-xl bg-slate-800 text-white border border-slate-600
                        focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all pr-10"
           />
           <button
@@ -122,10 +138,7 @@ const LoginPage: React.FC = () => {
 
         {/* Forgot Password */}
         <div className="flex justify-end">
-          <Link
-            to="/forgot-password"
-            className="text-sm text-blue-400 hover:underline"
-          >
+          <Link to="/forgot-password" className="text-sm text-blue-400 hover:underline">
             Forgot Password?
           </Link>
         </div>
@@ -134,7 +147,7 @@ const LoginPage: React.FC = () => {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-indigo-600 hover:bg-indigo-900 text-white font-bold py-3 rounded-xl 
+          className="w-full bg-indigo-600 hover:bg-indigo-900 text-white font-bold py-3 rounded-xl
                      transition-all duration-200 disabled:opacity-50 flex justify-center items-center"
         >
           {loading ? (
@@ -163,7 +176,7 @@ const LoginPage: React.FC = () => {
       {/* Google login */}
       <button
         onClick={handleGoogleLogin}
-        className="w-full flex items-center justify-center gap-2 bg-white text-black py-3 rounded-xl 
+        className="w-full flex items-center justify-center gap-2 bg-white text-black py-3 rounded-xl
                    shadow hover:shadow-lg transition-all font-semibold mb-6"
       >
         <FcGoogle size={24} /> Login with Google

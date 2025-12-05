@@ -10,6 +10,7 @@ interface SignupResult {
 interface AuthHook {
   isAuthenticated: boolean;
   loading: boolean;
+  userRole?: string;
   login: (email: string, password: string) => Promise<void>;
   signup: (name: string, email: string, password: string) => Promise<SignupResult>;
   logout: () => Promise<void>;
@@ -24,6 +25,7 @@ export const useAuth = (): AuthHook => {
   const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
+  const [userRole, setUserRole] = useState<string | undefined>(undefined);
 
   // 🔄 Keep auth state in sync with Supabase
   useEffect(() => {
@@ -33,8 +35,13 @@ export const useAuth = (): AuthHook => {
     };
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      async (_event, session) => {
         setIsAuthenticated(!!session);
+        if (session?.user) {
+          await fetchUserRole(session.user.id);
+        } else {
+          setUserRole(undefined);
+        }
       }
     );
 
@@ -45,26 +52,54 @@ export const useAuth = (): AuthHook => {
     };
   }, []);
 
-  // ✅ Login with email + password
-  const login = useCallback(async (email: string, password: string) => {
-    setLoading(true);
+  // 🔹 Fetch role from profiles table
+  const fetchUserRole = useCallback(async (userId: string) => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", userId)
+        .single();
 
-      if (error) throw new Error(error.message);
-      setIsAuthenticated(!!data.session);
+      if (error) {
+        console.error("Failed to fetch role:", error.message);
+        return undefined;
+      }
+
+      setUserRole(data?.role);
+      return data?.role;
     } catch (err: any) {
-      console.error("Login failed:", err.message);
-      throw err;
-    } finally {
-      setLoading(false);
+      console.error("fetchUserRole error:", err.message);
+      return undefined;
     }
   }, []);
 
-  // ✅ Signup with email + password (returns session + user)
+  // ✅ Login with email + password
+  const login = useCallback(
+    async (email: string, password: string) => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw new Error(error.message);
+
+        setIsAuthenticated(!!data.session);
+
+        if (data.user) {
+          const role = await fetchUserRole(data.user.id);
+          if (role === "admin") navigate("/dashboard");
+          else navigate("/user");
+        }
+      } catch (err: any) {
+        console.error("Login failed:", err.message);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [fetchUserRole, navigate]
+  );
+
+  // ✅ Signup with email + password
   const signup = useCallback(
     async (name: string, email: string, password: string): Promise<SignupResult> => {
       setLoading(true);
@@ -72,19 +107,32 @@ export const useAuth = (): AuthHook => {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: {
-            data: { full_name: name }, // store user name in metadata
-          },
+          options: { data: { full_name: name } },
         });
-
         if (error) throw new Error(error.message);
 
         setIsAuthenticated(!!data.session);
 
-        return {
-          session: data.session,
-          user: data.user,
-        };
+        // Create profile with default role
+        if (data.user) {
+          const { error: profileError } = await supabase
+            .from("profiles")
+            .insert({
+              id: data.user.id,
+              email,
+              role: "user", // normal user by default
+            });
+
+          if (profileError) throw new Error(profileError.message);
+
+          await fetchUserRole(data.user.id);
+
+          // Auto-login after signup
+          await supabase.auth.signInWithPassword({ email, password });
+          navigate("/user"); // redirect to user dashboard
+        }
+
+        return { session: data.session, user: data.user };
       } catch (err: any) {
         console.error("Signup failed:", err.message);
         throw err;
@@ -92,7 +140,7 @@ export const useAuth = (): AuthHook => {
         setLoading(false);
       }
     },
-    []
+    [fetchUserRole, navigate]
   );
 
   // ✅ Logout
@@ -102,6 +150,7 @@ export const useAuth = (): AuthHook => {
       if (error) throw new Error(error.message);
 
       setIsAuthenticated(false);
+      setUserRole(undefined);
       navigate("/login");
     } catch (err: any) {
       console.warn("Logout error:", err.message);
@@ -116,13 +165,18 @@ export const useAuth = (): AuthHook => {
 
       const isValid = !!data.session;
       setIsAuthenticated(isValid);
+
+      if (data.session?.user) {
+        await fetchUserRole(data.session.user.id);
+      }
+
       return isValid;
     } catch (err: any) {
       console.warn("Session check failed:", err.message);
       setIsAuthenticated(false);
       return false;
     }
-  }, []);
+  }, [fetchUserRole]);
 
   // ✅ Request password reset
   const requestPasswordReset = useCallback(async (email: string) => {
@@ -145,9 +199,7 @@ export const useAuth = (): AuthHook => {
     async (_token: string, newPassword: string) => {
       setLoading(true);
       try {
-        const { error } = await supabase.auth.updateUser({
-          password: newPassword,
-        });
+        const { error } = await supabase.auth.updateUser({ password: newPassword });
         if (error) throw new Error(error.message);
       } catch (err: any) {
         console.error("Confirm password reset failed:", err.message);
@@ -159,13 +211,11 @@ export const useAuth = (): AuthHook => {
     []
   );
 
-  // (Optional) Google OAuth login
+  // ✅ Google OAuth login/signup
   const loginWithGoogle = useCallback(async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: {
-        redirectTo: window.location.origin,
-      },
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
     if (error) throw new Error(error.message);
   }, []);
@@ -175,6 +225,7 @@ export const useAuth = (): AuthHook => {
   return {
     isAuthenticated,
     loading,
+    userRole,
     login,
     signup,
     logout,

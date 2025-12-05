@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
+import { Routes, Route, useLocation, Navigate, Outlet } from 'react-router-dom';
 import Header from './components/Header/Header';
 import Hero from './pages/Home/Home';
 import AboutUs from './pages/About/About';
@@ -19,11 +19,16 @@ import { useAuth } from './hooks/useAuth';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import Cookies from './pages/Cookies';
 import AuthCallback from './pages/AuthCallback';
-import DashboardLayout from "./layouts/DashboardLayout";
+import AdminDashboardLayout from "./layouts/AdminDashboardLayout";
+import UserDashboardLayout from './layouts/UserDashboardLayout';
 import Overview from "./pages/dashboard/Overview";
 import Analytics from "./pages/dashboard/Analytics";
 import Clients from "./pages/dashboard/Clients";
 import Settings from "./pages/dashboard/Settings";
+import UserOverview from './pages/user/UserOverview';
+import UserOrders from './pages/user/UserOrders';
+import UserProfile from './pages/user/UserProfile';
+import UserSupport from './pages/user/UserSupport';
 
 // Scroll to top and update title on route change
 const ScrollToTopAndTitle: React.FC = () => {
@@ -56,11 +61,12 @@ const BlogPostPage = () => <PageLayout><BlogPost /></PageLayout>;
 const QuotePage = () => <PageLayout><Quote /></PageLayout>;
 
 // ProtectedRoute wrapper
-const ProtectedRoute: React.FC<{children: React.ReactNode}> = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
+const ProtectedRoute: React.FC<{children: React.ReactNode; role?: string}> = ({ children, role }) => {
+  const { isAuthenticated, loading, userRole } = useAuth();
 
   if (loading) return <p className="text-center mt-20 text-white">Checking authentication...</p>;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (role && userRole !== role) return <Navigate to="/" replace />;
 
   return <>{children}</>;
 };
@@ -70,41 +76,59 @@ const App: React.FC = () => {
     <>
       <ScrollToTopAndTitle />
       <Routes>
-        {/* Public Routes */}
-        <Route path="/" element={<HomePage />} />
-        <Route path="/about" element={<AboutPage />} />
-        <Route path="/services" element={<ServicesPage />} />
-        <Route path="/contact" element={<ContactPage />} />
-        <Route path="/blog" element={<BlogPage />} />
-        <Route path="/blog/:slug" element={<BlogPostPage />} />
-        <Route path="/quote" element={<QuotePage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/signup" element={<SignupPage />} />
-        <Route path="/terms" element={<Terms />} />
-        <Route path="/privacy" element={<Privacy />} />
-        <Route path="/cookies" element={<Cookies />} />
-        <Route path="*" element={<NotFoundPage />} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/auth/callback" element={<AuthCallback />} />
-        <Route path="/dashboard" element={<DashboardLayout><Overview /></DashboardLayout>} />
-        <Route path="/dashboard/analytics" element={<ProtectedRoute><DashboardLayout><Analytics /></DashboardLayout></ProtectedRoute>} />
-        <Route path="/dashboard/clients" element={<ProtectedRoute><DashboardLayout><Clients /></DashboardLayout></ProtectedRoute>} />
-        <Route path="/dashboard/settings" element={<ProtectedRoute><DashboardLayout><Settings /></DashboardLayout></ProtectedRoute>} />
+  {/* PUBLIC ROUTES */}
+  <Route path="/" element={<HomePage />} />
+  <Route path="/about" element={<AboutPage />} />
+  <Route path="/services" element={<ServicesPage />} />
+  <Route path="/contact" element={<ContactPage />} />
+  <Route path="/blog" element={<BlogPage />} />
+  <Route path="/blog/:slug" element={<BlogPostPage />} />
+  <Route path="/quote" element={<QuotePage />} />
+  <Route path="/login" element={<LoginPage />} />
+  <Route path="/signup" element={<SignupPage />} />
+  <Route path="/terms" element={<Terms />} />
+  <Route path="/privacy" element={<Privacy />} />
+  <Route path="/cookies" element={<Cookies />} />
+  <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+  <Route path="/auth/callback" element={<AuthCallback />} />
+  <Route path="*" element={<NotFoundPage />} />
+
+  {/* ADMIN DASHBOARD (Protected) */}
+  <Route
+    path="/dashboard"
+    element={
+      <ProtectedRoute>
+        <AdminDashboardLayout>
+          <Outlet />
+        </AdminDashboardLayout>
+      </ProtectedRoute>
+    }
+  >
+    <Route index element={<Overview />} />
+    <Route path="analytics" element={<Analytics />} />
+    <Route path="clients" element={<Clients />} />
+    <Route path="settings" element={<Settings />} />
+  </Route>
 
 
-        {/* Protected Dashboard Route */}
-        <Route 
-          path="/dashboard" 
-          element={
-            <ProtectedRoute>
-              <Overview/>
-              <Analytics/>
-              <Clients/>
-              <Settings/>
-            </ProtectedRoute>
-          } 
-        />
-      </Routes>
+  {/* USER DASHBOARD */}
+  <Route
+    path="/user"
+    element={
+      <ProtectedRoute role="user">
+        <UserDashboardLayout>
+          <Outlet />
+        </UserDashboardLayout>
+      </ProtectedRoute>
+    }
+  >
+    <Route index element={<UserOverview />} />
+    <Route path="orders" element={<UserOrders />} />
+    <Route path="profile" element={<UserProfile />} />
+    <Route path="support" element={<UserSupport />} />
+  </Route>
+</Routes>
+
     </>
   );
 };

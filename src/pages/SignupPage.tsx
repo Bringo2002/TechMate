@@ -1,17 +1,14 @@
-
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { FcGoogle } from "react-icons/fc";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import { motion } from "framer-motion";
-import { useAuth } from "../hooks/useAuth";
 import { validateEmail, validatePassword } from "../utils/validateForm";
 import supabase from "../lib/supabaseClient"; 
 import AuthLayout from "../layouts/AuthLayout";
 
 const SignupPage: React.FC = () => {
   const navigate = useNavigate();
-  const { signup, login } = useAuth();
 
   const [formData, setFormData] = useState({
     name: "",
@@ -35,44 +32,102 @@ const SignupPage: React.FC = () => {
     setError("");
     setSuccessMsg("");
 
-    // ✅ Frontend validation
-    if (!formData.name.trim()) return setError("Name is required.");
+    // ---------- Frontend validation ----------
+    if (!formData.name.trim()) {
+      setError("Name is required.");
+      return;
+    }
 
     const emailError = validateEmail(formData.email);
-    if (emailError) return setError(emailError);
+    if (emailError) {
+      setError(emailError);
+      return;
+    }
 
     const passwordError = validatePassword(formData.password);
-    if (passwordError) return setError(passwordError);
+    if (passwordError) {
+      setError(passwordError);
+      return;
+    }
 
     if (formData.password !== formData.confirmPassword) {
-      return setError("Passwords do not match.");
+      setError("Passwords do not match.");
+      return;
     }
 
     setLoading(true);
-    try {
-      const { session } = await signup(
-        formData.name,
-        formData.email,
-        formData.password
-      );
 
-      if (!session) {
-        // ✅ No session returned → email confirmation likely required
-        setSuccessMsg(
-          "✅ Account created. Please check your email and confirm before logging in."
-        );
+    try {
+      // ---------- 1) Sign up the user with Supabase Auth ----------
+      // Pass the name into user metadata so it's available on the auth user.
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: { name: formData.name },
+        },
+      });
+
+      if (signUpError) {
+        // Auth error (validation, duplicate email, etc.)
+        throw signUpError;
+      }
+
+      // signUpData may contain a session if the provider returns one (auto-confirm),
+      // or may be null/without session if email confirmation is required.
+      const userId = signUpData?.user?.id;
+
+      // ---------- 2) Insert profile row into "profiles" table ----------
+      if (userId) {
+        const { error: profileError } = await supabase.from("profiles").insert({
+          id: userId,
+          email: formData.email,
+          full_name: formData.name, // adjust column name if your schema uses `name` instead
+          role: "user",
+        });
+
+        if (profileError) {
+          // If profile insertion fails, surface a helpful message (but don't hide the fact signup succeeded)
+          // We throw so UI shows the error; alternatively you could only warn and continue.
+          throw profileError;
+        }
+      }
+
+      // ---------- 3) Handle success + optional auto-login ----------
+      // If Supabase returned a session (user is already authenticated), redirect immediately.
+      if (signUpData?.session) {
+        setSuccessMsg("Account created and signed in. Redirecting...");
+        // Redirect normal users to /user
+        navigate("/user", { replace: true });
         return;
       }
 
-      // ✅ Auto-login fallback
+      // If no session returned, attempt optional auto-login (may fail if email confirmation required)
       try {
-        await login(formData.email, formData.password);
-      } catch {
-        console.warn("Auto-login after signup failed, redirecting manually.");
+        const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+          email: formData.email,
+          password: formData.password,
+        });
+
+        if (!loginError && loginData?.session) {
+          setSuccessMsg("Account created and signed in. Redirecting...");
+          navigate("/user", { replace: true });
+          return;
+        }
+        // If loginError exists, it's likely because email confirmation is required.
+      } catch (loginErr) {
+        // swallow; we'll fallback to the "check your email" flow below
+        console.warn("Auto-login attempt failed:", loginErr);
       }
 
-      navigate("/dashboard", { replace: true });
+      // ---------- 4) No session and auto-login didn't produce a session ----------
+      setSuccessMsg(
+        "✅ Account created. Please check your email and confirm your account before logging in."
+      );
+      // Optionally keep user on the page so they can see the success message and follow next steps.
     } catch (err: any) {
+      // ---------- 5) Error handling ----------
+      console.error("Signup flow error:", err);
       setError(err?.message || "Signup failed. Please try again.");
     } finally {
       setLoading(false);
@@ -82,7 +137,7 @@ const SignupPage: React.FC = () => {
   return (
     <AuthLayout
       title="Sign Up"
-      description="Create a TechMate account and unlock next-gen solutions with secure signup."
+      description="Create a NyxDev account and unlock next-gen solutions with secure signup."
       canonical="https://yourdomain.com/signup"
       heading="Create Account"
     >
@@ -214,29 +269,28 @@ const SignupPage: React.FC = () => {
       </div>
 
       {/* Google Signup */}
-<button
-  onClick={async () => {
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
+      <button
+        onClick={async () => {
+          try {
+            const { error } = await supabase.auth.signInWithOAuth({
+              provider: "google",
+              options: {
+                redirectTo: `${window.location.origin}/auth/callback`,
+              },
+            });
 
-      if (error) throw error;
-      // User will be redirected to Google and then back to your /auth/callback page
-    } catch (err: any) {
-      console.error("Google signup error:", err);
-      alert(err.message || "Google signup failed. Please try again.");
-    }
-  }}
-  className="w-full flex items-center justify-center gap-2 bg-white text-black py-3 rounded-xl 
-             shadow hover:shadow-lg transition-all font-semibold mb-6"
->
-  <FcGoogle size={24} /> Sign Up with Google
-</button>
-
+            if (error) {
+              console.error("Google signup error:", error);
+            }
+          } catch (err) {
+            console.error("Unexpected error during Google signup:", err);
+          }
+        }}
+        className="w-full bg-white text-black font-bold py-3 rounded-xl flex items-center justify-center gap-2"
+      >
+        <FcGoogle size={20} />
+        Sign up with Google
+      </button>
     </AuthLayout>
   );
 };
