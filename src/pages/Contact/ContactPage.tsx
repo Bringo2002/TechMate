@@ -95,7 +95,7 @@ const ContactPage: React.FC = () => {
           <h2 className="text-4xl font-extrabold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
             Connect With Us
           </h2>
-          <GlassCard icon={<Mail />} title="Email Us" detail="brianmacathur13@gmail.com" />
+          <GlassCard icon={<Mail />} title="Email Us" detail="nyxdev4@gmail.com" />
           <GlassCard icon={<Phone />} title="Call Us" detail="(254) 759449324" />
           <GlassCard icon={<MapPin />} title="Our Location" detail="Kilimani, Nairobi, Kenya" />
           <GlassCard icon={<Calendar />} title="Book a Call" detail="Schedule a free consultation" link="/schedule" />
