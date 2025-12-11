@@ -12,7 +12,7 @@ export const pwaOptions: Partial<VitePWAOptions> = {
     display: 'standalone',
     scope: '/',
     start_url: '/',
-    icons: [
+   /* icons: [
       {
         src: 'https://wakilifrontend.vercel.app/wakililogo.png',
         sizes: '192x192',
@@ -29,7 +29,7 @@ export const pwaOptions: Partial<VitePWAOptions> = {
         type: 'image/png',
         purpose: 'any maskable',
       },
-    ],
+    ],*/
   },
   workbox: {
     globPatterns: ['/*.{js,css,html,ico,png,svg,json,vue,txt,woff2}'],
