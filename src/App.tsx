@@ -117,7 +117,7 @@ const App: React.FC = () => {
     element={
       <ProtectedRoute role="user">
         <UserDashboardLayout>
-          <Outlet />
+          <Outlet/>
         </UserDashboardLayout>
       </ProtectedRoute>
     }
