@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "lib": ["esnext"],
+    "module": "esnext",
+    "moduleResolution": "node",
+    "target": "esnext",
+    "strict": true,
+    "noEmit": true,
+    "types": ["deno.ns"],
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["supabase/functions/**/*.ts"]
+}

@@ -29,6 +29,7 @@ import UserOverview from './pages/user/UserOverview';
 import UserOrders from './pages/user/UserOrders';
 import UserProfile from './pages/user/UserProfile';
 import UserSupport from './pages/user/UserSupport';
+import UserSettings from './pages/user/UserSettings';
 
 // Scroll to top and update title on route change
 const ScrollToTopAndTitle: React.FC = () => {
@@ -126,6 +127,7 @@ const App: React.FC = () => {
     <Route path="orders" element={<UserOrders />} />
     <Route path="profile" element={<UserProfile />} />
     <Route path="support" element={<UserSupport />} />
+    <Route path="settings" element={<UserSettings />} />
   </Route>
 </Routes>
 

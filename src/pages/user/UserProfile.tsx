@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import supabase from '../../lib/supabaseClient';
 import { 
   User, Mail, Phone, MapPin, Building, Calendar, Globe, Camera,
   Save, X, Lock, Bell, CreditCard, Shield, Eye, EyeOff, Check,
@@ -241,6 +242,7 @@ const UserProfile: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [profile, setProfile] = useState<UserProfile>({
@@ -248,8 +250,8 @@ const UserProfile: React.FC = () => {
     lastName: 'Blackwell',
     email: 'brianblackwell@gmail.com',
     phone: '+254 (254) 759449324',
-    company: 'Tech Innovations Inc.',
-    jobTitle: 'Senior Product Manager',
+    company: 'Nyxdev Innovations Inc.',
+    jobTitle: 'Chief Executive Officer',
     location: 'San Francisco, CA',
     country: 'United States',
     timezone: 'PST (UTC-8)',
@@ -346,10 +348,27 @@ const UserProfile: React.FC = () => {
     setTimeout(() => setSaveSuccess(false), 3000);
   };
 
-  const handleDeleteAccount = () => {
+  const handleDeleteAccount = async () => {
+  try {
+    setIsDeleting(true);
+    
+    // Call the database function to delete the account
+    const { error } = await supabase.rpc('delete_own_account');
+    
+    if (error) throw error;
+
+    // Sign out and redirect
+    await supabase.auth.signOut();
+    window.location.href = '/goodbye';
+    
+  } catch (error) {
+    console.error('Failed to delete account:', error);
+    alert('Failed to delete account. Please try again or contact support.');
+  } finally {
+    setIsDeleting(false);
     setShowDeleteDialog(false);
-    alert('Account deletion initiated (demo)');
-  };
+  }
+};
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -379,7 +398,7 @@ const UserProfile: React.FC = () => {
         )}
 
         {/* Profile Header Card */}
-        <div className="relative bg-gradient-to-r from-indigo-600 to-purple-600 rounded-3xl p-8 mb-8 overflow-hidden shadow-2xl">
+        <div className="relative bg-gradient-to-r from-indigo-900 via-purple-900 to-purple-950 rounded-3xl p-8 mb-8 overflow-hidden shadow-2xl border border-purple-800/30">
           <div className="absolute inset-0 bg-black/20"></div>
           <div className="relative z-10">
             <div className="flex flex-col md:flex-row items-center gap-6">
@@ -445,10 +464,6 @@ const UserProfile: React.FC = () => {
                   <p className="text-white/70 text-sm">Orders</p>
                 </div>
                 <div className="text-center bg-white/10 backdrop-blur-sm rounded-xl p-4 min-w-[100px]">
-                  <p className="text-3xl font-bold text-white">{formatCurrency(stats.totalSpent)}</p>
-                  <p className="text-white/70 text-sm">Total Spent</p>
-                </div>
-                <div className="text-center bg-white/10 backdrop-blur-sm rounded-xl p-4 min-w-[100px]">
                   <p className="text-3xl font-bold text-white">{stats.activeOrders}</p>
                   <p className="text-white/70 text-sm">Active</p>
                 </div>
@@ -486,13 +501,7 @@ const UserProfile: React.FC = () => {
             value={stats.activeOrders}
             color="#f59e0b"
           />
-          <StatCard
-            icon={DollarSign}
-            label="Avg Order"
-            value={formatCurrency(stats.avgOrderValue)}
-            color="#8b5cf6"
-          />
-
+          
           {/* Activity Feed - Spans 2 columns */}
           <div className="lg:col-span-2 bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-700/50">
             <div className="flex items-center justify-between mb-6">
@@ -1016,15 +1025,17 @@ const UserProfile: React.FC = () => {
       </div>
 
       {/* Confirmation Dialog */}
-      <ConfirmDialog
-        isOpen={showDeleteDialog}
-        title="Delete Account"
-        message="Are you absolutely sure you want to delete your account? This action cannot be undone and all your data will be permanently removed."
-        confirmText="Yes, Delete My Account"
-        onConfirm={handleDeleteAccount}
-        onCancel={() => setShowDeleteDialog(false)}
-        type="danger"
-      />
+      {showDeleteDialog && (
+        <ConfirmDialog
+          isOpen={showDeleteDialog}
+          title="Delete Account"
+          message="Are you sure you want to delete your account? This action cannot be undone."
+          confirmText={isDeleting ? "Deleting..." : "Delete"}
+          onConfirm={handleDeleteAccount}
+          onCancel={() => setShowDeleteDialog(false)}
+          type="danger"
+        />
+      )}
 
       {/* Custom Scrollbar Styles */}
       <style>{`

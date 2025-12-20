@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import supabase from '../lib/supabaseClient';
 import { NavLink } from 'react-router-dom';
 import { 
   Home, Package, User, HelpCircle, LogOut, MessageSquare, Bell, 
@@ -8,10 +9,16 @@ import {
 const UserDashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   
-  const user = {
-    name: 'Brian Blackwell',
-    email: 'brianblackwell@gmail.com',
-    avatar: 'BB'
+
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error("Logout error:", error);
+      return;
+    }
+
+    // Redirect after logout
+    window.location.href = "/login";
   };
 
   const menuItems = [
@@ -42,8 +49,8 @@ const UserDashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children
               TS
             </div>
             <div>
-              <h2 className="font-bold text-lg text-white">TechServices</h2>
-              <p className="text-xs text-gray-400">Client Portal</p>
+              <h2 className="font-bold text-lg text-white">NyxDev</h2>
+              <p className="text-xs text-gray-400"> Dashboard </p>
             </div>
           </div>
         )}
@@ -83,7 +90,6 @@ const UserDashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children
               <NavLink
                 key={item.id}
                 to={item.path || '#'}
-                end
                 className={({ isActive }) => `w-full flex items-center gap-3 px-3 md:px-4 py-3 rounded-xl transition-all 
                   duration-300 group relative flex-shrink-0
                   ${isActive
@@ -119,37 +125,22 @@ const UserDashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children
 
       {/* User Info & Logout - Bottom Section */}
       <div className="p-3 md:p-4 border-t border-gray-800/50 space-y-3">
-        {/* User Info Card */}
-        <div className={`flex items-center gap-3 p-3 bg-gray-800/30 rounded-xl transition-all 
-                        duration-300 ${isCollapsed ? 'justify-center' : ''}`}>
-          <div className="w-10 h-10 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 
-                          flex items-center justify-center flex-shrink-0">
-            <span className="text-white font-bold text-sm">{user.avatar}</span>
-          </div>
-          
-          {!isCollapsed && (
-            <div className="flex-1 min-w-0">
-              <p className="text-white text-sm font-semibold truncate">{user.name}</p>
-              <p className="text-gray-500 text-xs truncate">{user.email}</p>
-            </div>
-          )}
-        </div>
-
+       
         {/* Logout Button */}
-        <button 
-          onClick={() => console.log('Logging out...')}
-          className={`w-full flex items-center gap-3 px-3 md:px-4 py-3 rounded-xl 
-                       text-gray-400 hover:text-white hover:bg-gray-800/50 transition-all 
-                       font-medium group ${isCollapsed ? 'justify-center' : ''}`}
-          title={isCollapsed ? 'Logout' : ''}
-        >
-          <LogOut size={20} className="flex-shrink-0" />
-          <span className={`transition-all duration-300 ${
-            isCollapsed ? 'opacity-0 w-0' : 'opacity-100 w-auto'
-          }`}>
-            Logout
-          </span>
-        </button>
+       <button 
+  onClick={handleLogout}
+  className={`w-full flex items-center gap-3 px-3 md:px-4 py-3 rounded-xl 
+               text-gray-400 hover:text-white hover:bg-gray-800/50 transition-all 
+               font-medium group ${isCollapsed ? 'justify-center' : ''}`}
+  title={isCollapsed ? 'Logout' : ''}
+>
+  <LogOut size={20} className="flex-shrink-0" />
+  <span className={`transition-all duration-300 ${
+    isCollapsed ? 'opacity-0 w-0' : 'opacity-100 w-auto'
+  }`}>
+    Logout
+  </span>
+</button>
       </div>
     </div>
   );
