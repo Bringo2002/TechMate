@@ -26,8 +26,8 @@ export const DashboardNav: React.FC = () => {
       <div className="mb-8 flex items-center justify-between">
         {!collapsed && (
           <h1 className="text-2xl font-bold tracking-wide">
-            <span className="text-white">Tech</span>
-            <span className="text-blue-500">Mate</span>
+            <span className="text-white">Nyx</span>
+            <span className="text-blue-500">Dev</span>
           </h1>
         )}
         <button
