@@ -22,8 +22,14 @@ import AuthCallback from './pages/AuthCallback';
 import AdminDashboardLayout from "./layouts/AdminDashboardLayout";
 import UserDashboardLayout from './layouts/UserDashboardLayout';
 import Overview from "./pages/dashboard/Overview";
+import Projects from "./pages/dashboard/Projects";
+import Services from "./pages/dashboard/Services";
 import Analytics from "./pages/dashboard/Analytics";
 import Clients from "./pages/dashboard/Clients";
+import Revenue from "./pages/dashboard/Revenue";
+import Consulting from "./pages/dashboard/Consulting";
+import Deployments from "./pages/dashboard/Deployments";
+import Messages from './pages/user/Messages';
 import Settings from "./pages/dashboard/Settings";
 import UserOverview from './pages/user/UserOverview';
 import UserOrders from './pages/user/UserOrders';
@@ -106,8 +112,14 @@ const App: React.FC = () => {
     }
   >
     <Route index element={<Overview />} />
+    <Route path="projects" element={<Projects />} />
+    <Route path="services" element={<Services />} />
     <Route path="analytics" element={<Analytics />} />
     <Route path="clients" element={<Clients />} />
+    <Route path="revenue" element={<Revenue />} />
+    <Route path="consulting" element={<Consulting />} />
+    <Route path="deployments" element={<Deployments />} />
+    <Route path="messages" element={<Messages />} />
     <Route path="settings" element={<Settings />} />
   </Route>
 
