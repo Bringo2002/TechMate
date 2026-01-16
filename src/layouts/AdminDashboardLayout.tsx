@@ -1,5 +1,7 @@
-import React, { ReactNode, useState } from "react";
+import React, { ReactNode, useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import DashboardNav from "../components/dashboard/DashboardNav";
+import { DashboardSearchProvider } from "../context/DashboardSearchContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell, Search, Plus, ChevronDown, Menu, X, User, LogOut, Settings } from "lucide-react";
 
@@ -7,18 +9,63 @@ interface DashboardLayoutProps {
   children: ReactNode;
 }
 
-const notifications = [
-  { id: 1, type: "success", message: "Project deployed successfully", time: "2m ago" },
-  { id: 2, type: "warning", message: "3 tasks require review", time: "15m ago" },
-  { id: 3, type: "info", message: "New client onboarded", time: "1h ago" },
-  { id: 4, type: "success", message: "Payment received from TechCorp", time: "3h ago" },
-];
-
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [unreadNotifications] = useState(7);
+  const [notifications, setNotifications] = useState([
+    { id: 1, type: "success", message: "Project deployed successfully", time: "2m ago", read: false },
+    { id: 2, type: "warning", message: "3 tasks require review", time: "15m ago", read: false },
+    { id: 3, type: "info", message: "New client onboarded", time: "1h ago", read: true },
+    { id: 4, type: "success", message: "Payment received from TechCorp", time: "3h ago", read: true },
+  ]);
+
+  const navigate = useNavigate();
+
+  const unreadNotifications = notifications.filter(n => !n.read).length;
+
+  const notificationRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        notificationRef.current &&
+        !notificationRef.current.contains(event.target as Node)
+      ) {
+        setShowNotifications(false);
+      }
+    };
+
+    if (showNotifications) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showNotifications]);
+
+  useEffect(() => {
+    if (showNotifications) {
+      setNotifications((prev) =>
+        prev.map((n) => ({ ...n, read: true }))
+      );
+    }
+  }, [showNotifications]);
+
+  const handleProfileSettings = () => {
+    setShowUserMenu(false);
+    navigate("/dashboard/settings/profile");
+  }
+
+  function handlePreferences(): void {
+    throw new Error("Function not implemented.");
+  }
+
+  function handleSignOut(): void {
+    throw new Error("Function not implemented.");
+  }
 
   return (
     <div className="flex min-h-screen bg-[#000000] text-white font-sans antialiased">
@@ -62,7 +109,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
           initial={{ y: -40, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.6, delay: 0.2 }}
-          className="bg-gradient-to-r from-black via-gray-900/50 to-black backdrop-blur-xl border-b border-gray-800/50 relative overflow-hidden z-30"
+          className="bg-gradient-to-r from-black via-gray-900/50 to-black backdrop-blur-xl border-b border-gray-800/50 relative z-30"
         >
           {/* Animated background gradient */}
           <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 via-blue-500/5 to-purple-500/5 opacity-50"></div>
@@ -103,12 +150,14 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                 <input
                   type="text"
                   placeholder="Search projects, clients..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10 pr-4 py-2 bg-gray-900/50 border border-gray-800 rounded-xl text-sm focus:outline-none focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 w-64 transition-all"
                 />
               </div>
               
               {/* Notifications */}
-              <div className="relative">
+              <div className="relative" ref={notificationRef}>
                 <button
                   onClick={() => {
                     setShowNotifications(!showNotifications);
@@ -205,16 +254,22 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                         <p className="text-xs text-gray-400 mt-1">brian@nyxtech.com</p>
                       </div>
                       <div className="p-2">
-                        <button className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:bg-gray-800/50 rounded-lg transition-colors">
+                        <button
+                        onClick={handleProfileSettings}
+                         className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:bg-gray-800/50 rounded-lg transition-colors">
                           <User className="w-4 h-4" />
                           Profile Settings
                         </button>
-                        <button className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:bg-gray-800/50 rounded-lg transition-colors">
+                        <button
+                        onClick={handlePreferences}
+                         className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:bg-gray-800/50 rounded-lg transition-colors">
                           <Settings className="w-4 h-4" />
                           Preferences
                         </button>
                         <div className="my-2 border-t border-gray-800"></div>
-                        <button className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 rounded-lg transition-colors">
+                        <button
+                        onClick={handleSignOut}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 rounded-lg transition-colors">
                           <LogOut className="w-4 h-4" />
                           Sign Out
                         </button>
@@ -240,7 +295,10 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
           transition={{ duration: 0.7, delay: 0.4 }}
           className="flex-1 overflow-auto bg-[#000000] p-4 md:p-8"
         >
+          <DashboardSearchProvider searchQuery={searchQuery}
+          >
           {children}
+          </DashboardSearchProvider>
         </motion.main>
       </div>
     </div>
