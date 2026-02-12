@@ -3,21 +3,19 @@ import supabase from '../lib/supabaseClient';
 import { NavLink } from 'react-router-dom';
 import { 
   Home, Package, User, HelpCircle, LogOut, MessageSquare, Bell, 
-  BarChart3, CreditCard, Settings, Menu, X 
+  BarChart3, CreditCard, Settings, Menu, X, Sparkles
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const UserDashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   
-
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) {
       console.error("Logout error:", error);
       return;
     }
-
-    // Redirect after logout
     window.location.href = "/login";
   };
 
@@ -34,50 +32,67 @@ const UserDashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children
     { id: 'settings', label: 'Settings', icon: Settings, path: '/user/settings' }
   ];
 
-  const CollapsibleSidebar: React.FC = () => (
-    <div 
-      className={`fixed left-0 top-0 h-screen bg-gradient-to-b from-gray-900 to-gray-950 
-                   border-r border-gray-800/50 backdrop-blur-xl transition-all duration-300 z-50 
-                   flex flex-col ${isCollapsed ? 'w-20' : 'w-64'}`}
-    >
-      {/* Header Section */}
-      <div className="flex items-center justify-between p-4 md:p-6 border-b border-gray-800/50">
-        {!isCollapsed && (
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg 
-                            flex items-center justify-center font-bold text-sm text-white">
-              TS
-            </div>
-            <div>
-              <h2 className="font-bold text-lg text-white">NyxDev</h2>
-              <p className="text-xs text-gray-400"> Dashboard </p>
-            </div>
-          </div>
-        )}
-        
-        {/* Toggle Button */}
-        <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="p-2 hover:bg-gray-800/50 rounded-lg transition-colors ml-auto"
-          title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          {isCollapsed ? (
-            <Menu size={20} className="text-gray-400" />
-          ) : (
-            <X size={20} className="text-gray-400" />
-          )}
-        </button>
+  const sidebarVariants = {
+    collapsed: { width: "5rem" },
+    expanded: { width: "16rem" }
+  };
+
+  return (
+    <div className="flex h-screen bg-[#050511] text-white font-sans overflow-hidden relative">
+      {/* Background Ambience */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+          <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-indigo-900/20 rounded-full blur-[120px] animate-pulse" />
+          <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-cyan-900/10 rounded-full blur-[120px] animate-pulse delay-1000" />
       </div>
 
-      {/* Navigation Menu */}
-      <nav className="flex-1 p-3 overflow-y-auto custom-scrollbar">
-        <div className="space-y-1">
-          {menuItems.map((item) => {
+      <motion.div 
+        initial={false}
+        animate={isCollapsed ? "collapsed" : "expanded"}
+        variants={sidebarVariants}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        className="relative z-50 h-screen border-r border-white/5 bg-[#0a0a16]/80 backdrop-blur-xl flex flex-col shadow-2xl"
+      >
+        {/* Header Section */}
+        <div className="flex items-center justify-between p-4 md:p-6 border-b border-white/5">
+          <AnimatePresence mode="wait">
+            {!isCollapsed && (
+              <motion.div 
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="flex items-center gap-3 overflow-hidden"
+              >
+                <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg 
+                                flex items-center justify-center font-bold text-lg text-white shadow-lg shadow-cyan-500/20 relative group">
+                  <Sparkles size={20} className="text-white group-hover:animate-spin-slow transition-transform" />
+                  <div className="absolute inset-0 bg-white/20 rounded-lg animate-pulse" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-lg text-white tracking-wide font-orbitron">TechMate</h2>
+                  <p className="text-[10px] text-cyan-400 font-medium tracking-wider uppercase">User Portal</p>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          
+          {/* Toggle Button */}
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="p-2 hover:bg-white/5 rounded-lg transition-colors ml-auto text-slate-400 hover:text-white"
+            title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {isCollapsed ? <Menu size={20} /> : <X size={20} />}
+          </button>
+        </div>
+
+        {/* Navigation Menu */}
+        <nav className="flex-1 p-3 overflow-y-auto custom-scrollbar space-y-1">
+          {menuItems.map((item, index) => {
             if (item.isDivider) {
               return (
                 <div 
-                  key={item.id} 
-                  className={`my-2 border-t border-gray-800/50 transition-all duration-300 ${
+                  key={`div-${index}`} 
+                  className={`my-2 border-t border-white/5 transition-all duration-300 ${
                     isCollapsed ? 'opacity-0' : 'opacity-100'
                   }`}
                 />
@@ -91,69 +106,73 @@ const UserDashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children
                 key={item.id}
                 to={item.path || '#'}
                 className={({ isActive }) => `w-full flex items-center gap-3 px-3 md:px-4 py-3 rounded-xl transition-all 
-                  duration-300 group relative flex-shrink-0
+                  duration-300 group relative flex-shrink-0 overflow-hidden
                   ${isActive
-                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/30'
-                    : 'text-gray-400 hover:bg-gray-800/50 hover:text-white'
+                    ? 'bg-gradient-to-r from-cyan-900/30 to-blue-900/30 text-cyan-400 border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.15)]'
+                    : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
                   }
                 `}
                 title={isCollapsed ? item.label : ''}
               >
                 {({ isActive }) => (
                   <>
-                    <Icon size={20} className="flex-shrink-0" />
+                    <div className={`relative z-10 p-1 rounded-lg transition-colors ${isActive ? 'bg-cyan-500/20 text-cyan-300' : 'text-slate-400 group-hover:text-white'}`}>
+                        <Icon size={20} />
+                    </div>
                     
-                    {/* Label - Hidden when collapsed */}
-                    <span className={`font-medium whitespace-nowrap transition-all duration-300 ${
-                      isCollapsed ? 'opacity-0 w-0' : 'opacity-100 w-auto'
-                    }`}>
-                      {item.label}
-                    </span>
+                    <AnimatePresence>
+                        {!isCollapsed && (
+                            <motion.span 
+                                initial={{ opacity: 0, width: 0 }}
+                                animate={{ opacity: 1, width: "auto" }}
+                                exit={{ opacity: 0, width: 0 }}
+                                className="font-medium whitespace-nowrap z-10"
+                            >
+                                {item.label}
+                            </motion.span>
+                        )}
+                    </AnimatePresence>
 
-                    {/* Active indicator line */}
-                    {isActive && (
-                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 
-                                      bg-white rounded-r-full" />
+                    {/* Active indicator glow */}
+                    {isActive && !isCollapsed && (
+                      <motion.div 
+                        layoutId="activeTab"
+                        className="absolute right-2 w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.8)]"
+                      />
                     )}
                   </>
                 )}
               </NavLink>
             );
           })}
+        </nav>
+
+        {/* User Info & Logout - Bottom Section */}
+        <div className="p-3 md:p-4 border-t border-white/5 space-y-3 bg-[#0a0a16]/50">
+          <button 
+            onClick={handleLogout}
+            className={`w-full flex items-center gap-3 px-3 md:px-4 py-3 rounded-xl 
+                        text-slate-400 hover:text-red-400 hover:bg-red-500/10 hover:border-red-500/20 border border-transparent transition-all 
+                        font-medium group ${isCollapsed ? 'justify-center' : ''}`}
+            title={isCollapsed ? 'Logout' : ''}
+          >
+            <LogOut size={20} className="flex-shrink-0" />
+            <AnimatePresence>
+                {!isCollapsed && (
+                    <motion.span 
+                        initial={{ opacity: 0, width: 0 }}
+                        animate={{ opacity: 1, width: "auto" }}
+                        exit={{ opacity: 0, width: 0 }}
+                    >
+                        Logout
+                    </motion.span>
+                )}
+            </AnimatePresence>
+          </button>
         </div>
-      </nav>
+      </motion.div>
 
-      {/* User Info & Logout - Bottom Section */}
-      <div className="p-3 md:p-4 border-t border-gray-800/50 space-y-3">
-       
-        {/* Logout Button */}
-       <button 
-  onClick={handleLogout}
-  className={`w-full flex items-center gap-3 px-3 md:px-4 py-3 rounded-xl 
-               text-gray-400 hover:text-white hover:bg-gray-800/50 transition-all 
-               font-medium group ${isCollapsed ? 'justify-center' : ''}`}
-  title={isCollapsed ? 'Logout' : ''}
->
-  <LogOut size={20} className="flex-shrink-0" />
-  <span className={`transition-all duration-300 ${
-    isCollapsed ? 'opacity-0 w-0' : 'opacity-100 w-auto'
-  }`}>
-    Logout
-  </span>
-</button>
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
-      <CollapsibleSidebar />
-
-      <div 
-        className={`flex-1 overflow-y-auto transition-all duration-300 ${
-          isCollapsed ? 'ml-20' : 'ml-64'
-        }`}
-      >
+      <div className="flex-1 overflow-y-auto relative z-10 scroll-smooth">
         <div className="max-w-7xl mx-auto p-6 md:p-8">
           {children}
         </div>
