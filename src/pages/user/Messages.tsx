@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Search, Plus, Send, Paperclip, Smile, MoreVertical, Phone, Video, Star, Check, CheckCheck, Circle, Clock, Trash2, X, Copy, Reply, Pin, Archive, Bell, BellOff, Lock, User, MessageCircle, Mic, Camera, Play, Pause, ShieldCheck, Settings, Info, Moon, EyeOff, Terminal, Code } from 'lucide-react';
+import { Search, Plus, Send, Paperclip, Smile, MoreVertical, Phone, Video, Star, Check, CheckCheck, Circle, Clock, Trash2, X, Copy, Reply, Pin, Archive, Bell, BellOff, User, MessageCircle, Mic, Camera, Play, Pause, ShieldCheck, Settings, Info, Moon, EyeOff, Terminal, Code } from 'lucide-react';
 
 interface MessageAttachment {
   type: 'code' | 'image' | 'voice';
@@ -44,75 +44,79 @@ export default function Messages() {
   const [messageInput, setMessageInput] = useState<string>('');
   const [filterTab, setFilterTab] = useState<string>('all');
   const [theme, setTheme] = useState<Theme>('dark');
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 1,
-      sender: 'Sarah Chen',
-      avatar: '👩‍💻',
-      message: 'Hey team! I just finished the new dashboard mockups. Check them out when you get a chance. What do you think about the color scheme?',
-      time: '10:30 AM',
-      status: 'read',
-      reactions: [{ emoji: '👍', count: 3, users: ['Alex', 'Mike', 'You'] }, { emoji: '🔥', count: 2, users: ['Lisa', 'You'] }],
-      isPinned: true
-    },
-    {
-      id: 2,
-      sender: 'You',
-      avatar: '🧑‍💼',
-      message: 'These look amazing! The glassmorphism effect really fits our brand. Love the attention to detail.',
-      time: '10:32 AM',
-      status: 'read',
-      reactions: [{ emoji: '❤️', count: 1, users: ['Sarah'] }],
-      replyTo: { id: 1, sender: 'Sarah Chen', message: 'Hey team! I just finished the new dashboard mockups...' }
-    },
-    {
-      id: 3,
-      sender: 'Alex Kumar',
-      avatar: '👨‍💻',
-      message: 'Quick update: deployment pipeline is ready. We can push to production whenever you give the green light. All tests passing.',
-      time: '10:45 AM',
-      status: 'read',
-      reactions: [{ emoji: '✅', count: 2, users: ['You', 'Sarah'] }],
-      attachments: [{ type: 'code', content: 'kubectl apply -f deployment.yaml\nkubectl rollout status deployment/app', name: 'deploy.sh' }]
-    },
-    {
-      id: 4,
-      sender: 'Sarah Chen',
-      avatar: '👩‍💻',
-      message: '',
-      time: '10:48 AM',
-      status: 'read',
-      attachments: [{ type: 'image', content: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=800', name: 'mockup-preview.png', size: '2.4 MB' }]
-    },
-    {
-      id: 5,
-      sender: 'You',
-      avatar: '🧑‍💼',
-      message: '',
-      time: '10:50 AM',
-      status: 'delivered',
-      attachments: [{ type: 'voice', content: '', duration: '0:24' }]
-    },
-    {
-      id: 6,
-      sender: 'AI Assistant',
-      avatar: '🤖',
-      message: '📋 Action items extracted from conversation:\n\n1. Review dashboard mockups - @Brian (Priority: High)\n2. Deploy to production - @Alex (Status: Ready)\n3. Update documentation - @Sarah (Deadline: Tomorrow)\n\nWould you like me to create tasks in your project tracker?',
-      time: '10:51 AM',
-      status: 'delivered',
-      isAI: true
-    }
-  ]);
-  const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    const saved = localStorage.getItem('techmate_messages');
+    return saved ? JSON.parse(saved) : [
+      {
+        id: 1,
+        sender: 'Sarah Chen',
+        avatar: '👩‍💻',
+        message: 'Hey team! I just finished the new dashboard mockups. Check them out when you get a chance. What do you think about the color scheme?',
+        time: '10:30 AM',
+        status: 'read',
+        reactions: [{ emoji: '👍', count: 3, users: ['Alex', 'Mike', 'You'] }, { emoji: '🔥', count: 2, users: ['Lisa', 'You'] }],
+        isPinned: true
+      },
+      {
+        id: 2,
+        sender: 'You',
+        avatar: '🧑‍💼',
+        message: 'These look amazing! The glassmorphism effect really fits our brand. Love the attention to detail.',
+        time: '10:32 AM',
+        status: 'read',
+        reactions: [{ emoji: '❤️', count: 1, users: ['Sarah'] }],
+        replyTo: { id: 1, sender: 'Sarah Chen', message: 'Hey team! I just finished the new dashboard mockups...' }
+      },
+      {
+        id: 3,
+        sender: 'Alex Kumar',
+        avatar: '👨‍💻',
+        message: 'Quick update: deployment pipeline is ready. We can push to production whenever you give the green light. All tests passing.',
+        time: '10:45 AM',
+        status: 'read',
+        reactions: [{ emoji: '✅', count: 2, users: ['You', 'Sarah'] }],
+        attachments: [{ type: 'code', content: 'kubectl apply -f deployment.yaml\nkubectl rollout status deployment/app', name: 'deploy.sh' }]
+      },
+      {
+        id: 4,
+        sender: 'Sarah Chen',
+        avatar: '👩‍💻',
+        message: '',
+        time: '10:48 AM',
+        status: 'read',
+        attachments: [{ type: 'image', content: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=800', name: 'mockup-preview.png', size: '2.4 MB' }]
+      },
+      {
+        id: 5,
+        sender: 'You',
+        avatar: '🧑‍💼',
+        message: '',
+        time: '10:50 AM',
+        status: 'delivered',
+        attachments: [{ type: 'voice', content: '', duration: '0:24' }]
+      },
+      {
+        id: 6,
+        sender: 'AI Assistant',
+        avatar: '🤖',
+        message: '📋 Action items extracted from conversation:\n\n1. Review dashboard mockups - @Brian (Priority: High)\n2. Deploy to production - @Alex (Status: Ready)\n3. Update documentation - @Sarah (Deadline: Tomorrow)\n\nWould you like me to create tasks in your project tracker?',
+        time: '10:51 AM',
+        status: 'delivered',
+        isAI: true
+      }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('techmate_messages', JSON.stringify(messages));
+  }, [messages]);
   const [showEmojiPicker, setShowEmojiPicker] = useState<number | null>(null);
   const [hoveredMessageId, setHoveredMessageId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [replyingTo, setReplyingTo] = useState<ReplyTo | null>(null);
-  const [showMediaViewer, setShowMediaViewer] = useState<string | null>(null);
   const [isRecordingVoice, setIsRecordingVoice] = useState<boolean>(false);
   const [voiceRecordDuration, setVoiceRecordDuration] = useState<number>(0);
   const [playingVoiceId, setPlayingVoiceId] = useState<number | null>(null);
-  const [selectedMessages, setSelectedMessages] = useState<number[]>([]);
   const [showConversationInfo, setShowConversationInfo] = useState<boolean>(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -299,7 +303,6 @@ export default function Messages() {
     }
   ];
 
-  const quickEmojis = ['👍', '❤️', '😂', '🎉', '🔥', '✅', '👏', '💯', '🙏', '👀', '💪', '🚀'];
   const emojiCategories = {
     'Frequently Used': ['👍', '❤️', '😂', '🎉', '🔥', '✅'],
     'Smileys': ['😀', '😃', '😄', '😁', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉'],
@@ -371,12 +374,22 @@ export default function Messages() {
       ));
     }, 800);
 
-    setTimeout(() => {
-      setMessages(prev => prev.map(msg => 
-        msg.id === newMessage.id ? { ...msg, status: 'read' } : msg
-      ));
-    }, 2000);
-  }, [messageInput, messages, replyingTo, isRecordingVoice]);
+    // Simulate AI or User Reply
+    if (Math.random() > 0.5) {
+      setTimeout(() => {
+        const replyMessage: Message = {
+          id: Date.now(),
+          sender: selectedConv?.name || 'User',
+          avatar: selectedConv?.avatar || '👤',
+          message: 'Thanks for the update! I will check it out shortly.',
+          time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+          status: 'read',
+          replyTo: { id: newMessage.id, sender: 'You', message: newMessage.message }
+        };
+         setMessages(prev => [...prev, replyMessage]);
+      }, 3500);
+    }
+  }, [messageInput, messages, replyingTo, isRecordingVoice, selectedConv]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -436,13 +449,7 @@ export default function Messages() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const toggleMessageSelection = (messageId: number) => {
-    setSelectedMessages((prev: number[]) =>
-      prev.includes(messageId)
-        ? prev.filter(id => id !== messageId)
-        : [...prev, messageId]
-    );
-  };
+
 
   const filteredConversations = conversations.filter(conv => {
     if (conv.archived && filterTab !== 'archived') return false;

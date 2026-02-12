@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useDashboardData } from '../../hooks/useDashboardData';
 import { 
   Package, 
@@ -50,6 +51,7 @@ const getProjectTypeIcon = (type: string) => {
 };
 
 const UserOverview: React.FC = () => {
+  const navigate = useNavigate();
   const { profile, orders, invoices, loading, error } = useDashboardData();
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
@@ -120,7 +122,9 @@ const UserOverview: React.FC = () => {
           </p>
         </div>
         
-        <button className="bg-cyan-500 hover:bg-cyan-400 text-black font-bold py-2 px-6 rounded-lg 
+        <button 
+          onClick={() => navigate('/job-discovery')}
+          className="bg-cyan-500 hover:bg-cyan-400 text-black font-bold py-2 px-6 rounded-lg 
                            shadow-[0_0_20px_rgba(6,182,212,0.4)] transition-all hover:scale-105 active:scale-95">
           + New Project
         </button>
@@ -275,7 +279,12 @@ const UserOverview: React.FC = () => {
           {(!orders || orders.length === 0) && (
              <div className="col-span-full py-12 text-center border border-dashed border-slate-700 rounded-2xl bg-white/5">
                 <p className="text-slate-400">No active projects found.</p>
-                <button className="mt-4 text-cyan-400 text-sm hover:underline">Start a new project</button>
+                <button 
+                  onClick={() => navigate('/job-discovery')}
+                  className="mt-4 text-cyan-400 text-sm hover:underline"
+                >
+                  Start a new project
+                </button>
              </div>
           )}
         </div>

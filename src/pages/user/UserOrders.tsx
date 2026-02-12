@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import supabase from '../../lib/supabaseClient';
 import { 
   Package, 
@@ -6,24 +7,19 @@ import {
   Filter, 
   Clock, 
   CheckCircle, 
-  AlertCircle, 
   XCircle, 
-  Calendar, 
-  DollarSign, 
-  Eye, 
-  MoreVertical, 
-  ChevronDown, 
-  ChevronUp, 
-  TrendingUp, 
-  FileText, 
-  RefreshCw,
-  Sparkles,
   Zap,
   Smartphone,
   Brain,
   Palette,
   Code,
-  Activity
+  Activity,
+  Sparkles,
+  RefreshCw,
+  Eye,
+  ChevronDown,
+  Calendar,
+  FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -71,11 +67,12 @@ const getStatusConfig = (status: string) => {
 };
 
 const UserOrders: React.FC = () => {
+  const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [sortConfig, setSortConfig] = useState<{ key: keyof Order; direction: 'asc' | 'desc' }>({ key: 'created_at', direction: 'desc' });
+  const [sortConfig] = useState<{ key: keyof Order; direction: 'asc' | 'desc' }>({ key: 'created_at', direction: 'desc' });
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -103,12 +100,7 @@ const UserOrders: React.FC = () => {
     }
   };
 
-  const handleSort = (key: keyof Order) => {
-    setSortConfig(prev => ({
-      key,
-      direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc'
-    }));
-  };
+
 
   const filteredOrders = orders
     .filter(order => {
@@ -157,7 +149,9 @@ const UserOrders: React.FC = () => {
                 </h1>
                 <p className="text-slate-400">Manage your active projects and billing history.</p>
             </div>
-            <button className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white px-6 py-3 rounded-xl font-bold shadow-[0_0_20px_rgba(6,182,212,0.3)] transition-all flex items-center gap-2 hover:scale-105 active:scale-95">
+            <button 
+                onClick={() => navigate('/job-discovery')}
+                className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white px-6 py-3 rounded-xl font-bold shadow-[0_0_20px_rgba(6,182,212,0.3)] transition-all flex items-center gap-2 hover:scale-105 active:scale-95">
                 <Sparkles size={18} /> New Order
             </button>
         </div>

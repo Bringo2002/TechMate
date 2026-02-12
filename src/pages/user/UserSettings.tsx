@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { 
   Settings, Monitor, Moon, Sun, Cpu, Globe, 
-  Shield, Bell, Database, Eye, Zap, Sliders,
-  Volume2, Keyboard, Save, RotateCcw
+  Database, Eye, Zap, Sliders,
+  Volume2, Save, RotateCcw
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -31,34 +31,9 @@ const UserSettings: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
-  const [settings, setSettings] = useState<AppSettings>({
-    theme: 'dark',
-    colorMode: 'vibrant',
-    aiPersonality: 'balanced',
-    aiVoice: false,
-    reduceMotion: false,
-    highContrast: false,
-    dataUsage: 'standard',
-    autoSave: true,
-    language: 'en-US'
-  });
-
-  const handleSettingChange = (key: keyof AppSettings, value: any) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
-    setHasChanges(true);
-  };
-
-  const handleSave = async () => {
-    setIsSaving(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800));
-    setIsSaving(false);
-    setHasChanges(false);
-    toast.success('Preferences saved successfully');
-  };
-
-  const handleReset = () => {
-    setSettings({
+  const [settings, setSettings] = useState<AppSettings>(() => {
+    const saved = localStorage.getItem('techmate_settings');
+    return saved ? JSON.parse(saved) : {
       theme: 'dark',
       colorMode: 'vibrant',
       aiPersonality: 'balanced',
@@ -68,8 +43,39 @@ const UserSettings: React.FC = () => {
       dataUsage: 'standard',
       autoSave: true,
       language: 'en-US'
-    });
+    };
+  });
+
+  const handleSettingChange = (key: keyof AppSettings, value: any) => {
+    setSettings(prev => ({ ...prev, [key]: value }));
     setHasChanges(true);
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    // Simulate API call and save to local storage
+    await new Promise(resolve => setTimeout(resolve, 800));
+    localStorage.setItem('techmate_settings', JSON.stringify(settings));
+    setIsSaving(false);
+    setHasChanges(false);
+    toast.success('Preferences saved successfully');
+  };
+
+  const handleReset = () => {
+    const defaults: AppSettings = {
+      theme: 'dark',
+      colorMode: 'vibrant',
+      aiPersonality: 'balanced',
+      aiVoice: false,
+      reduceMotion: false,
+      highContrast: false,
+      dataUsage: 'standard',
+      autoSave: true,
+      language: 'en-US'
+    };
+    setSettings(defaults);
+    localStorage.removeItem('techmate_settings');
+    setHasChanges(false); // Reset implies saved to defaults
     toast('Settings reset to defaults', { icon: '↺' });
   };
 

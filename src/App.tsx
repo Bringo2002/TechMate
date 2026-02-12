@@ -36,13 +36,16 @@ import UserOrders from './pages/user/UserOrders';
 import UserProfile from './pages/user/UserProfile';
 import UserSupport from './pages/user/UserSupport';
 import UserSettings from './pages/user/UserSettings';
+import Billing from './pages/user/Billing';
+import Notifications from './pages/user/Notifications';
+import Stats from './pages/user/Stats';
 import SettingsLayout from './pages/dashboard/settings/SettingsLayout';
 import TeamManagement from './pages/dashboard/settings/team/TeamManagement';
 import ProfileSettings from './pages/dashboard/settings/profile/ProfileSettings';
 import SecuritySettings from './pages/dashboard/settings/security/SecuritySettings';
 import NotificationSettings from './pages/dashboard/settings/notifications/NotificationSettings';
 import ActivityLogs from './pages/dashboard/settings/activity/ActivityLogs';
-import ComingSoon from './components/common/ComingSoon';
+
 
 // Scroll to top and update title on route change
 const ScrollToTopAndTitle: React.FC = () => {
@@ -156,10 +159,10 @@ const App: React.FC = () => {
     <Route path="profile" element={<UserProfile />} />
     <Route path="support" element={<UserSupport />} />
     <Route path="settings" element={<UserSettings />} />
-    <Route path="billing" element={<ComingSoon title="Billing & Payments" />} />
-    <Route path="messages" element={<ComingSoon title="Messages" />} />
-    <Route path="notifications" element={<ComingSoon title="Notifications" />} />
-    <Route path="stats" element={<ComingSoon title="Statistics" />} />
+    <Route path="billing" element={<Billing />} />
+    <Route path="messages" element={<Messages />} />
+    <Route path="notifications" element={<Notifications />} />
+    <Route path="stats" element={<Stats />} />
   </Route>
       </Routes>
       <Toaster 
