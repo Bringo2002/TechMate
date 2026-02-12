@@ -1,8 +1,10 @@
+// src/pages/SignupPage.tsx
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { FcGoogle } from "react-icons/fc";
-import { FiEye, FiEyeOff } from "react-icons/fi";
+import { FiEye, FiEyeOff, FiUser, FiMail, FiLock } from "react-icons/fi";
 import { motion } from "framer-motion";
+import { toast } from "react-hot-toast";
 import { validateEmail, validatePassword } from "../utils/validateForm";
 import supabase from "../lib/supabaseClient"; 
 import AuthLayout from "../layouts/AuthLayout";
@@ -18,8 +20,6 @@ const SignupPage: React.FC = () => {
   });
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [successMsg, setSuccessMsg] = useState(""); // ✅ new state for confirmation message
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -29,37 +29,35 @@ const SignupPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
-    setError("");
-    setSuccessMsg("");
 
     // ---------- Frontend validation ----------
     if (!formData.name.trim()) {
-      setError("Name is required.");
+      toast.error("Full Name is required");
       return;
     }
 
     const emailError = validateEmail(formData.email);
     if (emailError) {
-      setError(emailError);
+      toast.error(emailError);
       return;
     }
 
     const passwordError = validatePassword(formData.password);
     if (passwordError) {
-      setError(passwordError);
+      toast.error(passwordError);
       return;
     }
 
     if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match.");
+      toast.error("Passwords do not match");
       return;
     }
 
     setLoading(true);
+    const loadingToast = toast.loading("Creating your account...");
 
     try {
       // ---------- 1) Sign up the user with Supabase Auth ----------
-      // Pass the name into user metadata so it's available on the auth user.
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -68,13 +66,8 @@ const SignupPage: React.FC = () => {
         },
       });
 
-      if (signUpError) {
-        // Auth error (validation, duplicate email, etc.)
-        throw signUpError;
-      }
+      if (signUpError) throw signUpError;
 
-      // signUpData may contain a session if the provider returns one (auto-confirm),
-      // or may be null/without session if email confirmation is required.
       const userId = signUpData?.user?.id;
 
       // ---------- 2) Insert profile row into "profiles" table ----------
@@ -82,110 +75,143 @@ const SignupPage: React.FC = () => {
         const { error: profileError } = await supabase.from("profiles").insert({
           id: userId,
           email: formData.email,
-          full_name: formData.name, // adjust column name if your schema uses `name` instead
+          full_name: formData.name,
           role: "user",
         });
 
         if (profileError) {
-          // If profile insertion fails, surface a helpful message (but don't hide the fact signup succeeded)
-          // We throw so UI shows the error; alternatively you could only warn and continue.
-          throw profileError;
+            console.error("Profile creation error:", profileError);
+            // Non-blocking but worth logging
         }
       }
 
       // ---------- 3) Handle success + optional auto-login ----------
       // If Supabase returned a session (user is already authenticated), redirect immediately.
       if (signUpData?.session) {
-        setSuccessMsg("Account created and signed in. Redirecting...");
-        // Redirect normal users to /user
+        toast.success("Account created successfully! Logging you in...", { id: loadingToast });
         navigate("/user", { replace: true });
         return;
       }
 
-      // If no session returned, attempt optional auto-login (may fail if email confirmation required)
+      // If no session returned, attempt optional auto-login
       try {
-        const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+        const { data: loginData } = await supabase.auth.signInWithPassword({
           email: formData.email,
           password: formData.password,
         });
 
-        if (!loginError && loginData?.session) {
-          setSuccessMsg("Account created and signed in. Redirecting...");
+        if (loginData?.session) {
+          toast.success("Account created! Welcome aboard.", { id: loadingToast });
           navigate("/user", { replace: true });
           return;
         }
-        // If loginError exists, it's likely because email confirmation is required.
       } catch (loginErr) {
-        // swallow; we'll fallback to the "check your email" flow below
-        console.warn("Auto-login attempt failed:", loginErr);
+        console.warn("Auto-login failed:", loginErr);
       }
 
-      // ---------- 4) No session and auto-login didn't produce a session ----------
-      setSuccessMsg(
-        "✅ Account created. Please check your email and confirm your account before logging in."
-      );
-      // Optionally keep user on the page so they can see the success message and follow next steps.
+      // ---------- 4) No session means email confirmation required ----------
+      toast.success("Account created! Please check your email to activate.", { id: loadingToast, duration: 6000 });
+      // Clear sensitive fields
+      setFormData(prev => ({ ...prev, password: "", confirmPassword: "" }));
+
     } catch (err: any) {
-      // ---------- 5) Error handling ----------
       console.error("Signup flow error:", err);
-      setError(err?.message || "Signup failed. Please try again.");
+      toast.error(err?.message || "Registration failed. Please try again.", { id: loadingToast });
     } finally {
       setLoading(false);
     }
   };
 
+  const handleGoogleSignup = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      if (error) throw error;
+    } catch (err: any) {
+      console.error("Google signup error:", err);
+      toast.error("Google sign up failed.");
+    }
+  };
+
+  // Animation variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+        delayChildren: 0.2,
+      },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: { y: 0, opacity: 1 },
+  };
+
   return (
     <AuthLayout
       title="Sign Up"
-      description="Create a NyxDev account and unlock next-gen solutions with secure signup."
+      description="Create a TechMate account and unlock next-gen solutions with secure signup."
       canonical="https://yourdomain.com/signup"
       heading="Create Account"
     >
-      {/* Show error or success messages */}
-      {error && (
-        <p role="alert" className="text-red-500 text-sm mb-4 text-center font-medium">
-          {error}
-        </p>
-      )}
-      {successMsg && (
-        <p role="status" className="text-green-500 text-sm mb-4 text-center font-medium">
-          {successMsg}
-        </p>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <motion.form 
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        onSubmit={handleSubmit} 
+        className="space-y-4"
+      >
         {/* Name */}
-        <input
-          id="name"
-          name="name"
-          type="text"
-          placeholder="Full Name"
-          value={formData.name}
-          onChange={handleChange}
-          required
-          autoComplete="name"
-          aria-label="Full Name"
-          className="w-full p-3 rounded-xl bg-slate-800 text-white border border-slate-600 
-                     focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all"
-        />
+        <motion.div variants={itemVariants} className="relative group">
+           <FiUser className="absolute left-4 top-3.5 text-slate-400 group-focus-within:text-cyan-400 transition-colors duration-300" size={20} />
+          <input
+            id="name"
+            name="name"
+            type="text"
+            placeholder="Full Name"
+            value={formData.name}
+            onChange={handleChange}
+            required
+            autoComplete="name"
+            aria-label="Full Name"
+            className="w-full pl-12 pr-4 py-3 rounded-xl bg-slate-900/50 text-white border border-slate-700
+                       focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 
+                       placeholder-slate-500 transition-all duration-300 backdrop-blur-sm
+                       hover:bg-slate-900/70 shadow-inner shadow-black/20"
+          />
+        </motion.div>
 
         {/* Email */}
-        <input
-          id="email"
-          name="email"
-          type="email"
-          placeholder="Email Address"
-          value={formData.email}
-          onChange={handleChange}
-          required
-          autoComplete="email"
-          aria-label="Email Address"
-          className="w-full p-3 rounded-xl bg-slate-800 text-white border border-slate-600 
-                     focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all"
-        />
+        <motion.div variants={itemVariants} className="relative group">
+           <FiMail className="absolute left-4 top-3.5 text-slate-400 group-focus-within:text-cyan-400 transition-colors duration-300" size={20} />
+          <input
+            id="email"
+            name="email"
+            type="email"
+            placeholder="Email Address"
+            value={formData.email}
+            onChange={handleChange}
+            required
+            autoComplete="email"
+            aria-label="Email Address"
+            className="w-full pl-12 pr-4 py-3 rounded-xl bg-slate-900/50 text-white border border-slate-700
+                       focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 
+                       placeholder-slate-500 transition-all duration-300 backdrop-blur-sm
+                       hover:bg-slate-900/70 shadow-inner shadow-black/20"
+          />
+        </motion.div>
 
         {/* Password */}
-        <div className="relative">
+        <motion.div variants={itemVariants} className="relative group">
+           <FiLock className="absolute left-4 top-3.5 text-slate-400 group-focus-within:text-cyan-400 transition-colors duration-300" size={20} />
           <input
             id="password"
             name="password"
@@ -196,21 +222,24 @@ const SignupPage: React.FC = () => {
             required
             autoComplete="new-password"
             aria-label="Password"
-            className="w-full p-3 rounded-xl bg-slate-800 text-white border border-slate-600 
-                       focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all pr-10"
+            className="w-full pl-12 pr-12 py-3 rounded-xl bg-slate-900/50 text-white border border-slate-700
+                       focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 
+                       placeholder-slate-500 transition-all duration-300 backdrop-blur-sm
+                       hover:bg-slate-900/70 shadow-inner shadow-black/20"
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-3 text-gray-400 hover:text-white focus:outline-none"
+            className="absolute right-4 top-3.5 text-gray-500 hover:text-cyan-400 focus:outline-none transition-colors"
             aria-label={showPassword ? "Hide password" : "Show password"}
           >
             {showPassword ? <FiEyeOff size={20} /> : <FiEye size={20} />}
           </button>
-        </div>
+        </motion.div>
 
         {/* Confirm Password */}
-        <div className="relative">
+        <motion.div variants={itemVariants} className="relative group">
+           <FiLock className="absolute left-4 top-3.5 text-slate-400 group-focus-within:text-cyan-400 transition-colors duration-300" size={20} />
           <input
             id="confirmPassword"
             name="confirmPassword"
@@ -221,76 +250,80 @@ const SignupPage: React.FC = () => {
             required
             autoComplete="new-password"
             aria-label="Confirm Password"
-            className="w-full p-3 rounded-xl bg-slate-800 text-white border border-slate-600 
-                       focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all pr-10"
+            className="w-full pl-12 pr-12 py-3 rounded-xl bg-slate-900/50 text-white border border-slate-700
+                       focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 
+                       placeholder-slate-500 transition-all duration-300 backdrop-blur-sm
+                       hover:bg-slate-900/70 shadow-inner shadow-black/20"
           />
           <button
             type="button"
-            onClick={() =>
-              setShowConfirmPassword(!showConfirmPassword)
-            }
-            className="absolute right-3 top-3 text-gray-400 hover:text-white focus:outline-none"
-            aria-label={
-              showConfirmPassword ? "Hide confirm password" : "Show confirm password"
-            }
+            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+            className="absolute right-4 top-3.5 text-gray-500 hover:text-cyan-400 focus:outline-none transition-colors"
+            aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
           >
             {showConfirmPassword ? <FiEyeOff size={20} /> : <FiEye size={20} />}
           </button>
-        </div>
+        </motion.div>
 
         {/* Submit Button */}
-        <button
+        <motion.button
+          variants={itemVariants}
           type="submit"
           disabled={loading}
-          className="w-full bg-indigo-600 hover:bg-indigo-900 text-white font-bold py-3 rounded-xl 
-                     transition-all duration-200 disabled:opacity-50 flex justify-center items-center"
+          whileHover={{ scale: 1.02, boxShadow: "0 0 20px rgba(6, 182, 212, 0.5)" }}
+          whileTap={{ scale: 0.98 }}
+          className="w-full bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 
+                     text-white font-bold py-3 rounded-xl transition-all duration-300 
+                     disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wider
+                     shadow-lg shadow-cyan-900/20 relative overflow-hidden group"
         >
           {loading ? (
-            <motion.div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+             <div className="flex justify-center items-center gap-2">
+             <motion.div 
+             animate={{ rotate: 360 }}
+             transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+             className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full" 
+           />
+           <span>Creating Account...</span>
+           </div>
           ) : (
-            "Sign Up"
+             <span className="relative z-10 flex items-center justify-center gap-2">
+             Sign Up
+           </span>
           )}
-        </button>
-      </form>
+          {/* Shine effect on hover */}
+          <div className="absolute top-0 -left-full w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-12 group-hover:animate-shine" />
+        </motion.button>
+        
+        {/* Divider */}
+        <motion.div variants={itemVariants} className="relative flex py-2 items-center">
+          <div className="flex-grow border-t border-slate-700"></div>
+          <span className="flex-shrink-0 mx-4 text-slate-500 text-xs uppercase tracking-widest">Or continue with</span>
+          <div className="flex-grow border-t border-slate-700"></div>
+        </motion.div>
 
-      {/* Login Link */}
-      <p className="text-center text-gray-300 mt-4">
-        Already have an account?{" "}
-        <Link to="/login" className="text-blue-400 hover:underline">
-          Login
-        </Link>
-      </p>
+        {/* Google Signup */}
+        <motion.button
+          variants={itemVariants}
+          type="button"
+          onClick={handleGoogleSignup}
+          whileHover={{ scale: 1.02, backgroundColor: "rgba(255, 255, 255, 0.1)" }}
+          whileTap={{ scale: 0.98 }}
+           className="w-full flex items-center justify-center gap-3 bg-slate-800/50 hover:bg-slate-800 text-slate-200 py-3 rounded-xl
+                     border border-slate-700 hover:border-slate-500 transition-all font-medium group backdrop-blur-sm"
+        >
+          <FcGoogle size={22} className="drop-shadow-sm" />
+          <span className="group-hover:text-white transition-colors">Sign up with Google</span>
+        </motion.button>
 
-      {/* Divider */}
-      <div className="flex items-center gap-4 my-6">
-        <hr className="flex-grow border-slate-600" />
-        <span className="text-slate-400">or</span>
-        <hr className="flex-grow border-slate-600" />
-      </div>
-
-      {/* Google Signup */}
-      <button
-        onClick={async () => {
-          try {
-            const { error } = await supabase.auth.signInWithOAuth({
-              provider: "google",
-              options: {
-                redirectTo: `${window.location.origin}/auth/callback`,
-              },
-            });
-
-            if (error) {
-              console.error("Google signup error:", error);
-            }
-          } catch (err) {
-            console.error("Unexpected error during Google signup:", err);
-          }
-        }}
-        className="w-full bg-white text-black font-bold py-3 rounded-xl flex items-center justify-center gap-2"
-      >
-        <FcGoogle size={20} />
-        Sign up with Google
-      </button>
+        {/* Login Link */}
+        <motion.p variants={itemVariants} className="text-center text-slate-400 mt-6 text-sm">
+          Already have an account?{" "}
+          <Link to="/login" className="text-cyan-400 hover:text-cyan-300 font-bold hover:underline transition-colors ml-1">
+            Log In
+          </Link>
+        </motion.p>
+      </motion.form>
     </AuthLayout>
   );
 };

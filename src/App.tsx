@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { Toaster } from 'react-hot-toast';
 import { Routes, Route, useLocation, Navigate, Outlet } from 'react-router-dom';
 import Header from './components/Header/Header';
 import Hero from './pages/Home/Home';
@@ -30,12 +31,17 @@ import Revenue from "./pages/dashboard/Revenue";
 import Consulting from "./pages/dashboard/Consulting";
 import Deployments from "./pages/dashboard/Deployments";
 import Messages from './pages/user/Messages';
-import Settings from "./pages/dashboard/Settings";
 import UserOverview from './pages/user/UserOverview';
 import UserOrders from './pages/user/UserOrders';
 import UserProfile from './pages/user/UserProfile';
 import UserSupport from './pages/user/UserSupport';
 import UserSettings from './pages/user/UserSettings';
+import SettingsLayout from './pages/dashboard/settings/SettingsLayout';
+import TeamManagement from './pages/dashboard/settings/team/TeamManagement';
+import ProfileSettings from './pages/dashboard/settings/profile/ProfileSettings';
+import SecuritySettings from './pages/dashboard/settings/security/SecuritySettings';
+import NotificationSettings from './pages/dashboard/settings/notifications/NotificationSettings';
+import ActivityLogs from './pages/dashboard/settings/activity/ActivityLogs';
 
 // Scroll to top and update title on route change
 const ScrollToTopAndTitle: React.FC = () => {
@@ -120,7 +126,16 @@ const App: React.FC = () => {
     <Route path="consulting" element={<Consulting />} />
     <Route path="deployments" element={<Deployments />} />
     <Route path="messages" element={<Messages />} />
-    <Route path="settings" element={<Settings />} />
+    {/* SETTINGS NESTED ROUTES */}
+    <Route path="/dashboard/settings" element={<SettingsLayout />}>
+  <Route index element={<TeamManagement />} />
+  <Route path="team" element={<TeamManagement />} />
+  <Route path="profile" element={<ProfileSettings />} />
+  <Route path="security" element={<SecuritySettings />} />
+  <Route path="notifications" element={<NotificationSettings />} />
+  <Route path="activity" element={<ActivityLogs />} />
+</Route>
+
   </Route>
 
 
@@ -141,8 +156,17 @@ const App: React.FC = () => {
     <Route path="support" element={<UserSupport />} />
     <Route path="settings" element={<UserSettings />} />
   </Route>
-</Routes>
-
+      </Routes>
+      <Toaster 
+        position="top-center"
+        toastOptions={{
+          style: {
+            background: '#1e293b',
+            color: '#fff',
+            border: '1px solid #475569',
+          },
+        }}
+      />
     </>
   );
 };

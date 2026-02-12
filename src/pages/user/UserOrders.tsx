@@ -19,36 +19,34 @@ import {
   FileText,
   RefreshCw
 } from 'lucide-react';
+import projectService, { Project } from '../../services/projectService';
+import supabase from '../../lib/supabaseClient';
+import toast from 'react-hot-toast';
 
 // ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
 
-type OrderStatus = 'pending' | 'in_progress' | 'review' | 'completed' | 'cancelled';
-type Priority = 'low' | 'medium' | 'high' | 'urgent';
+// UI Statuses
+type UIOrderStatus = 'pending' | 'in_progress' | 'review' | 'completed' | 'cancelled';
+type UIPriority = 'low' | 'medium' | 'high' | 'urgent';
 type SortField = 'date' | 'status' | 'amount' | 'title';
 type SortDirection = 'asc' | 'desc';
 
-interface Order {
-  id: number;
-  title: string;
-  description: string;
-  status: OrderStatus;
-  progress: number;
-  createdDate: string;
-  dueDate: string;
-  completedDate?: string;
-  amount: number;
-  priority: Priority;
-  category: string;
-  assignedTo?: string;
-  deliverables?: string[];
-  lastUpdate: string;
+// Extend Project or create a mapped type if strictly needed, 
+// but we can use the Project type and map on the fly.
+interface Order extends Omit<Project, 'status' | 'priority'> {
+  // Overwrite with UI-specific strict types if needed, or just use string and cast
+  status: UIOrderStatus; 
+  priority: UIPriority;
+  // Helper fields for UI that might be calculated
+  formattedDate: string;
+  formattedAmount: string;
 }
 
 interface FilterOptions {
-  status: OrderStatus | 'all';
-  priority: Priority | 'all';
+  status: UIOrderStatus | 'all';
+  priority: UIPriority | 'all';
   category: string | 'all';
   dateRange: 'all' | 'week' | 'month' | 'quarter';
 }
@@ -57,7 +55,28 @@ interface FilterOptions {
 // UTILITY FUNCTIONS
 // ============================================================================
 
-const getStatusConfig = (status: OrderStatus) => {
+const mapDBStatusToUI = (dbStatus: string | null): UIOrderStatus => {
+  if (!dbStatus) return 'pending';
+  const s = dbStatus.toLowerCase();
+  
+  if (s === 'active' || s === 'running') return 'in_progress';
+  if (s === 'planning' || s === 'open') return 'pending';
+  if (s === 'ready' || s === 'review') return 'review';
+  if (s === 'completed') return 'completed';
+  if (s === 'cancelled' || s === 'blocked') return 'cancelled';
+  
+  return 'pending'; // fallback
+};
+
+const mapDBPriorityToUI = (dbPriority: string | null): UIPriority => {
+  if (!dbPriority) return 'medium';
+  const p = dbPriority.toLowerCase();
+  if (p === 'critical') return 'urgent';
+  if (['low', 'medium', 'high'].includes(p)) return p as UIPriority;
+  return 'medium';
+};
+
+const getStatusConfig = (status: UIOrderStatus) => {
   const configs = {
     pending: {
       label: 'Pending',
@@ -93,7 +112,7 @@ const getStatusConfig = (status: OrderStatus) => {
   return configs[status];
 };
 
-const getPriorityConfig = (priority: Priority) => {
+const getPriorityConfig = (priority: UIPriority) => {
   const configs = {
     low: { label: 'Low', color: 'text-gray-400', bgColor: 'bg-gray-500/20' },
     medium: { label: 'Medium', color: 'text-blue-400', bgColor: 'bg-blue-500/20' },
@@ -103,7 +122,8 @@ const getPriorityConfig = (priority: Priority) => {
   return configs[priority];
 };
 
-const formatDate = (dateString: string): string => {
+const formatDate = (dateString: string | null): string => {
+  if (!dateString) return 'N/A';
   const date = new Date(dateString);
   return date.toLocaleDateString('en-US', { 
     month: 'short', 
@@ -112,7 +132,8 @@ const formatDate = (dateString: string): string => {
   });
 };
 
-const formatCurrency = (amount: number): string => {
+const formatCurrency = (amount: number | null): string => {
+  if (amount === null || amount === undefined) return '$0.00';
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD'
@@ -135,6 +156,9 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onViewDetails, isExpanded,
   const priorityConfig = getPriorityConfig(order.priority);
   const StatusIcon = statusConfig.icon;
 
+  // Fallback for visual progress if null
+  const displayProgress = order.progress ?? (order.status === 'completed' ? 100 : order.status === 'pending' ? 0 : 50);
+
   return (
     <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-5 hover:border-indigo-500/50 transition-all group">
       {/* Header */}
@@ -142,7 +166,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onViewDetails, isExpanded,
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">
             <h3 className="text-lg font-semibold text-white group-hover:text-indigo-400 transition-colors">
-              {order.title}
+              {order.name}
             </h3>
             <span className={`px-2 py-1 rounded text-xs font-medium ${priorityConfig.bgColor} ${priorityConfig.color}`}>
               {priorityConfig.label}
@@ -151,9 +175,9 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onViewDetails, isExpanded,
           <div className="flex items-center gap-4 text-sm text-gray-400">
             <span className="flex items-center gap-1">
               <Package size={14} />
-              {order.category}
+              {order.type}
             </span>
-            <span>Order #{order.id}</span>
+            <span>ID: {order.id.slice(0,8)}</span>
           </div>
         </div>
         
@@ -172,12 +196,12 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onViewDetails, isExpanded,
       <div className="mb-4">
         <div className="flex justify-between text-sm mb-2">
           <span className="text-gray-400">Progress</span>
-          <span className={`font-medium ${statusConfig.textColor}`}>{order.progress}%</span>
+          <span className={`font-medium ${statusConfig.textColor}`}>{displayProgress}%</span>
         </div>
         <div className="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
           <div 
             className="bg-gradient-to-r from-indigo-500 to-purple-500 h-2 rounded-full transition-all duration-500"
-            style={{ width: `${order.progress}%` }}
+            style={{ width: `${displayProgress}%` }}
           />
         </div>
       </div>
@@ -188,28 +212,28 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onViewDetails, isExpanded,
           <Calendar size={16} className="text-gray-500" />
           <div>
             <p className="text-xs text-gray-500">Created</p>
-            <p className="text-sm text-white font-medium">{formatDate(order.createdDate)}</p>
+            <p className="text-sm text-white font-medium">{formatDate(order.created_at)}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <Clock size={16} className="text-gray-500" />
           <div>
             <p className="text-xs text-gray-500">Due Date</p>
-            <p className="text-sm text-white font-medium">{formatDate(order.dueDate)}</p>
+            <p className="text-sm text-white font-medium">{formatDate(order.deadline)}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <DollarSign size={16} className="text-gray-500" />
           <div>
             <p className="text-xs text-gray-500">Amount</p>
-            <p className="text-sm text-white font-medium">{formatCurrency(order.amount)}</p>
+            <p className="text-sm text-white font-medium">{formatCurrency(order.budget)}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <RefreshCw size={16} className="text-gray-500" />
           <div>
             <p className="text-xs text-gray-500">Last Update</p>
-            <p className="text-sm text-white font-medium">{order.lastUpdate}</p>
+            <p className="text-sm text-white font-medium">{formatDate(order.updated_at)}</p>
           </div>
         </div>
       </div>
@@ -219,19 +243,28 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onViewDetails, isExpanded,
         <div className="border-t border-gray-700/50 pt-4 mb-4 space-y-3 animate-fadeIn">
           <div>
             <p className="text-xs text-gray-500 mb-1">Description</p>
-            <p className="text-sm text-gray-300">{order.description}</p>
+            <p className="text-sm text-gray-300">{order.description || 'No description provided.'}</p>
           </div>
-          {order.assignedTo && (
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Assigned To</p>
-              <p className="text-sm text-white">{order.assignedTo}</p>
-            </div>
-          )}
+         
           {order.deliverables && order.deliverables.length > 0 && (
             <div>
               <p className="text-xs text-gray-500 mb-2">Deliverables</p>
               <div className="flex flex-wrap gap-2">
                 {order.deliverables.map((item, idx) => (
+                  <span key={idx} className="px-2 py-1 bg-gray-700/50 rounded text-xs text-gray-300">
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+           {/* Fallback to technologies if deliverables not set */}
+           {(!order.deliverables || order.deliverables.length === 0) && order.technologies && order.technologies.length > 0 && (
+            <div>
+              <p className="text-xs text-gray-500 mb-2">Tech Stack</p>
+              <div className="flex flex-wrap gap-2">
+                {order.technologies.map((item, idx) => (
                   <span key={idx} className="px-2 py-1 bg-gray-700/50 rounded text-xs text-gray-300">
                     {item}
                   </span>
@@ -316,10 +349,17 @@ const StatsCard: React.FC<StatsCardProps> = ({ label, value, icon: Icon, trend, 
 // ============================================================================
 
 const UserOrders: React.FC = () => {
+    // We can't easily use useAuth() here because keeping it simple for replacement without 
+    // depending on the hook's specific return structure if it changes.
+    // Instead we will use Supabase client directly for auth check for maximum reliability
+    // since we already saw useAuth has many fields.
+  const [userId, setUserId] = useState<string | null>(null);
+
+  const [orders, setOrders] = useState<Order[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
-  const [expandedOrders, setExpandedOrders] = useState<Set<number>>(new Set());
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   
@@ -330,145 +370,69 @@ const UserOrders: React.FC = () => {
     dateRange: 'all'
   });
 
-  const [orders] = useState<Order[]>([
-    {
-      id: 1001,
-      title: 'E-commerce Website Development',
-      description: 'Full-stack e-commerce platform with payment integration, inventory management, and admin dashboard.',
-      status: 'in_progress',
-      progress: 65,
-      createdDate: '2024-11-15',
-      dueDate: '2025-01-15',
-      amount: 8500,
-      priority: 'high',
-      category: 'Web Development',
-      assignedTo: 'Dev Team A',
-      deliverables: ['Frontend', 'Backend API', 'Admin Panel', 'Documentation'],
-      lastUpdate: '2 hours ago'
-    },
-    {
-      id: 1002,
-      title: 'Mobile App UI/UX Design',
-      description: 'Complete UI/UX design for iOS and Android mobile application including wireframes and prototypes.',
-      status: 'review',
-      progress: 90,
-      createdDate: '2024-11-20',
-      dueDate: '2025-01-10',
-      amount: 3200,
-      priority: 'urgent',
-      category: 'Design',
-      assignedTo: 'Design Team B',
-      deliverables: ['Wireframes', 'UI Mockups', 'Prototype', 'Design System'],
-      lastUpdate: '1 day ago'
-    },
-    {
-      id: 1003,
-      title: 'API Integration Service',
-      description: 'Integration of third-party APIs including payment gateways, shipping providers, and analytics.',
-      status: 'pending',
-      progress: 20,
-      createdDate: '2024-11-25',
-      dueDate: '2025-01-20',
-      amount: 2400,
-      priority: 'medium',
-      category: 'Backend',
-      assignedTo: 'Backend Team C',
-      deliverables: ['API Documentation', 'Integration Code', 'Testing Suite'],
-      lastUpdate: '3 days ago'
-    },
-    {
-      id: 1004,
-      title: 'Database Migration',
-      description: 'Migration from MySQL to PostgreSQL with zero downtime and data integrity verification.',
-      status: 'completed',
-      progress: 100,
-      createdDate: '2024-10-10',
-      dueDate: '2024-12-01',
-      completedDate: '2024-11-28',
-      amount: 4500,
-      priority: 'high',
-      category: 'DevOps',
-      assignedTo: 'DevOps Team D',
-      deliverables: ['Migration Script', 'Backup System', 'Performance Report'],
-      lastUpdate: '5 days ago'
-    },
-    {
-      id: 1005,
-      title: 'SEO Optimization',
-      description: 'Comprehensive SEO audit and optimization including on-page, technical, and content improvements.',
-      status: 'completed',
-      progress: 100,
-      createdDate: '2024-10-01',
-      dueDate: '2024-11-28',
-      completedDate: '2024-11-25',
-      amount: 1800,
-      priority: 'low',
-      category: 'Marketing',
-      assignedTo: 'Marketing Team E',
-      deliverables: ['SEO Audit Report', 'Optimization Guide', 'Content Strategy'],
-      lastUpdate: '1 week ago'
-    },
-    {
-      id: 1006,
-      title: 'Cloud Infrastructure Setup',
-      description: 'AWS cloud infrastructure setup with auto-scaling, load balancing, and monitoring.',
-      status: 'in_progress',
-      progress: 45,
-      createdDate: '2024-11-18',
-      dueDate: '2025-01-25',
-      amount: 5600,
-      priority: 'high',
-      category: 'DevOps',
-      assignedTo: 'DevOps Team D',
-      deliverables: ['Infrastructure Code', 'Monitoring Dashboard', 'Documentation'],
-      lastUpdate: '5 hours ago'
-    },
-    {
-      id: 1007,
-      title: 'Logo and Brand Identity',
-      description: 'Complete brand identity package including logo design, color palette, and brand guidelines.',
-      status: 'review',
-      progress: 85,
-      createdDate: '2024-11-22',
-      dueDate: '2025-01-08',
-      amount: 2200,
-      priority: 'medium',
-      category: 'Design',
-      assignedTo: 'Design Team B',
-      deliverables: ['Logo Variations', 'Brand Guidelines', 'Asset Pack'],
-      lastUpdate: '2 days ago'
-    },
-    {
-      id: 1008,
-      title: 'Security Audit',
-      description: 'Comprehensive security audit including penetration testing and vulnerability assessment.',
-      status: 'pending',
-      progress: 10,
-      createdDate: '2024-11-28',
-      dueDate: '2025-02-01',
-      amount: 6800,
-      priority: 'urgent',
-      category: 'Security',
-      assignedTo: 'Security Team F',
-      deliverables: ['Audit Report', 'Vulnerability List', 'Remediation Plan'],
-      lastUpdate: '1 day ago'
-    }
-  ]);
+  useEffect(() => {
+    // Check auth
+    supabase.auth.getSession().then(({ data: { session } }) => {
+        setUserId(session?.user?.id || null);
+    });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+        (_event, session) => {
+            setUserId(session?.user?.id || null);
+        }
+    );
+
+    return () => {
+        authListener.subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 600);
-    return () => clearTimeout(timer);
-  }, []);
+    const fetchOrders = async () => {
+      if (!userId) {
+        setIsLoading(false);
+        return;
+      }
+      
+      try {
+        setIsLoading(true);
+        const projects = await projectService.getUserProjects(userId);
+        
+        // Map backend projects to UI orders
+        const mappedOrders: Order[] = projects.map(p => ({
+          ...p,
+          status: mapDBStatusToUI(p.status),
+          priority: mapDBPriorityToUI(p.priority),
+          // Fallback missing schema fields logic
+          progress: p.progress ?? 0,
+          deliverables: p.deliverables ?? p.technologies ?? [],
+          formattedDate: formatDate(p.created_at),
+          formattedAmount: formatCurrency(p.budget),
+        }));
+
+        setOrders(mappedOrders);
+      } catch (error) {
+        console.error('Failed to load orders', error);
+        toast.error('Could not load your orders. Please try again.');
+        // Don't set orders to empty array here necessarily if we want to show retry, 
+        // but for now empty is fine.
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchOrders();
+  }, [userId]);
 
   // Filter and search logic
   const filteredOrders = orders.filter(order => {
-    const matchesSearch = order.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         order.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         order.category.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = order.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         (order.description?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+                         order.type.toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesStatus = filters.status === 'all' || order.status === filters.status;
     const matchesPriority = filters.priority === 'all' || order.priority === filters.priority;
-    const matchesCategory = filters.category === 'all' || order.category === filters.category;
+    const matchesCategory = filters.category === 'all' || order.type === filters.category;
 
     return matchesSearch && matchesStatus && matchesPriority && matchesCategory;
   });
@@ -479,13 +443,14 @@ const UserOrders: React.FC = () => {
     
     switch (sortField) {
       case 'date':
-        comparison = new Date(a.createdDate).getTime() - new Date(b.createdDate).getTime();
+        comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
         break;
       case 'amount':
-        comparison = a.amount - b.amount;
+        // Handle null amounts by treating them as 0
+        comparison = (a.budget || 0) - (b.budget || 0);
         break;
       case 'title':
-        comparison = a.title.localeCompare(b.title);
+        comparison = a.name.localeCompare(b.name);
         break;
       case 'status':
         comparison = a.status.localeCompare(b.status);
@@ -501,10 +466,10 @@ const UserOrders: React.FC = () => {
     pending: orders.filter(o => o.status === 'pending').length,
     inProgress: orders.filter(o => o.status === 'in_progress').length,
     completed: orders.filter(o => o.status === 'completed').length,
-    totalSpent: orders.reduce((sum, o) => sum + o.amount, 0)
+    totalSpent: orders.reduce((sum, o) => sum + (o.budget || 0), 0)
   };
 
-  const toggleExpand = (orderId: number) => {
+  const toggleExpand = (orderId: string) => {
     setExpandedOrders(prev => {
       const newSet = new Set(prev);
       if (newSet.has(orderId)) {
@@ -529,9 +494,12 @@ const UserOrders: React.FC = () => {
     }
   };
 
+  // Get unique categories for filter dropdown
+  const categories = Array.from(new Set(orders.map(o => o.type)));
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-900">
+      <div className="flex items-center justify-center min-h-screen bg-transparent">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-400">Loading your orders...</p>
@@ -541,7 +509,7 @@ const UserOrders: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 p-6">
+    <div className="min-h-screen bg-transparent p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-4">
@@ -568,21 +536,21 @@ const UserOrders: React.FC = () => {
             value={stats.pending}
             icon={Clock}
             color="#eab308"
-            trend={{ value: 5, isPositive: false }}
+            // trend={{ value: 5, isPositive: false }}
           />
           <StatsCard 
             label="In Progress" 
             value={stats.inProgress}
             icon={RefreshCw}
             color="#3b82f6"
-            trend={{ value: 12, isPositive: true }}
+            // trend={{ value: 12, isPositive: true }}
           />
           <StatsCard 
             label="Completed" 
             value={stats.completed}
             icon={CheckCircle}
             color="#22c55e"
-            trend={{ value: 18, isPositive: true }}
+            // trend={{ value: 18, isPositive: true }}
           />
           <StatsCard 
             label="Total Spent" 
@@ -650,7 +618,7 @@ const UserOrders: React.FC = () => {
                 <select
                   title="Filter by status"
                   value={filters.status}
-                  onChange={(e) => setFilters({...filters, status: e.target.value as OrderStatus | 'all'})}
+                  onChange={(e) => setFilters({...filters, status: e.target.value as UIOrderStatus | 'all'})}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-indigo-500"
                 >
                   <option value="all">All Statuses</option>
@@ -667,7 +635,7 @@ const UserOrders: React.FC = () => {
                 <select
                   title="Filter by priority"
                   value={filters.priority}
-                  onChange={(e) => setFilters({...filters, priority: e.target.value as Priority | 'all'})}
+                  onChange={(e) => setFilters({...filters, priority: e.target.value as UIPriority | 'all'})}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-indigo-500"
                 >
                   <option value="all">All Priorities</option>
@@ -687,12 +655,9 @@ const UserOrders: React.FC = () => {
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-indigo-500"
                 >
                   <option value="all">All Categories</option>
-                  <option value="Web Development">Web Development</option>
-                  <option value="Design">Design</option>
-                  <option value="Backend">Backend</option>
-                  <option value="DevOps">DevOps</option>
-                  <option value="Marketing">Marketing</option>
-                  <option value="Security">Security</option>
+                  {categories.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
                 </select>
               </div>
             </div>

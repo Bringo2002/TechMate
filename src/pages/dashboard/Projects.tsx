@@ -1,1036 +1,1021 @@
-import React, { useState } from 'react';
-import { Search, Filter, Download, Plus, Calendar, DollarSign, Users, Clock, CheckCircle2, AlertCircle, AlertTriangle, Target, TrendingUp, TrendingDown, ArrowUp, ArrowDown, Zap, Brain, GitBranch, Code2, Bug, TestTube, Rocket, Eye, MessageSquare, Settings, MoreVertical, ChevronDown, ChevronRight, Layers, BarChart3, Activity, Shield, Sparkles, Timer, Award, Circle, Flame, Terminal } from 'lucide-react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
+import { 
+  Search, Plus, AlertTriangle, Clock, DollarSign, 
+  Briefcase, Sparkles, Brain, Command, ChevronRight, 
+  LayoutGrid, List, Calendar, Users, Target, TrendingUp,
+  ArrowUp, ArrowDown, Zap, CheckCircle2, XCircle, Filter,
+  Download, RefreshCw, BarChart3, MessageSquare, Send, X
+} from 'lucide-react';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts';
+
+// Add this constant at the top of your file
+const ANTHROPIC_API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY || 'your-api-key-here';
+
+interface Project {
+  id: string;
+  name: string;
+  client: string;
+  type: string;
+  budget: number;
+  status: 'planning' | 'active' | 'blocked' | 'ready';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  deadline:  string;
+  description?:  string;
+  created_at: string;
+  user_id: string;
+  progress?:  number;
+  actual_cost?: number;
+}
+
+interface AIInsight {
+  type: 'warning' | 'success' | 'info' | 'critical';
+  message: string;
+  action?: string;
+}
+
+const COLORS = {
+  emerald: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', text: 'text-emerald-400' },
+  blue: { bg: 'bg-blue-500/10', border:  'border-blue-500/20', text: 'text-blue-400' },
+  red: { bg: 'bg-red-500/10', border:  'border-red-500/20', text: 'text-red-400' },
+  purple: { bg: 'bg-purple-500/10', border:  'border-purple-500/20', text: 'text-purple-400' }
+};
 
 const Projects = () => {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showNewProjectDialog, setShowNewProjectDialog] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterPriority, setFilterPriority] = useState<string>('all');
   const [view, setView] = useState<'grid' | 'list'>('grid');
-  const [filter, setFilter] = useState<'all' | 'active' | 'blocked' | 'completed'>('all');
-  const [sortBy, setSortBy] = useState<'health' | 'deadline' | 'revenue'>('health');
-  const [selectedProject, setSelectedProject] = useState<number | null>(null);
+  const [showAiPanel, setShowAiPanel] = useState(false);
+  const [aiInsights, setAiInsights] = useState<AIInsight[]>([]);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiResponse, setAiResponse] = useState('');
+  const [aiConversation, setAiConversation] = useState<{role: 'user' | 'assistant', content: string}[]>([]);
+  const [userMessage, setUserMessage] = useState('');
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [sortBy, setSortBy] = useState<'deadline' | 'budget' | 'created' | 'priority'>('created');
+  const searchRef = useRef<HTMLInputElement>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
-  const projects = [
-    {
-      id: 1,
-      name: 'E-commerce Platform Redesign',
-      client: 'TechCorp Inc.',
-      clientLogo: 'TC',
-      status: 'Blocked',
-      statusType: 'danger',
-      progress: 67,
-      velocity: -12,
-      health: 'at-risk',
-      aiScore: 68,
-      aiInsight: 'Client approval delays detected. Historical pattern suggests 2-week extension likely.',
-      dueDate: '2024-02-15',
-      daysLeft: 25,
-      startDate: '2023-11-01',
-      priority: 'critical',
-      team: [
-        { name: 'Sarah Chen', role: 'Lead Dev', avatar: 'SC', status: 'active' },
-        { name: 'Mike Rodriguez', role: 'Backend', avatar: 'MR', status: 'active' },
-        { name: 'Alex Kim', role: 'Frontend', avatar: 'AK', status: 'active' },
-        { name: 'Jenny Liu', role: 'Designer', avatar: 'JL', status: 'active' },
-        { name: 'Tom Wilson', role: 'QA', avatar: 'TW', status: 'active' }
-      ],
-      revenue: 45000,
-      budget: 50000,
-      spent: 33500,
-      profitability: 22,
-      blockers: [
-        { type: 'client', message: 'Awaiting UI approval (2h overdue)', severity: 'high' },
-        { type: 'dependency', message: 'Third-party API rate limits', severity: 'medium' }
-      ],
-      risks: [
-        'Client indecision pattern detected',
-        'May trigger 2-week delay',
-        'Budget at 67% with 25 days remaining'
-      ],
-      opportunities: [
-        'Upsell Phase 2: +$35K potential',
-        'Client satisfaction high despite delays',
-        'Referral opportunity: High'
-      ],
-      techStack: ['React', 'Node.js', 'PostgreSQL', 'AWS', 'Redis'],
-      metrics: {
-        commits: 247,
-        prs: 34,
-        bugs: 3,
-        tests: 186,
-        coverage: 87,
-        uptime: 99.2
-      },
-      milestones: [
-        { name: 'Discovery & Planning', status: 'completed', date: '2023-11-15' },
-        { name: 'Design & Prototyping', status: 'completed', date: '2023-12-10' },
-        { name: 'Core Development', status: 'completed', date: '2024-01-05' },
-        { name: 'UI Implementation', status: 'in-progress', date: '2024-01-25' },
-        { name: 'Testing & QA', status: 'pending', date: '2024-02-08' },
-        { name: 'Deployment', status: 'pending', date: '2024-02-15' }
-      ],
-      recentActivity: [
-        { type: 'comment', user: 'Sarah Chen', message: 'Pushed UI updates to staging', time: '2h ago' },
-        { type: 'blocker', user: 'System', message: 'Client approval overdue', time: '2h ago' },
-        { type: 'commit', user: 'Mike Rodriguez', message: 'Optimized database queries', time: '4h ago' }
-      ],
-      tags: ['E-commerce', 'Redesign', 'High-Priority'],
-      predictedCompletion: 'Feb 28 (13 days late)',
-      confidence: 72
-    },
-    {
-      id: 2,
-      name: 'Mobile Banking App',
-      client: 'FinanceHub',
-      clientLogo: 'FH',
-      status: 'Testing',
-      statusType: 'warning',
-      progress: 89,
-      velocity: 8,
-      health: 'on-track',
-      aiScore: 92,
-      aiInsight: 'Excellent momentum. Prime candidate for Phase 2 upsell (+$85K opportunity).',
-      dueDate: '2024-01-28',
-      daysLeft: 7,
-      startDate: '2023-10-01',
-      priority: 'high',
-      team: [
-        { name: 'Maria Santos', role: 'Lead Dev', avatar: 'MS', status: 'active' },
-        { name: 'David Park', role: 'Mobile Dev', avatar: 'DP', status: 'active' },
-        { name: 'Chris Anderson', role: 'Backend', avatar: 'CA', status: 'active' },
-        { name: 'Lisa Chen', role: 'QA', avatar: 'LC', status: 'active' }
-      ],
-      revenue: 67000,
-      budget: 70000,
-      spent: 62300,
-      profitability: 28,
-      blockers: [],
-      risks: [
-        'Tight deadline - 7 days remaining',
-        'Final security audit pending',
-        'App store approval timeline uncertain'
-      ],
-      opportunities: [
-        'Client loves it - Phase 2 likely: +$85K',
-        '2 referrals confirmed',
-        'Case study & testimonial secured'
-      ],
-      techStack: ['React Native', 'Firebase', 'Stripe', 'Plaid', 'Jest'],
-      metrics: {
-        commits: 412,
-        prs: 67,
-        bugs: 1,
-        tests: 324,
-        coverage: 94,
-        uptime: 99.8
-      },
-      milestones: [
-        { name: 'Requirements & Design', status: 'completed', date: '2023-10-20' },
-        { name: 'Core Features', status: 'completed', date: '2023-11-30' },
-        { name: 'Payment Integration', status: 'completed', date: '2023-12-20' },
-        { name: 'Security Implementation', status: 'completed', date: '2024-01-10' },
-        { name: 'Testing & Bug Fixes', status: 'in-progress', date: '2024-01-25' },
-        { name: 'Production Deployment', status: 'pending', date: '2024-01-28' }
-      ],
-      recentActivity: [
-        { type: 'deployment', user: 'Maria Santos', message: 'v2.1 deployed to staging', time: '30m ago' },
-        { type: 'success', user: 'QA Team', message: 'All 324 tests passing', time: '1h ago' },
-        { type: 'comment', user: 'Client', message: 'Loved the demo! Ready for launch', time: '3h ago' }
-      ],
-      tags: ['Mobile', 'Fintech', 'High-Value'],
-      predictedCompletion: 'Jan 27 (1 day early)',
-      confidence: 94
-    },
-    {
-      id: 3,
-      name: 'AI Analytics Dashboard',
-      client: 'DataMinds',
-      clientLogo: 'DM',
-      status: 'Development',
-      statusType: 'active',
-      progress: 45,
-      velocity: 15,
-      health: 'excellent',
-      aiScore: 96,
-      aiInsight: 'Ahead of schedule. Complex ML implementation progressing smoothly.',
-      dueDate: '2024-03-10',
-      daysLeft: 48,
-      startDate: '2023-12-01',
-      priority: 'medium',
-      team: [
-        { name: 'Alex Kim', role: 'Lead Dev', avatar: 'AK', status: 'active' },
-        { name: 'Priya Sharma', role: 'ML Engineer', avatar: 'PS', status: 'active' },
-        { name: 'James Wilson', role: 'Backend', avatar: 'JW', status: 'active' },
-        { name: 'Sophie Martinez', role: 'Frontend', avatar: 'SM', status: 'active' },
-        { name: 'Mark Chen', role: 'Data Engineer', avatar: 'MC', status: 'active' },
-        { name: 'Emma Davis', role: 'Designer', avatar: 'ED', status: 'active' }
-      ],
-      revenue: 52000,
-      budget: 55000,
-      spent: 23400,
-      profitability: 31,
-      blockers: [],
-      risks: [
-        'Complex ML models require careful testing',
-        'Third-party API dependencies',
-        'Large dataset processing challenges'
-      ],
-      opportunities: [
-        'Enterprise license upgrade: +$120K/year',
-        'White-label opportunity',
-        'Premium case study material'
-      ],
-      techStack: ['Python', 'TensorFlow', 'React', 'PostgreSQL', 'Docker'],
-      metrics: {
-        commits: 189,
-        prs: 23,
-        bugs: 0,
-        tests: 156,
-        coverage: 91,
-        uptime: 99.9
-      },
-      milestones: [
-        { name: 'Architecture & Design', status: 'completed', date: '2023-12-15' },
-        { name: 'Data Pipeline Setup', status: 'completed', date: '2024-01-05' },
-        { name: 'ML Model Development', status: 'in-progress', date: '2024-02-01' },
-        { name: 'Dashboard UI', status: 'in-progress', date: '2024-02-20' },
-        { name: 'Integration & Testing', status: 'pending', date: '2024-03-01' },
-        { name: 'Launch', status: 'pending', date: '2024-03-10' }
-      ],
-      recentActivity: [
-        { type: 'commit', user: 'Priya Sharma', message: 'ML model accuracy improved to 94%', time: '1h ago' },
-        { type: 'success', user: 'Alex Kim', message: 'Real-time processing implemented', time: '5h ago' },
-        { type: 'comment', user: 'Client', message: 'Impressed with early results', time: '1d ago' }
-      ],
-      tags: ['AI/ML', 'Analytics', 'Enterprise'],
-      predictedCompletion: 'Mar 5 (5 days early)',
-      confidence: 96
-    },
-    {
-      id: 4,
-      name: 'CRM Integration Suite',
-      client: 'SalesPro',
-      clientLogo: 'SP',
-      status: 'Ready to Deploy',
-      statusType: 'success',
-      progress: 92,
-      velocity: 5,
-      health: 'excellent',
-      aiScore: 94,
-      aiInsight: 'On track for early delivery. High maintenance contract potential.',
-      dueDate: '2024-01-25',
-      daysLeft: 4,
-      startDate: '2023-11-15',
-      priority: 'medium',
-      team: [
-        { name: 'John Williams', role: 'Lead Dev', avatar: 'JW', status: 'active' },
-        { name: 'Amy Thompson', role: 'Backend', avatar: 'AT', status: 'active' },
-        { name: 'Robert Lee', role: 'Integration', avatar: 'RL', status: 'active' }
-      ],
-      revenue: 34000,
-      budget: 35000,
-      spent: 32200,
-      profitability: 26,
-      blockers: [],
-      risks: [
-        'Minimal - ready for launch'
-      ],
-      opportunities: [
-        'Maintenance contract: +$2K/mo',
-        'Training package: +$8K',
-        'Additional integrations: +$15K'
-      ],
-      techStack: ['Node.js', 'Express', 'MongoDB', 'Redis', 'Docker'],
-      metrics: {
-        commits: 156,
-        prs: 28,
-        bugs: 0,
-        tests: 142,
-        coverage: 89,
-        uptime: 99.7
-      },
-      milestones: [
-        { name: 'Planning & Design', status: 'completed', date: '2023-11-25' },
-        { name: 'Core API Development', status: 'completed', date: '2023-12-15' },
-        { name: 'CRM Integrations', status: 'completed', date: '2024-01-05' },
-        { name: 'Testing & Documentation', status: 'completed', date: '2024-01-18' },
-        { name: 'Client Training', status: 'in-progress', date: '2024-01-23' },
-        { name: 'Production Launch', status: 'pending', date: '2024-01-25' }
-      ],
-      recentActivity: [
-        { type: 'milestone', user: 'John Williams', message: 'All tests passing - ready to deploy', time: '15m ago' },
-        { type: 'comment', user: 'Client', message: 'Training session went great!', time: '2h ago' },
-        { type: 'success', user: 'Amy Thompson', message: 'Documentation completed', time: '4h ago' }
-      ],
-      tags: ['Integration', 'API', 'B2B'],
-      predictedCompletion: 'Jan 24 (1 day early)',
-      confidence: 97
-    },
-    {
-      id: 5,
-      name: 'Healthcare Portal',
-      client: 'MediCare Solutions',
-      clientLogo: 'MS',
-      status: 'Planning',
-      statusType: 'neutral',
-      progress: 12,
-      velocity: 0,
-      health: 'excellent',
-      aiScore: 88,
-      aiInsight: 'Strong start. Requirements gathering ahead of schedule.',
-      dueDate: '2024-04-30',
-      daysLeft: 99,
-      startDate: '2024-01-15',
-      priority: 'medium',
-      team: [
-        { name: 'Sarah Chen', role: 'Lead Dev', avatar: 'SC', status: 'assigned' },
-        { name: 'Tom Wilson', role: 'Backend', avatar: 'TW', status: 'assigned' },
-        { name: 'Jenny Liu', role: 'Designer', avatar: 'JL', status: 'assigned' }
-      ],
-      revenue: 85000,
-      budget: 90000,
-      spent: 8500,
-      profitability: 35,
-      blockers: [],
-      risks: [
-        'HIPAA compliance requirements',
-        'Complex regulatory environment',
-        'Multiple stakeholder alignment needed'
-      ],
-      opportunities: [
-        'Long-term partnership potential',
-        'Multiple facility rollout: +$250K',
-        'Recurring maintenance revenue'
-      ],
-      techStack: ['React', 'Node.js', 'PostgreSQL', 'AWS', 'HIPAA Compliant'],
-      metrics: {
-        commits: 23,
-        prs: 4,
-        bugs: 0,
-        tests: 18,
-        coverage: 92,
-        uptime: 100
-      },
-      milestones: [
-        { name: 'Requirements Gathering', status: 'in-progress', date: '2024-01-30' },
-        { name: 'Architecture Design', status: 'pending', date: '2024-02-15' },
-        { name: 'Security & Compliance', status: 'pending', date: '2024-03-01' },
-        { name: 'Core Development', status: 'pending', date: '2024-03-30' },
-        { name: 'Testing & Certification', status: 'pending', date: '2024-04-20' },
-        { name: 'Launch', status: 'pending', date: '2024-04-30' }
-      ],
-      recentActivity: [
-        { type: 'meeting', user: 'Sarah Chen', message: 'Kickoff meeting completed', time: '2d ago' },
-        { type: 'comment', user: 'Client', message: 'Excited to get started!', time: '3d ago' }
-      ],
-      tags: ['Healthcare', 'Compliance', 'Enterprise'],
-      predictedCompletion: 'Apr 28 (2 days early)',
-      confidence: 88
-    },
-    {
-      id: 6,
-      name: 'Inventory Management System',
-      client: 'RetailMax',
-      clientLogo: 'RM',
-      status: 'Development',
-      statusType: 'active',
-      progress: 58,
-      velocity: 10,
-      health: 'on-track',
-      aiScore: 85,
-      aiInsight: 'Steady progress. Consider upselling mobile app companion.',
-      dueDate: '2024-02-20',
-      daysLeft: 30,
-      startDate: '2023-11-20',
-      priority: 'medium',
-      team: [
-        { name: 'David Park', role: 'Lead Dev', avatar: 'DP', status: 'active' },
-        { name: 'Chris Anderson', role: 'Backend', avatar: 'CA', status: 'active' },
-        { name: 'Emma Davis', role: 'Frontend', avatar: 'ED', status: 'active' }
-      ],
-      revenue: 42000,
-      budget: 45000,
-      spent: 26100,
-      profitability: 24,
-      blockers: [],
-      risks: [
-        'Legacy system integration complexity',
-        'Data migration challenges'
-      ],
-      opportunities: [
-        'Mobile app upsell: +$35K',
-        'Multi-location expansion: +$60K',
-        'Analytics module: +$18K'
-      ],
-      techStack: ['Vue.js', 'Python', 'MySQL', 'Redis', 'Docker'],
-      metrics: {
-        commits: 198,
-        prs: 31,
-        bugs: 2,
-        tests: 167,
-        coverage: 86,
-        uptime: 99.5
-      },
-      milestones: [
-        { name: 'Planning & Design', status: 'completed', date: '2023-12-05' },
-        { name: 'Core Modules', status: 'completed', date: '2023-12-30' },
-        { name: 'Inventory Features', status: 'in-progress', date: '2024-01-25' },
-        { name: 'Reporting Dashboard', status: 'in-progress', date: '2024-02-10' },
-        { name: 'Testing & Training', status: 'pending', date: '2024-02-18' },
-        { name: 'Launch', status: 'pending', date: '2024-02-20' }
-      ],
-      recentActivity: [
-        { type: 'commit', user: 'David Park', message: 'Barcode scanning implemented', time: '3h ago' },
-        { type: 'success', user: 'Emma Davis', message: 'UI components finalized', time: '6h ago' }
-      ],
-      tags: ['Retail', 'Inventory', 'B2B'],
-      predictedCompletion: 'Feb 20 (on time)',
-      confidence: 89
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+      if ((e.metaKey || e. ctrlKey) && e.key === 'i') {
+        e.preventDefault();
+        setShowAiPanel(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, []);
+
+  // Auto-scroll chat
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [aiConversation]);
+
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  // FIX #3: Add projects dependency
+  useEffect(() => {
+    if (projects.length > 0 && aiInsights.length === 0) {
+      generateRealAiInsights();
     }
-  ];
+  }, [projects. length]); // Changed from [projects] to avoid infinite loop
 
-  const filteredProjects = projects.filter(p => {
-    if (filter === 'all') return true;
-    if (filter === 'active') return ['Development', 'Testing', 'Planning'].includes(p.status);
-    if (filter === 'blocked') return p.statusType === 'danger';
-    if (filter === 'completed') return p.statusType === 'success';
-    return true;
-  });
-
-  const sortedProjects = [...filteredProjects].sort((a, b) => {
-    if (sortBy === 'health') return b.aiScore - a.aiScore;
-    if (sortBy === 'deadline') return a.daysLeft - b.daysLeft;
-    if (sortBy === 'revenue') return b.revenue - a.revenue;
-    return 0;
-  });
-
-  const getHealthColor = (score: number) => {
-    if (score >= 90) return 'emerald';
-    if (score >= 75) return 'blue';
-    if (score >= 60) return 'amber';
-    return 'red';
+  const fetchProjects = async () => {
+    try {
+      setLoading(true);
+      const mockProjects: Project[] = [
+        {
+          id: '1',
+          name: 'E-commerce Platform Redesign',
+          client: 'TechCorp Inc.',
+          type: 'web',
+          budget: 125000,
+          status: 'active',
+          priority: 'high',
+          deadline: '2026-03-15',
+          description: 'Complete overhaul of existing e-commerce platform with modern UI/UX',
+          created_at: '2026-01-10T10:00:00Z',
+          user_id: 'user1',
+          progress: 45,
+          actual_cost: 52000
+        },
+        {
+          id: '2',
+          name: 'Mobile Banking App',
+          client: 'FinanceFlow',
+          type: 'mobile',
+          budget: 200000,
+          status: 'active',
+          priority: 'critical',
+          deadline: '2026-02-28',
+          description: 'iOS and Android banking application with biometric authentication',
+          created_at: '2026-01-05T14:30:00Z',
+          user_id: 'user1',
+          progress: 65,
+          actual_cost: 130000
+        },
+        {
+          id: '3',
+          name: 'Brand Identity System',
+          client: 'StartupXYZ',
+          type: 'design',
+          budget: 45000,
+          status: 'planning',
+          priority: 'medium',
+          deadline: '2026-04-01',
+          description: 'Complete brand identity including logo, guidelines, and assets',
+          created_at: '2026-01-12T09:15:00Z',
+          user_id: 'user1',
+          progress: 15,
+          actual_cost: 8000
+        },
+        {
+          id: '4',
+          name: 'AI Chatbot Integration',
+          client:  'CustomerCare Co.',
+          type: 'web',
+          budget: 75000,
+          status: 'blocked',
+          priority: 'high',
+          deadline: '2026-01-20',
+          description: 'Custom AI chatbot for customer support automation',
+          created_at: '2025-12-20T16:45:00Z',
+          user_id: 'user1',
+          progress: 30,
+          actual_cost: 35000
+        },
+        {
+          id: '5',
+          name: 'Marketing Campaign Dashboard',
+          client: 'AdAgency Pro',
+          type: 'web',
+          budget: 60000,
+          status: 'ready',
+          priority: 'low',
+          deadline: '2026-02-15',
+          description: 'Analytics dashboard for tracking multi-channel campaigns',
+          created_at: '2025-12-15T11:20:00Z',
+          user_id: 'user1',
+          progress: 95,
+          actual_cost: 58000
+        }
+      ];
+      
+      setProjects(mockProjects);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const HealthScore = ({ score }: { score: number }) => {
-    const color = getHealthColor(score);
-    return (
-      <div className="flex items-center gap-2">
-        <div className="relative w-14 h-14">
-          <svg className="transform -rotate-90 w-14 h-14">
-            <circle cx="28" cy="28" r="24" stroke="currentColor" strokeWidth="3" fill="none" className="text-gray-800" />
-            <circle 
-              cx="28" 
-              cy="28" 
-              r="24" 
-              stroke="currentColor" 
-              strokeWidth="3" 
-              fill="none" 
-              className={`text-${color}-400`}
-              strokeDasharray={`${score * 1.507} 150.7`}
-              strokeLinecap="round"
-            />
-          </svg>
-          <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-white">{score}</span>
-        </div>
-        <div>
-          <div className={`text-sm font-semibold text-${color}-400`}>
-            {score >= 90 ? 'Excellent' : score >= 75 ? 'Good' : score >= 60 ? 'Fair' : 'Poor'}
-          </div>
-          <div className="text-xs text-gray-500">AI Health</div>
-        </div>
-      </div>
-    );
+  const generateRealAiInsights = async () => {
+    setIsAnalyzing(true);
+    try {
+      const projectsSummary = projects.map(p => ({
+        name: p.name,
+        status: p.status,
+        priority: p.priority,
+        budget: p.budget,
+        deadline: p.deadline,
+        progress: p.progress || 0
+      }));
+
+      // FIX #2: Add API key header
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": ANTHROPIC_API_KEY, // Added API key
+          "anthropic-version": "2023-06-01" // Added version header
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          messages: [{
+            role: "user",
+            content: `You are a project management AI assistant. Analyze these projects and provide 4-5 actionable insights in JSON format. Each insight should have a "type" (warning, success, info, or critical), "message" (the insight text), and optionally an "action" (recommended action).
+
+Projects data:
+${JSON.stringify(projectsSummary, null, 2)}
+
+Return ONLY a JSON array of insights, no other text.  Format: 
+[{"type": "warning", "message":  ".. .", "action": "..."}, ...]`
+          }]
+        })
+      });
+
+      if (! response.ok) {
+        throw new Error(`API request failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.content && data.content[0]) {
+        const textContent = data.content[0]. text;
+        const cleanedContent = textContent.replace(/```json\n? |\n?```/g, '').trim();
+        const insights = JSON.parse(cleanedContent);
+        setAiInsights(insights);
+      }
+    } catch (error) {
+      console.error('AI Insights Error:', error);
+      generateFallbackInsights();
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
-  const ProjectCard = ({ project }: { project: typeof projects[0] }) => {
-    const healthColor = getHealthColor(project.aiScore);
+  const generateFallbackInsights = () => {
+    const insights: AIInsight[] = [];
+    const now = new Date();
+    const overdueProjects = projects.filter(p => new Date(p.deadline) < now && p.status !== 'ready');
+    const criticalProjects = projects.filter(p => p.priority === 'critical');
+    const blockedProjects = projects.filter(p => p.status === 'blocked');
+    const totalBudget = projects.reduce((sum, p) => sum + p.budget, 0);
+    const totalActualCost = projects.reduce((sum, p) => sum + (p.actual_cost || 0), 0);
     
+    if (overdueProjects.length > 0) {
+      insights.push({
+        type: 'critical',
+        message: `${overdueProjects.length} project${overdueProjects.length > 1 ? 's are' : ' is'} overdue and requires immediate attention`,
+        action: 'Review timeline and allocate additional resources'
+      });
+    }
+    
+    if (criticalProjects.length > 0) {
+      insights.push({
+        type: 'warning',
+        message: `${criticalProjects.length} critical priority project${criticalProjects.length > 1 ? 's' : ''} in pipeline`,
+        action: 'Ensure top developers are assigned'
+      });
+    }
+    
+    if (blockedProjects.length > 0) {
+      insights.push({
+        type: 'warning',
+        message: `${blockedProjects.length} blocked project${blockedProjects.length > 1 ? 's need' : ' needs'} resolution to proceed`,
+        action: 'Schedule stakeholder meeting to unblock'
+      });
+    }
+    
+    const budgetUtilization = totalBudget > 0 ?  (totalActualCost / totalBudget) * 100 : 0;
+    if (budgetUtilization > 80) {
+      insights.push({
+        type: 'warning',
+        message: `Budget utilization at ${budgetUtilization.toFixed(1)}% - approaching limit`,
+        action: 'Review project budgets and negotiate extensions if needed'
+      });
+    } else {
+      insights.push({
+        type: 'success',
+        message: `Healthy budget utilization at ${budgetUtilization.toFixed(1)}%`,
+        action: 'Continue current spending trajectory'
+      });
+    }
+    
+    insights.push({
+      type: 'info',
+      message: `$${(totalBudget / 1000).toFixed(0)}K total budget across ${projects.length} projects`,
+      action: 'Portfolio diversification is balanced'
+    });
+    
+    setAiInsights(insights);
+  };
+
+  const handleDeepAnalysis = async () => {
+    setIsAnalyzing(true);
+    try {
+      const projectDetails = projects.map(p => ({
+        name: p.name,
+        client: p.client,
+        type: p.type,
+        budget: p.budget,
+        actual_cost: p.actual_cost || 0,
+        status:  p.status,
+        priority: p.priority,
+        deadline: p.deadline,
+        progress: p.progress || 0,
+        daysRemaining: Math.ceil((new Date(p.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+      }));
+
+      // FIX #2: Add API key header
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method:  "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": ANTHROPIC_API_KEY,
+          "anthropic-version":  "2023-06-01"
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 2000,
+          messages: [{
+            role: "user",
+            content: `As an expert project portfolio analyst, provide a comprehensive analysis of this project portfolio. Include:
+
+1. Overall portfolio health assessment
+2. Risk analysis and mitigation strategies
+3. Resource allocation recommendations
+4. Budget optimization opportunities
+5. Timeline predictions and concerns
+6. Strategic recommendations for the next quarter
+
+Portfolio Data:
+${JSON.stringify(projectDetails, null, 2)}
+
+Provide detailed, actionable insights formatted in markdown with clear sections. `
+          }]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.content && data.content[0]) {
+        setAiResponse(data.content[0].text);
+      } else {
+        setAiResponse('Unable to generate analysis.  Please try again.');
+      }
+    } catch (error) {
+      console.error('Deep Analysis Error:', error);
+      setAiResponse('**Analysis Error**\n\nUnable to connect to AI service. Please check your API key and connection.');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!userMessage.trim()) return;
+    
+    const newMessage = { role: 'user' as const, content: userMessage };
+    setAiConversation([...aiConversation, newMessage]);
+    setUserMessage('');
+    setIsSendingMessage(true);
+
+    try {
+      const conversationHistory = [... aiConversation, newMessage];
+      const projectContext = projects.map(p => ({
+        name: p.name,
+        client: p.client,
+        status: p.status,
+        priority: p.priority,
+        budget: p.budget,
+        deadline: p.deadline,
+        progress: p.progress
+      }));
+
+      // FIX #2: Add API key header
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method:  "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01"
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1500,
+          messages: [
+            {
+              role: "user",
+              content: `You are an AI project management assistant. Here is the current project portfolio context:
+
+${JSON.stringify(projectContext, null, 2)}
+
+Based on this context, answer the user's questions and provide helpful project management advice.  Be concise but insightful.`
+            },
+            ... conversationHistory
+          ]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status}`);
+      }
+
+      const data = await response. json();
+      
+      if (data.content && data.content[0]) {
+        const assistantMessage = {
+          role: 'assistant' as const,
+          content: data.content[0].text
+        };
+        setAiConversation(prev => [...prev, assistantMessage]);
+      }
+    } catch (error) {
+      console.error('Chat Error:', error);
+      const errorMessage = {
+        role: 'assistant' as const,
+        content:  'I apologize, but I encountered an error.  Please check your API key configuration.'
+      };
+      setAiConversation(prev => [... prev, errorMessage]);
+    } finally {
+      setIsSendingMessage(false);
+    }
+  };
+
+  // Memoized calculations
+  const stats = useMemo(() => {
+    const totalBudget = projects.reduce((sum, p) => sum + p.budget, 0);
+    const activeCount = projects.filter(p => p.status === 'active').length;
+    const atRiskCount = projects.filter(p => new Date(p.deadline) < new Date() || p.status === 'blocked').length;
+    const avgProgress = projects.length > 0 ? projects.reduce((sum, p) => sum + (p.progress || 0), 0) / projects.length : 0;
+    
+    return [
+      { 
+        label: 'Total Budget', 
+        value: `$${(totalBudget / 1000).toFixed(0)}K`, 
+        change: '+27%', 
+        trend: 'up',
+        icon: DollarSign, 
+        color: 'emerald' 
+      },
+      { 
+        label: 'Active Projects', 
+        value: activeCount. toString(), 
+        change: `${activeCount} active`, 
+        trend: 'up',
+        icon:  Briefcase, 
+        color: 'blue' 
+      },
+      { 
+        label: 'At Risk', 
+        value: atRiskCount.toString(), 
+        change: atRiskCount > 0 ?  'Needs attention' : 'On track',
+        trend: atRiskCount > 0 ?  'down' : 'up',
+        icon: AlertTriangle, 
+        color: 'red' 
+      },
+      { 
+        label: 'Completion Rate', 
+        value: `${Math.round(avgProgress)}%`, 
+        change: '+12%', 
+        trend: 'up',
+        icon: TrendingUp, 
+        color: 'purple' 
+      }
+    ];
+  }, [projects]);
+
+  const statusData = useMemo(() => [
+    { name: 'Planning', value: projects.filter(p => p.status === 'planning').length, color: '#6366f1' },
+    { name: 'Active', value: projects.filter(p => p.status === 'active').length, color: '#10b981' },
+    { name: 'Blocked', value:  projects.filter(p => p. status === 'blocked').length, color: '#ef4444' },
+    { name: 'Ready', value: projects.filter(p => p.status === 'ready').length, color: '#f59e0b' }
+  ], [projects]);
+
+  const budgetTrendData = useMemo(() => 
+    projects
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+      .slice(0, 5)
+      .map(p => ({
+        name: p.name. length > 15 ? p.name.substring(0, 15) + '...' : p.name,
+        budget: p.budget / 1000,
+        actual: (p.actual_cost || 0) / 1000
+      }))
+  , [projects]);
+
+  const filteredProjects = useMemo(() => {
+    return projects.filter(p => {
+      const matchesSearch = p. name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                           p.client.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesStatus = filterStatus === 'all' || p.status === filterStatus;
+      const matchesPriority = filterPriority === 'all' || p. priority === filterPriority;
+      return matchesSearch && matchesStatus && matchesPriority;
+    }).sort((a, b) => {
+      switch (sortBy) {
+        case 'deadline':
+          return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+        case 'budget':
+          return b.budget - a.budget;
+        case 'priority':
+          const priorityOrder = { critical: 0, high: 1, medium:  2, low: 3 };
+          return priorityOrder[a.priority] - priorityOrder[b.priority];
+        default:
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      }
+    });
+  }, [projects, searchQuery, filterStatus, filterPriority, sortBy]);
+
+  if (loading) {
     return (
-      <div className="group bg-gradient-to-br from-gray-900/50 to-gray-900/30 backdrop-blur-sm border border-gray-800/50 hover:border-gray-700/50 rounded-2xl p-6 transition-all cursor-pointer"
-        onClick={() => setSelectedProject(selectedProject === project.id ? null : project.id)}>
-        
-        {/* Header */}
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400 to-blue-500 flex items-center justify-center text-white font-bold text-lg">
-              {project.clientLogo}
-            </div>
-            <div>
-              <h3 className="font-bold text-lg text-white group-hover:text-emerald-400 transition-colors">
-                {project.name}
-              </h3>
-              <p className="text-sm text-gray-400">{project.client}</p>
-            </div>
-          </div>
-          <button className="p-2 hover:bg-gray-800 rounded-lg transition-colors" title="More options">
-            <MoreVertical className="w-5 h-5 text-gray-400" />
-          </button>
-        </div>
-
-        {/* Status & Health */}
-        <div className="flex items-center gap-3 mb-4">
-          <span className={`px-3 py-1 text-xs rounded-full border font-semibold ${
-            project.statusType === 'danger' ? 'bg-red-500/10 text-red-400 border-red-500/30 animate-pulse' :
-            project.statusType === 'warning' ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' :
-            project.statusType === 'active' ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' :
-            project.statusType === 'success' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' :
-            'bg-gray-500/10 text-gray-400 border-gray-500/30'
-          }`}>
-            {project.status}
-          </span>
-          <HealthScore score={project.aiScore} />
-        </div>
-
-        {/* AI Insight */}
-        <div className={`mb-4 p-3 rounded-xl border ${
-          project.aiScore >= 90 ? 'bg-emerald-500/5 border-emerald-500/20' :
-          project.aiScore >= 75 ? 'bg-blue-500/5 border-blue-500/20' :
-          'bg-amber-500/5 border-amber-500/20'
-        }`}>
-          <div className="flex items-start gap-2">
-            <Brain className={`w-4 h-4 mt-0.5 flex-shrink-0 text-${healthColor}-400`} />
-            <p className="text-sm text-gray-300">{project.aiInsight}</p>
-          </div>
-        </div>
-
-        {/* Metrics Grid */}
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          <div className="text-center p-3 bg-gray-800/30 rounded-lg">
-            <div className="text-2xl font-bold text-emerald-400">${(project.revenue / 1000).toFixed(0)}K</div>
-            <div className="text-xs text-gray-400">Revenue</div>
-          </div>
-          <div className="text-center p-3 bg-gray-800/30 rounded-lg">
-            <div className="text-2xl font-bold text-white">{project.progress}%</div>
-            <div className="text-xs text-gray-400">Complete</div>
-          </div>
-          <div className="text-center p-3 bg-gray-800/30 rounded-lg">
-            <div className="text-2xl font-bold text-blue-400">{project.daysLeft}d</div>
-            <div className="text-xs text-gray-400">Remaining</div>
-          </div>
-        </div>
-
-        {/* Progress Bar */}
-        <div className="mb-4">
-          <div className="flex items-center justify-between text-sm mb-2">
-            <span className="text-gray-400">Progress</span>
-            <div className={`flex items-center gap-1 text-xs font-semibold ${
-              project.velocity > 0 ? 'text-emerald-400' : project.velocity < 0 ? 'text-red-400' : 'text-gray-400'
-            }`}>
-              {project.velocity > 0 && <ArrowUp className="w-3 h-3" />}
-              {project.velocity < 0 && <ArrowDown className="w-3 h-3" />}
-              {project.velocity !== 0 && `${Math.abs(project.velocity)}% velocity`}
-            </div>
-          </div>
-          <div className="h-2.5 bg-gray-800 rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-500 bg-gradient-to-r ${
-                project.aiScore >= 90 ? 'from-emerald-500 to-blue-500' :
-                project.aiScore >= 75 ? 'from-blue-500 to-cyan-500' :
-                'from-amber-500 to-orange-500'
-              }`}
-              style={{ width: `${project.progress}%` }}
-            />
-          </div>
-        </div>
-
-        {/* Team */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex -space-x-2">
-            {project.team.slice(0, 4).map((member, i) => (
-              <div
-                key={i}
-                className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-blue-500 flex items-center justify-center text-xs font-bold border-2 border-gray-900 text-white"
-                title={`${member.name} - ${member.role}`}
-              >
-                {member.avatar}
-              </div>
-            ))}
-            {project.team.length > 4 && (
-              <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-xs font-semibold border-2 border-gray-900">
-                +{project.team.length - 4}
-              </div>
-            )}
-          </div>
-          <div className="text-xs text-gray-400">
-            {project.team.length} members
-          </div>
-        </div>
-
-        {/* Blockers */}
-        {project.blockers.length > 0 && (
-          <div className="mb-4 p-3 bg-red-500/5 border border-red-500/20 rounded-lg">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="w-4 h-4 text-red-400" />
-              <span className="text-sm font-semibold text-red-400">{project.blockers.length} Blocker{project.blockers.length > 1 ? 's' : ''}</span>
-            </div>
-            {project.blockers.slice(0, 1).map((blocker, i) => (
-              <p key={i} className="text-sm text-gray-300">• {blocker.message}</p>
-            ))}
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="flex gap-2">
-          <button className="flex-1 py-2.5 px-4 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-lg text-sm font-medium transition-all">
-            View Details
-          </button>
-          <button title="Send a message" className="py-2.5 px-4 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 rounded-lg transition-all">
-            <MessageSquare className="w-4 h-4 text-gray-400" />
-          </button>
-        </div>
-
-        {/* Tags */}
-        <div className="flex gap-2 mt-4 flex-wrap">
-          {project.tags.map((tag, i) => (
-            <span key={i} className="px-2 py-1 bg-gray-700/30 text-gray-300 text-xs rounded-md">
-              {tag}
-            </span>
-          ))}
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-slate-400">Loading project intelligence...</p>
         </div>
       </div>
     );
-  };
+  }
 
   return (
-    <div className="min-h-screen bg-[#0A0E1A] text-white p-8 space-y-6">
-      {/* Premium Header */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-emerald-900/20 via-blue-900/20 to-purple-900/20 border border-emerald-500/20 rounded-3xl p-8">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl"></div>
-        
-        <div className="relative z-10">
-          <div className="flex items-start justify-between mb-6">
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-white via-emerald-200 to-blue-200 bg-clip-text text-transparent mb-2">
-                Project Command Center
-              </h1>
-              <p className="text-gray-400 text-lg">
-                AI-powered project intelligence & real-time monitoring
-              </p>
-            </div>
-            <button className="flex items-center gap-2 px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl transition-all font-semibold shadow-lg shadow-emerald-500/20">
-              <Plus className="w-5 h-5" />
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+      {/* Animated Background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl" style={{ animation: 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite', animationDelay: '1s' }} />
+      </div>
+
+      <div className="relative z-10 p-6 max-w-[1800px] mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-white via-emerald-200 to-emerald-400 bg-clip-text text-transparent mb-2">
+              Project Intelligence Hub
+            </h1>
+            <p className="text-slate-400 flex items-center gap-2">
+              <Sparkles className="text-emerald-400" size={16} />
+              Real-time AI-powered insights and predictive analytics
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <button 
+              onClick={fetchProjects} 
+              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-medium transition-all flex items-center gap-2 border border-slate-700"
+            >
+              <RefreshCw size={18} />
+              Refresh
+            </button>
+            <button 
+              onClick={() => setShowAiPanel(! showAiPanel)} 
+              className="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg font-medium transition-all flex items-center gap-2 shadow-lg shadow-purple-500/25"
+            >
+              <Brain size={18} />
+              AI Copilot
+              <kbd className="px-1. 5 py-0.5 bg-white/20 rounded text-xs">⌘I</kbd>
+            </button>
+            <button 
+              onClick={() => setShowNewProjectDialog(true)} 
+              className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-semibold transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/25"
+            >
+              <Plus size={20} />
               New Project
             </button>
           </div>
+        </div>
 
-          {/* Quick Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="p-4 bg-white/5 rounded-xl border border-white/10">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-emerald-500/10 rounded-lg">
-                  <Rocket className="w-5 h-5 text-emerald-400" />
+        {/* AI Insights Banner */}
+        {aiInsights.length > 0 && (
+          <div className="mb-6 bg-gradient-to-r from-purple-900/30 to-pink-900/30 border border-purple-500/30 rounded-xl p-4">
+            <div className="flex items-start gap-3">
+              <Sparkles className="text-purple-400 mt-0.5 animate-pulse" size={20} />
+              <div className="flex-1">
+                <h3 className="text-white font-semibold mb-2 flex items-center gap-2">
+                  AI-Generated Insights
+                  <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded text-xs">Live Analysis</span>
+                </h3>
+                <div className="grid grid-cols-1 md: grid-cols-2 gap-2">
+                  {aiInsights. slice(0, 4).map((insight, idx) => (
+                    <div key={idx} className="flex items-start gap-2 p-2 bg-slate-900/30 rounded-lg">
+                      {insight.type === 'critical' && <XCircle className="text-red-400 flex-shrink-0 mt-0.5" size={16} />}
+                      {insight. type === 'warning' && <AlertTriangle className="text-yellow-400 flex-shrink-0 mt-0.5" size={16} />}
+                      {insight.type === 'success' && <CheckCircle2 className="text-green-400 flex-shrink-0 mt-0.5" size={16} />}
+                      {insight.type === 'info' && <Sparkles className="text-blue-400 flex-shrink-0 mt-0.5" size={16} />}
+                      <div className="flex-1">
+                        <p className="text-purple-200 text-sm">{insight.message}</p>
+                        {insight.action && (
+                          <p className="text-purple-300/70 text-xs mt-1">→ {insight.action}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  <div className="text-2xl font-bold text-white">{projects.length}</div>
-                  <div className="text-xs text-gray-400">Total Projects</div>
-                </div>
-              </div>
-            </div>
-            <div className="p-4 bg-white/5 rounded-xl border border-white/10">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-blue-500/10 rounded-lg">
-                  <Activity className="w-5 h-5 text-blue-400" />
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-white">
-                    {projects.filter(p => ['Development', 'Testing', 'Planning'].includes(p.status)).length}
-                  </div>
-                  <div className="text-xs text-gray-400">Active</div>
-                </div>
-              </div>
-            </div>
-            <div className="p-4 bg-white/5 rounded-xl border border-white/10">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-amber-500/10 rounded-lg">
-                  <AlertTriangle className="w-5 h-5 text-amber-400" />
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-white">
-                    {projects.filter(p => p.blockers.length > 0).length}
-                  </div>
-                  <div className="text-xs text-gray-400">Blocked</div>
-                </div>
-              </div>
-            </div>
-            <div className="p-4 bg-white/5 rounded-xl border border-white/10">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-purple-500/10 rounded-lg">
-                  <DollarSign className="w-5 h-5 text-purple-400" />
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-white">
-                    ${(projects.reduce((sum, p) => sum + p.revenue, 0) / 1000).toFixed(0)}K
-                  </div>
-                  <div className="text-xs text-gray-400">Total Value</div>
-                </div>
+                <button 
+                  onClick={() => setShowAiPanel(true)} 
+                  className="text-purple-300 hover:text-purple-200 text-sm mt-3 flex items-center gap-1"
+                >
+                  View detailed analysis <ChevronRight size={14} />
+                </button>
               </div>
             </div>
           </div>
-        </div>
-      </div>
+        )}
 
-      {/* Filters & Controls */}
-      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-        <div className="flex items-center gap-3 flex-wrap">
-          <button
-            onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              filter === 'all'
-                ? 'bg-emerald-500 text-white'
-                : 'bg-gray-800/50 text-gray-400 hover:bg-gray-800'
-            }`}
-          >
-            All Projects
-          </button>
-          <button
-            onClick={() => setFilter('active')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              filter === 'active'
-                ? 'bg-blue-500 text-white'
-                : 'bg-gray-800/50 text-gray-400 hover:bg-gray-800'
-            }`}
-          >
-            Active
-          </button>
-          <button
-            onClick={() => setFilter('blocked')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              filter === 'blocked'
-                ? 'bg-red-500 text-white'
-                : 'bg-gray-800/50 text-gray-400 hover:bg-gray-800'
-            }`}
-          >
-            Blocked
-          </button>
-          <button
-            onClick={() => setFilter('completed')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              filter === 'completed'
-                ? 'bg-emerald-500 text-white'
-                : 'bg-gray-800/50 text-gray-400 hover:bg-gray-800'
-            }`}
-          >
-            Ready to Deploy
-          </button>
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {stats.map((stat, idx) => {
+            const Icon = stat.icon;
+            const colors = COLORS[stat.color as keyof typeof COLORS];
+            return (
+              <div key={idx} className="bg-slate-900/50 border border-slate-800/50 rounded-xl p-5 hover:border-slate-700/50 transition-all group">
+                <div className="flex items-start justify-between mb-4">
+                  <div className={`p-2.5 rounded-lg ${colors.bg} ${colors. border} border`}>
+                    <Icon className={colors.text} size={20} />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {stat.trend === 'up' ?  (
+                      <ArrowUp className="text-emerald-400" size={16} />
+                    ) : (
+                      <ArrowDown className="text-red-400" size={16} />
+                    )}
+                    <span className={`text-xs font-semibold ${stat.trend === 'up' ? 'text-emerald-400' :  'text-red-400'}`}>
+                      {stat.change}
+                    </span>
+                  </div>
+                </div>
+                <p className="text-3xl font-bold text-white mb-1">{stat.value}</p>
+                <p className="text-sm text-slate-400">{stat.label}</p>
+              </div>
+            );
+          })}
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search projects..."
-              className="pl-10 pr-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-400 focus:outline-none focus:border-emerald-500/50 transition-colors"
+        {/* Charts Section */}
+        {projects.length > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <div className="lg:col-span-2 bg-slate-900/50 border border-slate-800/50 rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <BarChart3 size={20} className="text-emerald-400" />
+                Budget vs Actual Cost
+              </h3>
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={budgetTrendData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} />
+                  <YAxis stroke="#94a3b8" fontSize={12} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                    labelStyle={{ color:  '#e2e8f0' }}
+                  />
+                  <Line type="monotone" dataKey="budget" stroke="#10b981" strokeWidth={2} name="Budget ($K)" />
+                  <Line type="monotone" dataKey="actual" stroke="#f59e0b" strokeWidth={2} name="Actual ($K)" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* FIX #1: Fixed PieChart legend */}
+            <div className="bg-slate-900/50 border border-slate-800/50 rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-white mb-4">Project Status</h3>
+              {statusData.some(s => s.value > 0) ? (
+                <>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <PieChart>
+                      <Pie 
+                        data={statusData. filter(s => s.value > 0)} 
+                        cx="50%" 
+                        cy="50%" 
+                        innerRadius={50} 
+                        outerRadius={70} 
+                        paddingAngle={5} 
+                        dataKey="value"
+                      >
+                        {statusData.filter(s => s.value > 0).map((e, i) => (
+                          <Cell key={i} fill={e.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="mt-4 space-y-2">
+                    {statusData.filter(s => s.value > 0).map((item, idx) => (
+                      <div key={idx} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                          <span className="text-sm text-slate-300">{item.name}</span>
+                        </div>
+                        <span className="text-sm font-semibold text-white">{item.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-8 text-slate-400 text-sm">No data available</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Filters and Search */}
+        <div className="mb-6 flex flex-col md:flex-row gap-4">
+          <div className="flex-1 relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+            <Command className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+            <input 
+              ref={searchRef}
+              type="text" 
+              placeholder="Search projects...  (⌘K)" 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-12 pr-12 py-3 bg-slate-900/50 border border-slate-800/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50 transition-colors"
             />
           </div>
-          
-          <select
-            title="Sort projects"
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
-            className="px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
-          >
-            <option value="health">Sort by Health</option>
-            <option value="deadline">Sort by Deadline</option>
-            <option value="revenue">Sort by Revenue</option>
-          </select>
+          <div className="flex gap-3">
+            <label htmlFor="filterStatus" className="sr-only">Filter by status</label>
+            <select 
+              id="filterStatus"
+              aria-label="Filter by status"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="px-4 py-3 bg-slate-900/50 border border-slate-800/50 rounded-lg text-white focus:outline-none focus:border-emerald-500/50"
+            >
+              <option value="all">All Status</option>
+              <option value="planning">Planning</option>
+              <option value="active">Active</option>
+              <option value="blocked">Blocked</option>
+              <option value="ready">Ready</option>
+            </select>
 
-          <button title="Filter options" className="p-2 bg-gray-800/50 border border-gray-700 rounded-lg hover:bg-gray-800 transition-colors">
-            <Filter className="w-5 h-5 text-gray-400" />
-          </button>
-          
-          <button title="Filter options" className="p-2 bg-gray-800/50 border border-gray-700 rounded-lg hover:bg-gray-800 transition-colors">
-            <Download className="w-5 h-5 text-gray-400" />
-          </button>
+            <label htmlFor="filterPriority" className="sr-only">Filter by priority</label>
+            <select 
+              id="filterPriority"
+              aria-label="Filter by priority"
+              value={filterPriority}
+              onChange={(e) => setFilterPriority(e.target.value)}
+              className="px-4 py-3 bg-slate-900/50 border border-slate-800/50 rounded-lg text-white focus:outline-none focus:border-emerald-500/50"
+            >
+              <option value="all">All Priority</option>
+              <option value="critical">Critical</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+
+            <label htmlFor="sortBy" className="sr-only">Sort by</label>
+            <select 
+              id="sortBy"
+              aria-label="Sort by"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="px-4 py-3 bg-slate-900/50 border border-slate-800/50 rounded-lg text-white focus:outline-none focus:border-emerald-500/50"
+            >
+              <option value="created">Latest</option>
+              <option value="deadline">Deadline</option>
+              <option value="budget">Budget</option>
+              <option value="priority">Priority</option>
+            </select>
+            <div className="flex border border-slate-800/50 rounded-lg overflow-hidden">
+              <button 
+                onClick={() => setView('grid')}
+                className={`px-4 py-3 ${view === 'grid' ? 'bg-emerald-500 text-white' : 'bg-slate-900/50 text-slate-400 hover:text-white'} transition-colors`}
+              >
+                <LayoutGrid size={18} />
+              </button>
+              <button 
+                onClick={() => setView('list')}
+                className={`px-4 py-3 ${view === 'list' ? 'bg-emerald-500 text-white' :  'bg-slate-900/50 text-slate-400 hover:text-white'} transition-colors`}
+              >
+                <List size={18} />
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Projects Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        {sortedProjects.map((project) => (
-          <ProjectCard key={project.id} project={project} />
-        ))}
-      </div>
-
-      {/* Detailed Project View Modal */}
-      {selectedProject && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-          onClick={() => setSelectedProject(null)}>
-          <div className="max-w-6xl w-full max-h-[90vh] overflow-y-auto bg-gradient-to-br from-gray-900 to-gray-900/90 border border-gray-800 rounded-3xl"
-            onClick={(e) => e.stopPropagation()}>
-            {(() => {
-              const project = projects.find(p => p.id === selectedProject);
-              if (!project) return null;
-              const healthColor = getHealthColor(project.aiScore);
-
+        {/* Projects Grid/List */}
+        {filteredProjects.length === 0 ?  (
+          <div className="bg-slate-900/50 border border-slate-800/50 rounded-xl p-12 text-center">
+            <Target className="text-slate-600 mx-auto mb-4" size={48} />
+            <h3 className="text-xl font-semibold text-white mb-2">No projects found</h3>
+            <p className="text-slate-400 mb-6">Try adjusting your filters or create a new project</p>
+            <button 
+              onClick={() => setShowNewProjectDialog(true)}
+              className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-semibold transition-all inline-flex items-center gap-2"
+            >
+              <Plus size={20} />
+              Create Project
+            </button>
+          </div>
+        ) : (
+          <div className={view === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
+            {filteredProjects.map((project) => {
+              const daysRemaining = Math.ceil((new Date(project.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+              const isOverdue = daysRemaining < 0;
+              const progressPercent = project.progress || 0;
+              
+              const priorityColors = {
+                critical: { bg: 'bg-red-500/10', border: 'border-red-500/30', text: 'text-red-400' },
+                high: { bg: 'bg-orange-500/10', border: 'border-orange-500/30', text: 'text-orange-400' },
+                medium:  { bg: 'bg-yellow-500/10', border: 'border-yellow-500/30', text: 'text-yellow-400' },
+                low:  { bg: 'bg-green-500/10', border: 'border-green-500/30', text: 'text-green-400' }
+              };
+              
+              const statusColors = {
+                planning: { bg: 'bg-blue-500/10', text: 'text-blue-400' },
+                active: { bg: 'bg-green-500/10', text: 'text-green-400' },
+                blocked: { bg: 'bg-red-500/10', text: 'text-red-400' },
+                ready: { bg: 'bg-purple-500/10', text: 'text-purple-400' }
+              };
+              
+              const priorityColor = priorityColors[project.priority];
+              const statusColor = statusColors[project.status];
+              
               return (
-                <div className="p-8">
-                  {/* Modal Header */}
-                  <div className="flex items-start justify-between mb-8">
-                    <div className="flex items-center gap-4">
-                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-blue-500 flex items-center justify-center text-white font-bold text-2xl">
-                        {project.clientLogo}
-                      </div>
-                      <div>
-                        <h2 className="text-3xl font-bold text-white mb-1">{project.name}</h2>
-                        <p className="text-gray-400">{project.client}</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setSelectedProject(null)}
-                      className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
-                    >
-                      <span className="text-2xl text-gray-400">×</span>
-                    </button>
-                  </div>
-
-                  {/* AI Health & Status */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    <div className={`p-6 rounded-2xl border bg-gradient-to-br ${
-                      project.aiScore >= 90 ? 'from-emerald-900/20 to-emerald-900/5 border-emerald-500/30' :
-                      project.aiScore >= 75 ? 'from-blue-900/20 to-blue-900/5 border-blue-500/30' :
-                      'from-amber-900/20 to-amber-900/5 border-amber-500/30'
-                    }`}>
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-semibold text-white">AI Health Score</h3>
-                        <Brain className={`w-6 h-6 text-${healthColor}-400`} />
-                      </div>
-                      <HealthScore score={project.aiScore} />
-                      <p className="text-sm text-gray-300 mt-4">{project.aiInsight}</p>
-                    </div>
-
-                    <div className="p-6 rounded-2xl border bg-gradient-to-br from-gray-800/40 to-gray-800/20 border-gray-700/50">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-semibold text-white">Progress</h3>
-                        <Activity className="w-6 h-6 text-blue-400" />
-                      </div>
-                      <div className="text-4xl font-bold text-white mb-2">{project.progress}%</div>
-                      <div className="h-3 bg-gray-800 rounded-full overflow-hidden mb-4">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 bg-gradient-to-r from-${healthColor}-500 to-${healthColor}-400`}
-                          style={{ width: `${project.progress}%` }}
-                        />
-                      </div>
-                      <div className={`flex items-center gap-2 text-sm ${
-                        project.velocity > 0 ? 'text-emerald-400' : project.velocity < 0 ? 'text-red-400' : 'text-gray-400'
-                      }`}>
-                        {project.velocity > 0 && <ArrowUp className="w-4 h-4" />}
-                        {project.velocity < 0 && <ArrowDown className="w-4 h-4" />}
-                        <span>{project.velocity !== 0 ? `${Math.abs(project.velocity)}% velocity` : 'Stable'}</span>
-                      </div>
-                    </div>
-
-                    <div className="p-6 rounded-2xl border bg-gradient-to-br from-gray-800/40 to-gray-800/20 border-gray-700/50">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-semibold text-white">Timeline</h3>
-                        <Clock className="w-6 h-6 text-purple-400" />
-                      </div>
-                      <div className="text-4xl font-bold text-white mb-2">{project.daysLeft}d</div>
-                      <div className="text-sm text-gray-400 mb-4">Days remaining</div>
-                      <div className="text-sm">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-gray-400">Due date:</span>
-                          <span className="text-white font-semibold">{project.dueDate}</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-gray-400">Predicted:</span>
-                          <span className={project.predictedCompletion.includes('early') ? 'text-emerald-400' : project.predictedCompletion.includes('late') ? 'text-red-400' : 'text-blue-400'}>
-                            {project.predictedCompletion}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Financial Overview */}
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                    <div className="p-4 bg-gray-800/30 rounded-xl">
-                      <div className="text-sm text-gray-400 mb-1">Revenue</div>
-                      <div className="text-2xl font-bold text-emerald-400">${(project.revenue / 1000).toFixed(0)}K</div>
-                    </div>
-                    <div className="p-4 bg-gray-800/30 rounded-xl">
-                      <div className="text-sm text-gray-400 mb-1">Budget</div>
-                      <div className="text-2xl font-bold text-white">${(project.budget / 1000).toFixed(0)}K</div>
-                    </div>
-                    <div className="p-4 bg-gray-800/30 rounded-xl">
-                      <div className="text-sm text-gray-400 mb-1">Spent</div>
-                      <div className="text-2xl font-bold text-blue-400">${(project.spent / 1000).toFixed(1)}K</div>
-                    </div>
-                    <div className="p-4 bg-gray-800/30 rounded-xl">
-                      <div className="text-sm text-gray-400 mb-1">Margin</div>
-                      <div className="text-2xl font-bold text-purple-400">{project.profitability}%</div>
-                    </div>
-                  </div>
-
-                  {/* Blockers, Risks, Opportunities */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    {project.blockers.length > 0 && (
-                      <div className="p-6 bg-red-500/5 border border-red-500/20 rounded-xl">
-                        <div className="flex items-center gap-2 mb-4">
-                          <AlertTriangle className="w-5 h-5 text-red-400" />
-                          <h3 className="font-semibold text-red-400">Blockers</h3>
-                        </div>
-                        <div className="space-y-2">
-                          {project.blockers.map((blocker, i) => (
-                            <div key={i} className="text-sm text-gray-300">
-                              • {blocker.message}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="p-6 bg-amber-500/5 border border-amber-500/20 rounded-xl">
-                      <div className="flex items-center gap-2 mb-4">
-                        <Shield className="w-5 h-5 text-amber-400" />
-                        <h3 className="font-semibold text-amber-400">Risks</h3>
-                      </div>
-                      <div className="space-y-2">
-                        {project.risks.map((risk, i) => (
-                          <div key={i} className="text-sm text-gray-300">
-                            • {risk}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="p-6 bg-emerald-500/5 border border-emerald-500/20 rounded-xl">
-                      <div className="flex items-center gap-2 mb-4">
-                        <Sparkles className="w-5 h-5 text-emerald-400" />
-                        <h3 className="font-semibold text-emerald-400">Opportunities</h3>
-                      </div>
-                      <div className="space-y-2">
-                        {project.opportunities.map((opp, i) => (
-                          <div key={i} className="text-sm text-gray-300">
-                            • {opp}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Tech Stack & Metrics */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                    <div className="p-6 bg-gray-800/30 rounded-xl">
-                      <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
-                        <Terminal className="w-5 h-5 text-blue-400" />
-                        Tech Stack
+                <div 
+                  key={project.id} 
+                  className="bg-slate-900/50 border border-slate-800/50 rounded-xl p-6 hover:border-slate-700/50 transition-all group cursor-pointer"
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-white mb-1 group-hover:text-emerald-400 transition-colors">
+                        {project.name}
                       </h3>
-                      <div className="flex flex-wrap gap-2">
-                        {project.techStack.map((tech, i) => (
-                          <span key={i} className="px-3 py-1.5 bg-gray-700/50 text-gray-300 text-sm rounded-lg font-medium">
-                            {tech}
-                          </span>
-                        ))}
-                      </div>
+                      <p className="text-sm text-slate-400">{project.client}</p>
                     </div>
-
-                    <div className="p-6 bg-gray-800/30 rounded-xl">
-                      <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
-                        <BarChart3 className="w-5 h-5 text-purple-400" />
-                        Code Metrics
-                      </h3>
-                      <div className="grid grid-cols-3 gap-4">
-                        <div>
-                          <div className="text-2xl font-bold text-white">{project.metrics.commits}</div>
-                          <div className="text-xs text-gray-400">Commits</div>
-                        </div>
-                        <div>
-                          <div className="text-2xl font-bold text-white">{project.metrics.prs}</div>
-                          <div className="text-xs text-gray-400">PRs</div>
-                        </div>
-                        <div>
-                          <div className={`text-2xl font-bold ${project.metrics.bugs === 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                            {project.metrics.bugs}
-                          </div>
-                          <div className="text-xs text-gray-400">Bugs</div>
-                        </div>
-                        <div>
-                          <div className="text-2xl font-bold text-white">{project.metrics.tests}</div>
-                          <div className="text-xs text-gray-400">Tests</div>
-                        </div>
-                        <div>
-                          <div className="text-2xl font-bold text-emerald-400">{project.metrics.coverage}%</div>
-                          <div className="text-xs text-gray-400">Coverage</div>
-                        </div>
-                        <div>
-                          <div className="text-2xl font-bold text-blue-400">{project.metrics.uptime}%</div>
-                          <div className="text-xs text-gray-400">Uptime</div>
-                        </div>
-                      </div>
+                    <div className={`px-2. 5 py-1 rounded-lg ${priorityColor.bg} ${priorityColor.border} border`}>
+                      <span className={`text-xs font-semibold uppercase ${priorityColor.text}`}>
+                        {project.priority}
+                      </span>
                     </div>
                   </div>
-
-                  {/* Team */}
-                  <div className="p-6 bg-gray-800/30 rounded-xl mb-8">
-                    <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
-                      <Users className="w-5 h-5 text-emerald-400" />
-                      Team Members
-                    </h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {project.team.map((member, i) => (
-                        <div key={i} className="flex items-center gap-3 p-3 bg-gray-700/30 rounded-lg">
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-blue-500 flex items-center justify-center text-sm font-bold text-white">
-                            {member.avatar}
-                          </div>
-                          <div>
-                            <div className="text-sm font-semibold text-white">{member.name}</div>
-                            <div className="text-xs text-gray-400">{member.role}</div>
-                          </div>
-                        </div>
-                      ))}
+                  
+                  <p className="text-sm text-slate-300 mb-4 line-clamp-2">{project.description}</p>
+                  
+                  <div className="space-y-3 mb-4">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-400">Progress</span>
+                      <span className="text-white font-semibold">{progressPercent}%</span>
+                    </div>
+                    <div className="w-full bg-slate-800/50 rounded-full h-2 overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full transition-all duration-500"
+                        style={{ width:  `${progressPercent}%` }}
+                      />
                     </div>
                   </div>
-
-                  {/* Milestones Timeline */}
-                  <div className="p-6 bg-gray-800/30 rounded-xl mb-8">
-                    <h3 className="font-semibold text-white mb-6 flex items-center gap-2">
-                      <Target className="w-5 h-5 text-purple-400" />
-                      Project Milestones
-                    </h3>
-                    <div className="space-y-4">
-                      {project.milestones.map((milestone, i) => (
-                        <div key={i} className="flex items-start gap-4">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                            milestone.status === 'completed' ? 'bg-emerald-500' :
-                            milestone.status === 'in-progress' ? 'bg-blue-500 animate-pulse' :
-                            'bg-gray-700'
-                          }`}>
-                            {milestone.status === 'completed' && <CheckCircle2 className="w-5 h-5 text-white" />}
-                            {milestone.status === 'in-progress' && <Activity className="w-5 h-5 text-white" />}
-                            {milestone.status === 'pending' && <Circle className="w-5 h-5 text-gray-500" />}
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <h4 className="font-semibold text-white">{milestone.name}</h4>
-                              <span className="text-sm text-gray-400">{milestone.date}</span>
-                            </div>
-                            <span className={`text-xs px-2 py-1 rounded-full ${
-                              milestone.status === 'completed' ? 'bg-emerald-500/10 text-emerald-400' :
-                              milestone.status === 'in-progress' ? 'bg-blue-500/10 text-blue-400' :
-                              'bg-gray-500/10 text-gray-400'
-                            }`}>
-                              {milestone.status.charAt(0).toUpperCase() + milestone.status.slice(1).replace('-', ' ')}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
+                  
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">Budget</p>
+                      <p className="text-sm font-semibold text-white">${(project.budget / 1000).toFixed(0)}K</p>
+                      <p className="text-xs text-slate-400">${((project.actual_cost || 0) / 1000).toFixed(0)}K used</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">Deadline</p>
+                      <p className={`text-sm font-semibold ${isOverdue ? 'text-red-400' : 'text-white'}`}>
+                        {new Date(project.deadline).toLocaleDateString()}
+                      </p>
+                      <p className={`text-xs ${isOverdue ? 'text-red-400' : 'text-slate-400'}`}>
+                        {isOverdue ? `${Math.abs(daysRemaining)}d overdue` : `${daysRemaining}d left`}
+                      </p>
                     </div>
                   </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex gap-4">
-                    <button className="flex-1 py-4 px-6 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-semibold transition-all">
-                      Open Project Dashboard
-                    </button>
-                    <button className="flex-1 py-4 px-6 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded-xl font-semibold transition-all">
-                      Contact Client
-                    </button>
-                    <button title="Settings" className="py-4 px-6 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 rounded-xl transition-all">
-                      <Settings className="w-5 h-5 text-gray-400" />
-                    </button>
+                  
+                  <div className="flex items-center justify-between pt-4 border-t border-slate-800/50">
+                    <div className={`px-2.5 py-1 rounded-lg ${statusColor.bg}`}>
+                      <span className={`text-xs font-medium ${statusColor.text}`}>
+                        {project.status}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button className="p-2 hover:bg-slate-800 rounded-lg transition-colors">
+                        <Users size={16} className="text-slate-400" />
+                      </button>
+                      <button className="p-2 hover:bg-slate-800 rounded-lg transition-colors">
+                        <MessageSquare size={16} className="text-slate-400" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
-            })()}
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* AI Copilot Panel */}
+      {showAiPanel && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between p-6 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg">
+                  <Brain className="text-white" size={24} />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">AI Project Copilot</h2>
+                  <p className="text-sm text-slate-400">Powered by Claude</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowAiPanel(false)}
+                className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
+              >
+                <X className="text-slate-400" size={24} />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-hidden flex">
+              <div className="w-1/3 border-r border-slate-800 p-4 overflow-y-auto">
+                <h3 className="text-sm font-semibold text-white mb-3">Quick Actions</h3>
+                <div className="space-y-2">
+                  <button 
+                    onClick={handleDeepAnalysis}
+                    disabled={isAnalyzing}
+                    className="w-full text-left px-4 py-3 bg-slate-800/50 hover:bg-slate-800 rounded-lg transition-all flex items-center gap-3 disabled:opacity-50"
+                  >
+                    <BarChart3 size={18} className="text-emerald-400" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-white">Deep Analysis</p>
+                      <p className="text-xs text-slate-400">Portfolio insights</p>
+                    </div>
+                  </button>
+                  <button 
+                    onClick={generateRealAiInsights}
+                    disabled={isAnalyzing}
+                    className="w-full text-left px-4 py-3 bg-slate-800/50 hover:bg-slate-800 rounded-lg transition-all flex items-center gap-3 disabled:opacity-50"
+                  >
+                    <Zap size={18} className="text-yellow-400" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-white">Refresh Insights</p>
+                      <p className="text-xs text-slate-400">Update analysis</p>
+                    </div>
+                  </button>
+                </div>
+                
+                {aiInsights.length > 0 && (
+                  <div className="mt-6">
+                    <h3 className="text-sm font-semibold text-white mb-3">Current Insights</h3>
+                    <div className="space-y-2">
+                      {aiInsights.map((insight, idx) => (
+                        <div key={idx} className="p-3 bg-slate-800/30 rounded-lg border border-slate-700/50">
+                          <div className="flex items-start gap-2">
+                            {insight.type === 'critical' && <XCircle className="text-red-400 flex-shrink-0 mt-0.5" size={14} />}
+                            {insight.type === 'warning' && <AlertTriangle className="text-yellow-400 flex-shrink-0 mt-0.5" size={14} />}
+                            {insight.type === 'success' && <CheckCircle2 className="text-green-400 flex-shrink-0 mt-0.5" size={14} />}
+                            {insight.type === 'info' && <Sparkles className="text-blue-400 flex-shrink-0 mt-0.5" size={14} />}
+                            <p className="text-xs text-slate-300">{insight.message}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              <div className="flex-1 flex flex-col">
+                <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                  {aiResponse && (
+                    <div className="p-4 bg-slate-800/30 rounded-lg border border-slate-700/50">
+                      <div className="prose prose-invert prose-sm max-w-none">
+                        <div className="text-slate-300 whitespace-pre-wrap">{aiResponse}</div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {aiConversation. map((msg, idx) => (
+                    <div 
+                      key={idx} 
+                      className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div className={`max-w-[80%] p-4 rounded-lg ${
+                        msg.role === 'user' 
+                          ? 'bg-emerald-500 text-white' 
+                          : 'bg-slate-800/50 border border-slate-700/50 text-slate-200'
+                      }`}>
+                        <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {isSendingMessage && (
+                    <div className="flex justify-start">
+                      <div className="bg-slate-800/50 border border-slate-700/50 p-4 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" />
+                          <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                          <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div ref={chatEndRef} />
+                </div>
+                
+                <div className="p-4 border-t border-slate-800">
+                  <div className="flex gap-2">
+                    <input 
+                      type="text"
+                      value={userMessage}
+                      onChange={(e) => setUserMessage(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                      placeholder="Ask about your projects..."
+                      className="flex-1 px-4 py-3 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50"
+                    />
+                    <button 
+                      onClick={handleSendMessage}
+                      disabled={!userMessage.trim() || isSendingMessage}
+                      className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-all flex items-center gap-2"
+                    >
+                      <Send size={18} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

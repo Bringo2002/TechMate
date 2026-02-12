@@ -2,9 +2,10 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { FcGoogle } from "react-icons/fc";
-import { FiEye, FiEyeOff } from "react-icons/fi";
+import { FiEye, FiEyeOff, FiMail, FiLock } from "react-icons/fi";
 import { motion } from "framer-motion";
-import { validateEmail, validatePassword } from "../utils/validateForm";
+import { toast } from "react-hot-toast";
+import { validateEmail } from "../utils/validateForm";
 import supabase from "../lib/supabaseClient";
 import AuthLayout from "../layouts/AuthLayout";
 
@@ -13,7 +14,6 @@ const LoginPage: React.FC = () => {
 
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -22,22 +22,29 @@ const LoginPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
-    setError("");
 
     const emailError = validateEmail(formData.email);
-    if (emailError) return setError(emailError);
+    if (emailError) {
+      toast.error(emailError);
+      return;
+    }
 
-    const passwordError = validatePassword(formData.password);
-    if (passwordError) return setError(passwordError);
+    if (!formData.password) {
+      toast.error("Password is required");
+      return;
+    }
 
     setLoading(true);
+    const loadingToast = toast.loading("Signing in...");
+
     try {
       // 1️⃣ Sign in with email/password
       const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
       });
-      if (loginError) throw loginError;
+
+      if (loginError) throw loginData ? loginError : new Error(loginError?.message || "Invalid credentials");
 
       // 2️⃣ Fetch user role from profiles
       const { data: profileData, error: profileError } = await supabase
@@ -45,9 +52,15 @@ const LoginPage: React.FC = () => {
         .select("role")
         .eq("id", loginData.user?.id)
         .single();
-      if (profileError) throw profileError;
+
+      if (profileError) {
+        // Fallback if profile doesn't exist (edge case) -> default to user
+        console.warn("Profile fetch error:", profileError);
+      }
 
       const role = profileData?.role;
+
+      toast.success("Welcome back!", { id: loadingToast });
 
       // 3️⃣ Redirect based on role
       if (role === "admin") {
@@ -57,13 +70,15 @@ const LoginPage: React.FC = () => {
       }
     } catch (err: any) {
       console.error("Login failed:", err);
+      let errorMessage = "Unable to sign in.";
+      
       if (err.message?.toLowerCase().includes("email not confirmed")) {
-        setError("Please confirm your email before logging in. Check your inbox.");
+        errorMessage = "Please confirm your email address first.";
       } else if (err.message?.toLowerCase().includes("invalid login")) {
-        setError("Invalid email or password. Please try again.");
-      } else {
-        setError(err.message || "Unable to log in. Please try again later.");
+        errorMessage = "Invalid email or password.";
       }
+      
+      toast.error(errorMessage, { id: loadingToast });
     } finally {
       setLoading(false);
     }
@@ -71,49 +86,72 @@ const LoginPage: React.FC = () => {
 
   const handleGoogleLogin = async () => {
     try {
-      await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
         },
       });
-      // Redirect handled by AuthCallback
+      if (error) throw error;
     } catch (err: any) {
       console.error("Google login failed:", err);
-      setError("Google login failed. Please try again.");
+      toast.error("Google sign in failed.");
     }
+  };
+
+  // Animation variants for staggered entrance
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+        delayChildren: 0.2,
+      },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: { y: 0, opacity: 1 },
   };
 
   return (
     <AuthLayout
       title="Login"
       description="Login securely to TechMate and manage your tech solutions with futuristic ease."
-      canonical="https://yourdomain.com/login"
+      canonical="https://techmate.com/login"
       heading="Welcome Back"
     >
-      {error && (
-        <p role="alert" className="text-red-500 text-sm mb-4 text-center font-medium">
-          {error}
-        </p>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <motion.form 
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        onSubmit={handleSubmit} 
+        className="space-y-5"
+      >
         {/* Email */}
-        <input
-          type="email"
-          name="email"
-          placeholder="Email Address"
-          value={formData.email}
-          onChange={handleChange}
-          required
-          autoComplete="email"
-          aria-label="Email Address"
-          className="w-full p-3 rounded-xl bg-slate-800 text-white border border-slate-600
-                     focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all"
-        />
+        <motion.div variants={itemVariants} className="relative group">
+          <FiMail className="absolute left-4 top-3.5 text-slate-400 group-focus-within:text-cyan-400 transition-colors duration-300" size={20} />
+          <input
+            type="email"
+            name="email"
+            placeholder="Email Address"
+            value={formData.email}
+            onChange={handleChange}
+            required
+            autoComplete="email"
+            aria-label="Email Address"
+            className="w-full pl-12 pr-4 py-3 rounded-xl bg-slate-900/50 text-white border border-slate-700
+                       focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 
+                       placeholder-slate-500 transition-all duration-300 backdrop-blur-sm
+                       hover:bg-slate-900/70 shadow-inner shadow-black/20"
+          />
+        </motion.div>
 
         {/* Password */}
-        <div className="relative">
+        <motion.div variants={itemVariants} className="relative group">
+          <FiLock className="absolute left-4 top-3.5 text-slate-400 group-focus-within:text-cyan-400 transition-colors duration-300" size={20} />
           <input
             type={showPassword ? "text" : "password"}
             name="password"
@@ -123,64 +161,91 @@ const LoginPage: React.FC = () => {
             required
             autoComplete="current-password"
             aria-label="Password"
-            className="w-full p-3 rounded-xl bg-slate-800 text-white border border-slate-600
-                       focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all pr-10"
+            className="w-full pl-12 pr-12 py-3 rounded-xl bg-slate-900/50 text-white border border-slate-700
+                       focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 
+                       placeholder-slate-500 transition-all duration-300 backdrop-blur-sm
+                       hover:bg-slate-900/70 shadow-inner shadow-black/20"
           />
           <button
             type="button"
             onClick={() => setShowPassword((prev) => !prev)}
-            className="absolute right-3 top-3 text-gray-400 hover:text-white focus:outline-none"
+            className="absolute right-4 top-3.5 text-gray-500 hover:text-cyan-400 focus:outline-none transition-colors"
             aria-label={showPassword ? "Hide password" : "Show password"}
           >
             {showPassword ? <FiEyeOff size={20} /> : <FiEye size={20} />}
           </button>
-        </div>
+        </motion.div>
 
         {/* Forgot Password */}
-        <div className="flex justify-end">
-          <Link to="/forgot-password" className="text-sm text-blue-400 hover:underline">
-            Forgot Password?
+        <motion.div variants={itemVariants} className="flex justify-end">
+          <Link 
+            to="/forgot-password" 
+            className="text-sm text-cyan-500 hover:text-cyan-300 hover:underline transition-colors flex items-center gap-1 group"
+          >
+           <span>Forgot Password?</span>
           </Link>
-        </div>
+        </motion.div>
 
         {/* Login Button */}
-        <button
+        <motion.button
+          variants={itemVariants}
           type="submit"
           disabled={loading}
-          className="w-full bg-indigo-600 hover:bg-indigo-900 text-white font-bold py-3 rounded-xl
-                     transition-all duration-200 disabled:opacity-50 flex justify-center items-center"
+          whileHover={{ scale: 1.02, boxShadow: "0 0 20px rgba(6, 182, 212, 0.5)" }}
+          whileTap={{ scale: 0.98 }}
+          className="w-full bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 
+                     text-white font-bold py-3 rounded-xl transition-all duration-300 
+                     disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wider
+                     shadow-lg shadow-cyan-900/20 relative overflow-hidden group"
         >
           {loading ? (
-            <motion.div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            <div className="flex justify-center items-center gap-2">
+              <motion.div 
+                animate={{ rotate: 360 }}
+                transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full" 
+              />
+              <span>Signing in...</span>
+            </div>
           ) : (
-            "Login"
+            <span className="relative z-10 flex items-center justify-center gap-2">
+              Login
+            </span>
           )}
-        </button>
-      </form>
+          
+          {/* Shine effect on hover */}
+          <div className="absolute top-0 -left-full w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-12 group-hover:animate-shine" />
+        </motion.button>
+        
+        {/* Divider */}
+        <motion.div variants={itemVariants} className="relative flex py-2 items-center">
+          <div className="flex-grow border-t border-slate-700"></div>
+          <span className="flex-shrink-0 mx-4 text-slate-500 text-xs uppercase tracking-widest">Or continue with</span>
+          <div className="flex-grow border-t border-slate-700"></div>
+        </motion.div>
 
-      {/* Signup Link */}
-      <p className="text-center text-gray-300 mt-4">
-        Don’t have an account?{" "}
-        <Link to="/signup" className="text-blue-400 hover:underline">
-          Sign Up
-        </Link>
-      </p>
+        {/* Google login */}
+        <motion.button
+          variants={itemVariants}
+          type="button"
+          onClick={handleGoogleLogin}
+          whileHover={{ scale: 1.02, backgroundColor: "rgba(255, 255, 255, 0.1)" }}
+          whileTap={{ scale: 0.98 }}
+          className="w-full flex items-center justify-center gap-3 bg-slate-800/50 hover:bg-slate-800 text-slate-200 py-3 rounded-xl
+                     border border-slate-700 hover:border-slate-500 transition-all font-medium group backdrop-blur-sm"
+        >
+          <FcGoogle size={22} className="drop-shadow-sm" /> 
+          <span className="group-hover:text-white transition-colors">Sign in with Google</span>
+        </motion.button>
 
-      {/* Divider */}
-      <div className="flex items-center gap-4 my-6">
-        <hr className="flex-grow border-slate-600" />
-        <span className="text-slate-400">or</span>
-        <hr className="flex-grow border-slate-600" />
-      </div>
-
-      {/* Google login */}
-      <button
-        onClick={handleGoogleLogin}
-        className="w-full flex items-center justify-center gap-2 bg-white text-black py-3 rounded-xl
-                   shadow hover:shadow-lg transition-all font-semibold mb-6"
-      >
-        <FcGoogle size={24} /> Login with Google
-      </button>
+        {/* Signup Link */}
+        <motion.p variants={itemVariants} className="text-center text-slate-400 mt-6 text-sm">
+          Don't have an account?{" "}
+          <Link to="/signup" className="text-cyan-400 hover:text-cyan-300 font-bold hover:underline transition-colors ml-1">
+            Sign Up
+          </Link>
+        </motion.p>
+      </motion.form>
     </AuthLayout>
   );
 };
