@@ -124,14 +124,24 @@ const SignupPage: React.FC = () => {
 
   const handleGoogleSignup = async () => {
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
+          skipBrowserRedirect: true,
         },
       });
 
       if (error) throw error;
+
+      if (data?.url) {
+        try {
+           // @ts-ignore
+           window.top.location.href = data.url; 
+        } catch (e) {
+           window.location.href = data.url;
+        }
+      }
     } catch (err: any) {
       console.error("Google signup error:", err);
       toast.error("Google sign up failed.");
