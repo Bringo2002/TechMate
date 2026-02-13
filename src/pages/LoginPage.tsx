@@ -70,15 +70,18 @@ const LoginPage: React.FC = () => {
       }
     } catch (err: any) {
       console.error("Login failed:", err);
-      let errorMessage = "Unable to sign in.";
+      let errorMessage = err.message || "Unable to sign in.";
       
+      // Handle known Supabase/Network errors
       if (err.message?.toLowerCase().includes("email not confirmed")) {
         errorMessage = "Please confirm your email address first.";
       } else if (err.message?.toLowerCase().includes("invalid login")) {
         errorMessage = "Invalid email or password.";
+      } else if (err.message?.includes("Connection to server failed")) {
+         errorMessage = err.message; // Use the detailed message from useAuth
       }
       
-      toast.error(errorMessage, { id: loadingToast });
+      toast.error(errorMessage, { id: loadingToast, duration: 6000 });
     } finally {
       setLoading(false);
     }

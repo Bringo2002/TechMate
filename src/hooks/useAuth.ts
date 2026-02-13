@@ -74,13 +74,26 @@ export const useAuth = (): AuthHook => {
     }
   }, []);
 
+
+  const handleAuthError = (error: any) => {
+    console.error("Auth error:", error);
+    let message = error.message || "An unexpected error occurred.";
+
+    // Check for network/timeout errors (Supabase 522 or similar)
+    if (error.message === "Failed to fetch" || error.status === 522 || error.status === 504) {
+      message = "Connection to server failed. The database might be sleeping (paused) or you are offline. Please try again in a moment.";
+    }
+
+    return message;
+  };
+
   // ✅ Login with email + password
   const login = useCallback(
     async (email: string, password: string) => {
       setLoading(true);
       try {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw new Error(error.message);
+        if (error) throw error;
 
         setIsAuthenticated(!!data.session);
 
@@ -90,8 +103,7 @@ export const useAuth = (): AuthHook => {
           else navigate("/user");
         }
       } catch (err: any) {
-        console.error("Login failed:", err.message);
-        throw err;
+        throw new Error(handleAuthError(err));
       } finally {
         setLoading(false);
       }
@@ -109,7 +121,7 @@ export const useAuth = (): AuthHook => {
           password,
           options: { data: { full_name: name } },
         });
-        if (error) throw new Error(error.message);
+        if (error) throw error;
 
         setIsAuthenticated(!!data.session);
 
@@ -123,7 +135,10 @@ export const useAuth = (): AuthHook => {
               role: "user", // normal user by default
             });
 
-          if (profileError) throw new Error(profileError.message);
+          if (profileError) {
+            // If profile creation fails due to network, we should still allow the user to be 'signed up' but warn them
+            console.error("Profile creation failed:", profileError);
+          }
 
           await fetchUserRole(data.user.id);
 
@@ -134,8 +149,7 @@ export const useAuth = (): AuthHook => {
 
         return { session: data.session, user: data.user };
       } catch (err: any) {
-        console.error("Signup failed:", err.message);
-        throw err;
+        throw new Error(handleAuthError(err));
       } finally {
         setLoading(false);
       }
@@ -147,13 +161,13 @@ export const useAuth = (): AuthHook => {
   const logout = useCallback(async () => {
     try {
       const { error } = await supabase.auth.signOut();
-      if (error) throw new Error(error.message);
+      if (error) throw error;
 
       setIsAuthenticated(false);
       setUserRole(undefined);
       navigate("/login");
     } catch (err: any) {
-      console.warn("Logout error:", err.message);
+      console.warn("Logout error:", handleAuthError(err));
     }
   }, [navigate]);
 
@@ -161,7 +175,7 @@ export const useAuth = (): AuthHook => {
   const verifyToken = useCallback(async (): Promise<boolean> => {
     try {
       const { data, error } = await supabase.auth.getSession();
-      if (error) throw new Error(error.message);
+      if (error) throw error;
 
       const isValid = !!data.session;
       setIsAuthenticated(isValid);
@@ -172,52 +186,27 @@ export const useAuth = (): AuthHook => {
 
       return isValid;
     } catch (err: any) {
-      console.warn("Session check failed:", err.message);
+      console.warn("Session check failed:", handleAuthError(err));
       setIsAuthenticated(false);
       return false;
     }
   }, [fetchUserRole]);
 
-  // ✅ Request password reset
-  const requestPasswordReset = useCallback(async (email: string) => {
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin + "/reset-password",
-      });
-      if (error) throw new Error(error.message);
-    } catch (err: any) {
-      console.error("Request password reset failed:", err.message);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // ✅ Confirm password reset
-  const confirmPasswordReset = useCallback(
-    async (_token: string, newPassword: string) => {
-      setLoading(true);
-      try {
-        const { error } = await supabase.auth.updateUser({ password: newPassword });
-        if (error) throw new Error(error.message);
-      } catch (err: any) {
-        console.error("Confirm password reset failed:", err.message);
-        throw err;
-      } finally {
-        setLoading(false);
-      }
-    },
-    []
-  );
 
   // ✅ Google OAuth login/signup
   const loginWithGoogle = useCallback(async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
-    });
-    if (error) throw new Error(error.message);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          skipBrowserRedirect: true
+        },
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      throw new Error(handleAuthError(err));
+    }
   }, []);
 
   const signupWithGoogle = loginWithGoogle;
