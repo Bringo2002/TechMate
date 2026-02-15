@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { User } from "@supabase/supabase-js";
 import { useNavigate } from "react-router-dom";
 import supabase from "../lib/supabaseClient";
 
@@ -10,6 +11,7 @@ interface SignupResult {
 interface AuthHook {
   isAuthenticated: boolean;
   loading: boolean;
+  user: User | null;
   userRole?: string;
   login: (email: string, password: string) => Promise<void>;
   signup: (name: string, email: string, password: string) => Promise<SignupResult>;
@@ -24,6 +26,7 @@ interface AuthHook {
 export const useAuth = (): AuthHook => {
   const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [userRole, setUserRole] = useState<string | undefined>(undefined);
 
@@ -37,6 +40,7 @@ export const useAuth = (): AuthHook => {
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         setIsAuthenticated(!!session);
+        setUser(session?.user ?? null);
         if (session?.user) {
           await fetchUserRole(session.user.id);
         } else {
@@ -66,8 +70,9 @@ export const useAuth = (): AuthHook => {
         return undefined;
       }
 
-      setUserRole(data?.role);
-      return data?.role;
+      const role = (data as any)?.role;
+      setUserRole(role);
+      return role;
     } catch (err: any) {
       console.error("fetchUserRole error:", err.message);
       return undefined;
@@ -98,6 +103,7 @@ export const useAuth = (): AuthHook => {
         setIsAuthenticated(!!data.session);
 
         if (data.user) {
+          setUser(data.user);
           const role = await fetchUserRole(data.user.id);
           if (role === "admin") navigate("/dashboard");
           else navigate("/user");
@@ -133,7 +139,7 @@ export const useAuth = (): AuthHook => {
               id: data.user.id,
               email,
               role: "user", // normal user by default
-            });
+            } as any);
 
           if (profileError) {
             // If profile creation fails due to network, we should still allow the user to be 'signed up' but warn them
@@ -142,7 +148,11 @@ export const useAuth = (): AuthHook => {
 
           await fetchUserRole(data.user.id);
 
-          // Auto-login after signup
+        }
+
+        // Auto-login after signup
+        if (data.user) {
+          setUser(data.user);
           await supabase.auth.signInWithPassword({ email, password });
           navigate("/user"); // redirect to user dashboard
         }
@@ -164,6 +174,7 @@ export const useAuth = (): AuthHook => {
       if (error) throw error;
 
       setIsAuthenticated(false);
+      setUser(null);
       setUserRole(undefined);
       navigate("/login");
     } catch (err: any) {
@@ -179,6 +190,7 @@ export const useAuth = (): AuthHook => {
 
       const isValid = !!data.session;
       setIsAuthenticated(isValid);
+      setUser(data.session?.user ?? null);
 
       if (data.session?.user) {
         await fetchUserRole(data.session.user.id);
@@ -188,6 +200,7 @@ export const useAuth = (): AuthHook => {
     } catch (err: any) {
       console.warn("Session check failed:", handleAuthError(err));
       setIsAuthenticated(false);
+      setUser(null);
       return false;
     }
   }, [fetchUserRole]);
@@ -211,9 +224,32 @@ export const useAuth = (): AuthHook => {
 
   const signupWithGoogle = loginWithGoogle;
 
+  // ✅ Password Reset Request
+  const requestPasswordReset = useCallback(async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/update-password`,
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      throw new Error(handleAuthError(err));
+    }
+  }, []);
+
+  // ✅ Confirm Password Reset
+  const confirmPasswordReset = useCallback(async (_token: string, newPassword: string) => {
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+    } catch (err: any) {
+      throw new Error(handleAuthError(err));
+    }
+  }, []);
+
   return {
     isAuthenticated,
     loading,
+    user,
     userRole,
     login,
     signup,

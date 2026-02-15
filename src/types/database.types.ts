@@ -3,12 +3,12 @@
 // TypeScript types matching the Supabase database schema
 // ============================================================================
 
-export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+export type Json = any;
 
 // ============================================================================
 // Database Schema Type (for typed Supabase client)
 // ============================================================================
-export interface Database {
+export type Database = {
     public: {
         Tables: {
             profiles: {
@@ -87,6 +87,9 @@ export interface Database {
                 Update: SupportTicketUpdate;
             };
         };
+        Views: {
+            [_ in never]: never;
+        };
         Functions: {
             get_admin_metrics: {
                 Args: Record<string, never>;
@@ -97,11 +100,11 @@ export interface Database {
                 Returns: Json;
             };
             get_user_growth: {
-                Args: { p_months?: number };
+                Args: { p_months: number };
                 Returns: { month: string; count: number }[];
             };
             get_revenue_by_month: {
-                Args: { p_months?: number };
+                Args: { p_months: number };
                 Returns: { month: string; revenue: number }[];
             };
             is_admin: {
@@ -109,8 +112,14 @@ export interface Database {
                 Returns: boolean;
             };
         };
+        Enums: {
+            [_ in never]: never;
+        };
+        CompositeTypes: {
+            [_ in never]: never;
+        };
     };
-}
+};
 
 // ============================================================================
 // Enum Types

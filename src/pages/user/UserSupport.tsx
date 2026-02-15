@@ -1,31 +1,56 @@
-import React, { useState } from 'react';
-import { Plus, MessageSquare, Send, CheckCircle2, AlertCircle, Clock, Search } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, MessageSquare, Send, Clock, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
-
-interface SupportTicket {
-  id: number;
-  subject: string;
-  status: 'open' | 'resolved' | 'pending';
-  created: string;
-  replies: number;
-  priority: 'low' | 'medium' | 'high';
-}
+import { useAuth } from '../../hooks/useAuth';
+import * as supportService from '../../services/support.service';
+import type { SupportTicketRow, TicketPriority, TicketCategory } from '../../types/database.types';
 
 const UserSupport: React.FC = () => {
-  const [newTicket, setNewTicket] = useState({ subject: '', description: '', priority: 'medium' });
+  const { user } = useAuth();
+  const [tickets, setTickets] = useState<SupportTicketRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [newTicket, setNewTicket] = useState({ subject: '', description: '', priority: 'medium' as TicketPriority, category: 'general' as TicketCategory });
   const [isCreating, setIsCreating] = useState(false);
 
-  const supportTickets: SupportTicket[] = [
-    { id: 1024, subject: 'API Rate Limiting Issue', status: 'open', created: '2025-12-03', replies: 2, priority: 'high' },
-    { id: 1023, subject: 'Design System Integration', status: 'resolved', created: '2025-11-28', replies: 5, priority: 'medium' },
-    { id: 1021, subject: 'Billing Cycle Question', status: 'pending', created: '2025-12-01', replies: 1, priority: 'low' }
-  ];
+  useEffect(() => {
+    if (user) {
+      loadTickets();
+    }
+  }, [user]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const loadTickets = async () => {
+    if (!user) return;
+    setLoading(true);
+    const { data, error } = await supportService.getUserTickets(user.id);
+    if (error) {
+      toast.error('Failed to load tickets');
+    } else {
+      setTickets(data || []);
+    }
+    setLoading(false);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success('Ticket created successfully!');
-    setNewTicket({ subject: '', description: '', priority: 'medium' });
-    setIsCreating(false);
+    if (!user) return;
+
+    const { error } = await supportService.createTicket({
+      user_id: user.id,
+      subject: newTicket.subject,
+      description: newTicket.description,
+      priority: newTicket.priority,
+      category: newTicket.category, // Default category
+      status: 'open'
+    } as any);
+
+    if (error) {
+      toast.error('Failed to create ticket: ' + error.message);
+    } else {
+      toast.success('Ticket created successfully!');
+      setNewTicket({ subject: '', description: '', priority: 'medium', category: 'general' });
+      setIsCreating(false);
+      loadTickets();
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -95,7 +120,7 @@ const UserSupport: React.FC = () => {
                       <label className="text-sm font-medium text-gray-300">Priority</label>
                       <select
                         value={newTicket.priority}
-                        onChange={(e) => setNewTicket({...newTicket, priority: e.target.value as 'low' | 'medium' | 'high'})}
+                        onChange={(e) => setNewTicket({...newTicket, priority: e.target.value as TicketPriority})}
                         className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 hover:bg-slate-800/80 transition-colors"
                       >
                         <option value="low">Low - General Question</option>
@@ -105,10 +130,15 @@ const UserSupport: React.FC = () => {
                     </div>
                      <div className="space-y-2">
                       <label className="text-sm font-medium text-gray-300">Category</label>
-                      <select className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 hover:bg-slate-800/80 transition-colors">
-                        <option>Technical Support</option>
-                        <option>Billing & Account</option>
-                        <option>Feature Request</option>
+                      <select 
+                        value={newTicket.category}
+                        onChange={(e) => setNewTicket({...newTicket, category: e.target.value as TicketCategory})}
+                        className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 hover:bg-slate-800/80 transition-colors"
+                      >
+                        <option value="technical">Technical Support</option>
+                        <option value="billing">Billing & Account</option>
+                        <option value="feature_request">Feature Request</option>
+                        <option value="general">General Inquiry</option>
                       </select>
                     </div>
                   </div>
@@ -162,38 +192,42 @@ const UserSupport: React.FC = () => {
                 </div>
 
                 {/* Ticket List */}
-                {supportTickets.map(ticket => (
-                  <div 
-                    key={ticket.id}
-                    className="group bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 rounded-2xl p-6 hover:border-indigo-500/30 transition-all cursor-pointer hover:bg-slate-800/40"
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <span className="text-gray-500 font-mono text-sm">#{ticket.id}</span>
-                          <h3 className="text-lg font-bold text-white group-hover:text-indigo-400 transition-colors">{ticket.subject}</h3>
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold border ${getStatusColor(ticket.status)}`}>
-                            {ticket.status}
-                          </span>
+                {loading ? (
+                    <div className="text-center text-gray-400 py-10">Loading tickets...</div>
+                ) : tickets.length === 0 ? (
+                    <div className="text-center text-gray-400 py-10">No tickets found.</div>
+                ) : (
+                  tickets.map(ticket => (
+                    <div 
+                      key={ticket.id}
+                      className="group bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 rounded-2xl p-6 hover:border-indigo-500/30 transition-all cursor-pointer hover:bg-slate-800/40"
+                    >
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="text-gray-500 font-mono text-sm">#{ticket.id.slice(0, 8)}</span>
+                            <h3 className="text-lg font-bold text-white group-hover:text-indigo-400 transition-colors">{ticket.subject}</h3>
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold border ${getStatusColor(ticket.status)}`}>
+                              {ticket.status}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-4 text-sm text-gray-400">
+                            <span className="flex items-center gap-1.5">
+                              <Clock size={14} /> Created {new Date(ticket.created_at).toLocaleDateString()}
+                            </span>
+                            {/* Replies count not in table yet, just static/hidden */}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-gray-400">
-                          <span className="flex items-center gap-1.5">
-                            <Clock size={14} /> Created {ticket.created}
-                          </span>
-                          <span className="flex items-center gap-1.5">
-                            <MessageSquare size={14} /> {ticket.replies} replies
-                          </span>
+                        <div className="flex flex-col items-end gap-2">
+                           <span className={`text-xs font-bold uppercase ${getPriorityColor(ticket.priority)}`}>
+                             {ticket.priority} Priority
+                           </span>
+                           {/* <span className="text-xs text-gray-500">Last activity 2h ago</span> */}
                         </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-2">
-                         <span className={`text-xs font-bold uppercase ${getPriorityColor(ticket.priority)}`}>
-                           {ticket.priority} Priority
-                         </span>
-                         <span className="text-xs text-gray-500">Last activity 2h ago</span>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             )}
           </div>

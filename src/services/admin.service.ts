@@ -28,7 +28,7 @@ export async function getAdminMetrics(): Promise<ServiceResponse<AdminDashboardM
 // Chart Data
 // ============================================================================
 export async function getUserGrowth(months: number = 12): Promise<ServiceResponse<GrowthDataPoint[]>> {
-    const { data, error } = await supabase.rpc('get_user_growth', { p_months: months });
+    const { data, error } = await supabase.rpc<'get_user_growth'>('get_user_growth', { p_months: months });
 
     if (error) {
         return { data: null, error: { code: error.code, message: error.message } };
@@ -52,13 +52,14 @@ export async function getRevenueStats() {
     const { data: invoices, error } = await supabase
         .from('invoices')
         .select('amount, tax_amount, status, paid_date, created_at')
-        .is('deleted_at', null);
+        .is('deleted_at', null)
+        .returns<InvoiceRow[]>();
 
     if (error) return { totalRevenue: 0, paidRevenue: 0, pendingRevenue: 0, overdueRevenue: 0, monthlyRevenue: 0 };
 
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    const all = invoices ?? [];
+    const all = (invoices as InvoiceRow[]) ?? [];
 
     return {
         totalRevenue: all.reduce((s, i) => s + (i.amount ?? 0) + (i.tax_amount ?? 0), 0),
@@ -120,6 +121,19 @@ export async function getRecentInvoices(limit: number = 10): Promise<ServiceResp
         .from('invoices')
         .select('*')
         .is('deleted_at', null)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+    if (error) {
+        return { data: null, error: { code: error.code, message: error.message } };
+    }
+    return { data: data ?? [], error: null };
+}
+
+export async function getRecentActivity(limit: number = 10): Promise<ServiceResponse<any[]>> {
+    const { data, error } = await supabase
+        .from('activity_logs')
+        .select('*, profiles(full_name, avatar_url, email)')
         .order('created_at', { ascending: false })
         .limit(limit);
 

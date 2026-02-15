@@ -24,6 +24,7 @@ interface AdminDashboardData {
         overdueRevenue: number;
         monthlyRevenue: number;
     };
+    recentActivity: any[];
     loading: boolean;
     error: string | null;
     refresh: () => Promise<void>;
@@ -41,6 +42,7 @@ export function useAdmin(): AdminDashboardData {
     const [revenueStats, setRevenueStats] = useState({
         totalRevenue: 0, paidRevenue: 0, pendingRevenue: 0, overdueRevenue: 0, monthlyRevenue: 0,
     });
+    const [recentActivity, setRecentActivity] = useState<any[]>([]); // TODO: Define strict type
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -59,6 +61,7 @@ export function useAdmin(): AdminDashboardData {
                 requestsRes,
                 categories,
                 revStats,
+                activityRes,
             ] = await Promise.all([
                 adminService.getAdminMetrics(),
                 adminService.getUserGrowth(12),
@@ -69,6 +72,7 @@ export function useAdmin(): AdminDashboardData {
                 adminService.getOpenRequests(10),
                 adminService.getServiceCategories(),
                 adminService.getRevenueStats(),
+                adminService.getRecentActivity(10),
             ]);
 
             setMetrics(metricsRes.data);
@@ -80,6 +84,7 @@ export function useAdmin(): AdminDashboardData {
             setOpenRequests(requestsRes.data ?? []);
             setServiceCategories(categories);
             setRevenueStats(revStats);
+            setRecentActivity(activityRes.data ?? []);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load admin data');
         } finally {
@@ -101,6 +106,7 @@ export function useAdmin(): AdminDashboardData {
         openRequests,
         serviceCategories,
         revenueStats,
+        recentActivity,
         loading,
         error,
         refresh: fetchAll,

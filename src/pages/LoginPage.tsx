@@ -46,11 +46,13 @@ const LoginPage: React.FC = () => {
 
       if (loginError) throw loginData ? loginError : new Error(loginError?.message || "Invalid credentials");
 
+      if (!loginData.user) throw new Error("User not found");
+
       // 2️⃣ Fetch user role from profiles
       const { data: profileData, error: profileError } = await supabase
         .from("profiles")
         .select("role")
-        .eq("id", loginData.user?.id)
+        .eq("id", loginData.user.id)
         .single();
 
       if (profileError) {
@@ -58,7 +60,7 @@ const LoginPage: React.FC = () => {
         console.warn("Profile fetch error:", profileError);
       }
 
-      const role = profileData?.role;
+      const role = (profileData as any)?.role;
 
       toast.success("Welcome back!", { id: loadingToast });
 
