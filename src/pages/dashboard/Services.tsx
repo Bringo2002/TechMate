@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Globe, Smartphone, Cloud, Database, Code2, Cpu, Zap, Shield, Layers, Terminal, Brain, TrendingUp, TrendingDown, ArrowUp, ArrowDown, DollarSign, Users, Award, Target, BarChart3, Activity, Rocket, CheckCircle2, AlertTriangle, Sparkles, Eye, ChevronRight, Plus, Filter, Download, PieChart, LineChart, Flame, Star, Briefcase, Clock, CircleDot, Package, Server, GitBranch, Boxes, Network, Settings } from 'lucide-react';
+import { useState } from 'react';
+import { Globe, Smartphone, Cloud, Database, Brain, TrendingUp, ArrowUp, DollarSign, Users, Award, Target, BarChart3, Rocket, CheckCircle2, Sparkles, ChevronRight, Plus, PieChart, Star, Briefcase, Server, Terminal, Settings } from 'lucide-react';
 
 const Services = () => {
   const [selectedService, setSelectedService] = useState<number | null>(null);
@@ -525,7 +525,7 @@ const Services = () => {
               <select
                 aria-label="Select time range"
                 value={timeRange}
-                onChange={(e) => setTimeRange(e.target.value as any)}
+                onChange={(e) => setTimeRange(e.target.value as any)} // eslint-disable-line @typescript-eslint/no-explicit-any
                 className="px-4 py-2.5 bg-gray-800/50 border border-gray-700 rounded-xl text-sm text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
               >
                 <option value="7d">Last 7 days</option>

@@ -140,7 +140,7 @@ export default function TeamManagement() {
   };
 
   const filteredAndSortedMembers = useMemo(() => {
-    let filtered = teamMembers. filter(m => {
+    const filtered = teamMembers. filter(m => {
       const matchesSearch = m.name. toLowerCase().includes(searchQuery.toLowerCase()) ||
                            m.email.toLowerCase().includes(searchQuery. toLowerCase());
       const matchesStatus = statusFilter === 'all' || m.status === statusFilter;

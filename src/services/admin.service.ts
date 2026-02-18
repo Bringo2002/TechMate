@@ -130,7 +130,10 @@ export async function getRecentInvoices(limit: number = 10): Promise<ServiceResp
     return { data: data ?? [], error: null };
 }
 
-export async function getRecentActivity(limit: number = 10): Promise<ServiceResponse<any[]>> {
+
+import type { ActivityLogRow } from '../types/database.types';
+
+export async function getRecentActivity(limit: number = 10): Promise<ServiceResponse<ActivityLogRow[]>> {
     const { data, error } = await supabase
         .from('activity_logs')
         .select('*, profiles(full_name, avatar_url, email)')

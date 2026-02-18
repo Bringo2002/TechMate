@@ -30,6 +30,9 @@ import Clients from "./pages/dashboard/Clients";
 import Revenue from "./pages/dashboard/Revenue";
 import Consulting from "./pages/dashboard/Consulting";
 import Deployments from "./pages/dashboard/Deployments";
+// Admin Pages
+import { InquiryPipeline } from './pages/admin/InquiryPipeline';
+import { InquiryDetail } from './pages/admin/InquiryDetail';
 import Messages from './pages/user/Messages';
 import UserOverview from './pages/user/UserOverview';
 import UserOrders from './pages/user/UserOrders';
@@ -123,6 +126,8 @@ const App: React.FC = () => {
   >
     <Route index element={<Overview />} />
     <Route path="projects" element={<Projects />} />
+    <Route path="inquiries" element={<InquiryPipeline />} />
+    <Route path="inquiries/:inquiryId" element={<InquiryDetail />} />
     <Route path="services" element={<Services />} />
     <Route path="analytics" element={<Analytics />} />
     <Route path="clients" element={<Clients />} />

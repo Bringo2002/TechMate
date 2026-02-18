@@ -50,7 +50,7 @@ export function useRealtime<T extends Record<string, unknown>>(
                     event: options.event ?? '*',
                     schema: 'public',
                     table: options.table,
-                    ...(options.filter ? { filter: options.filter } : {}),
+                    filter: options.filter,
                 },
                 (payload) => {
                     const eventType = payload.eventType as EventType;

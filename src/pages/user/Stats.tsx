@@ -23,48 +23,52 @@ import {
   Legend
 } from 'recharts';
 
+// Static Data moved outside component
+const activityData = [
+  { name: 'Mon', hours: 4, tasks: 12 },
+  { name: 'Tue', hours: 6, tasks: 18 },
+  { name: 'Wed', hours: 8, tasks: 24 },
+  { name: 'Thu', hours: 5, tasks: 15 },
+  { name: 'Fri', hours: 7, tasks: 20 },
+  { name: 'Sat', hours: 2, tasks: 5 },
+  { name: 'Sun', hours: 0, tasks: 0 },
+];
+
+const projectDistribution = [
+  { name: 'Development', value: 45, color: '#8b5cf6' },
+  { name: 'Design', value: 25, color: '#ec4899' },
+  { name: 'Meeting', value: 15, color: '#f59e0b' },
+  { name: 'Planning', value: 15, color: '#10b981' },
+];
+
+const skillsGrowth = [
+  { name: 'Jan', score: 65 },
+  { name: 'Feb', score: 68 },
+  { name: 'Mar', score: 75 },
+  { name: 'Apr', score: 72 },
+  { name: 'May', score: 80 },
+  { name: 'Jun', score: 85 },
+];
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl shadow-xl">
+        <p className="font-semibold text-white mb-1">{label}</p>
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+        {payload.map((entry: any, index: number) => (
+          <p key={index} className="text-sm" style={{ color: entry.color }}>
+            {entry.name}: {entry.value}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
 export default function Stats() {
-  const activityData = [
-    { name: 'Mon', hours: 4, tasks: 12 },
-    { name: 'Tue', hours: 6, tasks: 18 },
-    { name: 'Wed', hours: 8, tasks: 24 },
-    { name: 'Thu', hours: 5, tasks: 15 },
-    { name: 'Fri', hours: 7, tasks: 20 },
-    { name: 'Sat', hours: 2, tasks: 5 },
-    { name: 'Sun', hours: 0, tasks: 0 },
-  ];
-
-  const projectDistribution = [
-    { name: 'Development', value: 45, color: '#8b5cf6' },
-    { name: 'Design', value: 25, color: '#ec4899' },
-    { name: 'Meeting', value: 15, color: '#f59e0b' },
-    { name: 'Planning', value: 15, color: '#10b981' },
-  ];
-
-  const skillsGrowth = [
-    { name: 'Jan', score: 65 },
-    { name: 'Feb', score: 68 },
-    { name: 'Mar', score: 75 },
-    { name: 'Apr', score: 72 },
-    { name: 'May', score: 80 },
-    { name: 'Jun', score: 85 },
-  ];
-
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl shadow-xl">
-          <p className="font-semibold text-white mb-1">{label}</p>
-          {payload.map((entry: any, index: number) => (
-            <p key={index} className="text-sm" style={{ color: entry.color }}>
-              {entry.name}: {entry.value}
-            </p>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
 
   return (
     <div className="p-6 space-y-8 min-h-screen">
@@ -210,5 +214,7 @@ export default function Stats() {
 }
 
 // Helper Icons for JSX
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function CheckCheck(props: any) { return <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg> }
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function PieChartIcon(props: any) { return <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg> }

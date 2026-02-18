@@ -1,10 +1,7 @@
 import React, { useState } from 'react';
-import { DollarSign, ArrowUp, ArrowDown, Download, CreditCard, Wallet, PiggyBank, BarChart3, Target, Zap, Clock, CheckCircle2, AlertCircle, XCircle, RefreshCw, ChevronRight, ChevronDown, Briefcase, Globe, Smartphone, Database, Cloud, Code, Send, FileText, TrendingUp } from 'lucide-react';
+import { DollarSign, ArrowUp, ArrowDown, Download, CreditCard, Wallet, PiggyBank, BarChart3, Target, Zap, Clock, CheckCircle2, AlertCircle, XCircle, RefreshCw, ChevronRight, ChevronDown, Briefcase, Globe, Smartphone, Database, Cloud, Code, FileText, TrendingUp } from 'lucide-react';
 
-export default function Revenue() {
-  const [timeRange, setTimeRange] = useState('month');
-  const [expandedService, setExpandedService] = useState<number | null>(null);
-
+// Static Data moved outside component to prevent recreation on render
   const revenueMetrics = {
     total: { current: 847290, previous: 687450, target: 900000 },
     recurring: { current: 234500, previous: 198200, percentage: 27.7 },
@@ -59,7 +56,7 @@ export default function Revenue() {
     { method: 'Crypto', count: 4, amount: 23290, percentage: 2.8, icon: PiggyBank, color: 'amber' }
   ];
 
-interface ColorClasses {
+  interface ColorClasses {
     bg: string;
     text: string;
     bgLight: string;
@@ -97,7 +94,7 @@ const getStatusConfig = (status: string): StatusConfig => {
     return configs[status] || configs.pending;
 };
 
-  const RevenueChart = () => {
+const RevenueChart = () => {
     const maxRevenue = Math.max(...monthlyRevenue.map(m => m.revenue));
     
     return (
@@ -207,6 +204,11 @@ const getStatusConfig = (status: string): StatusConfig => {
       </div>
     );
   };
+
+export default function Revenue() {
+  const [timeRange, setTimeRange] = useState('month');
+  const [expandedService, setExpandedService] = useState<number | null>(null);
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 p-8">
@@ -418,7 +420,7 @@ const getStatusConfig = (status: string): StatusConfig => {
                   <div key={idx} className="flex items-center justify-between p-3 bg-gray-800/30 hover:bg-gray-800/50 border border-gray-800 rounded-xl transition-all group cursor-pointer">
                     <div className="flex items-center gap-3 flex-1">
                       <div className={`p-2 ${config.bgLight} rounded-lg`}>
-                        {Icon && React.createElement(Icon, { className: `w-4 h-4 ${config.text}` } as any)}
+                        {Icon && React.createElement(Icon, { className: `w-4 h-4 ${config.text}` } as any)} {/* eslint-disable-line @typescript-eslint/no-explicit-any */}
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2">

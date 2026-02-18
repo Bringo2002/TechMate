@@ -1,10 +1,13 @@
 // src/store/authStore.ts
 import { create } from "zustand";
 
+
+import type { ProfileRow } from "../types/database.types";
+
 interface AuthState {
   token: string | null;
-  user: any | null;
-  setAuth: (token: string, user: any) => void;
+  user: ProfileRow | null;
+  setAuth: (token: string, user: ProfileRow) => void;
   clearAuth: () => void;
 }
 

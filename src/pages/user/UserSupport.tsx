@@ -3,7 +3,7 @@ import { Plus, MessageSquare, Send, Clock, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../hooks/useAuth';
 import * as supportService from '../../services/support.service';
-import type { SupportTicketRow, TicketPriority, TicketCategory } from '../../types/database.types';
+import type { SupportTicketRow, SupportTicketInsert, TicketPriority, TicketCategory } from '../../types/database.types';
 
 const UserSupport: React.FC = () => {
   const { user } = useAuth();
@@ -41,7 +41,7 @@ const UserSupport: React.FC = () => {
       priority: newTicket.priority,
       category: newTicket.category, // Default category
       status: 'open'
-    } as any);
+    } as SupportTicketInsert);
 
     if (error) {
       toast.error('Failed to create ticket: ' + error.message);
