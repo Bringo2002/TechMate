@@ -3,7 +3,7 @@ import supabase from '../../lib/supabaseClient';
 import {
   Settings, User, Bell, Shield, Clock, Users, Save, X, Check, Info, 
   CheckCircle, XCircle, Search, UserPlus, UserCheck, Laptop, Smartphone,
-  Download, AlertTriangle, Activity, Trash2
+  Download, AlertTriangle, Activity
 } from 'lucide-react';
 import { DeleteAccountButton } from '../../components/Buttons/DeleteAccountButton';
 
@@ -277,7 +277,7 @@ export default function AdminSettings() {
                     {m.role === 'owner' ? (
                       <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium bg-violet-900/30 text-violet-300 border border-violet-800/50">Owner</span>
                     ) : (
-                      <select title="Change role" value={m.role} onChange={(e) => handleRoleChange(m.id, e.target.value as any)} disabled={m.status === 'suspended'} className="px-2.5 py-1 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded text-xs font-medium text-zinc-300 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-all">
+                      <select title="Change role" value={m.role} onChange={(e) => handleRoleChange(m.id, e.target.value as 'admin' | 'developer' | 'viewer')} disabled={m.status === 'suspended'} className="px-2.5 py-1 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded text-xs font-medium text-zinc-300 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-all">
                         <option value="admin">Admin</option>
                         <option value="developer">Developer</option>
                         <option value="viewer">Viewer</option>
@@ -607,7 +607,8 @@ export default function AdminSettings() {
   );
 
   // Function to handle account deletion
-  const deleteAccount = async () => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _deleteAccount = async () => {
     const res = await fetch("/api/account", {
       method: "DELETE",
       credentials: "include",
@@ -784,7 +785,7 @@ export default function AdminSettings() {
                 <select
                   title="Select role for the new team member"
                   value={inviteRole}
-                  onChange={(e) => setInviteRole(e.target.value as any)}
+                  onChange={(e) => setInviteRole(e.target.value as 'admin' | 'developer' | 'viewer')}
                   className="w-full px-3 py-2 bg-black border border-zinc-800 hover:border-zinc-700 focus:border-violet-500 rounded-md text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-all"
                 >
                   <option value="admin">Admin</option>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, MessageSquare, Send, Clock, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../hooks/useAuth';
@@ -11,14 +11,10 @@ const UserSupport: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [newTicket, setNewTicket] = useState({ subject: '', description: '', priority: 'medium' as TicketPriority, category: 'general' as TicketCategory });
   const [isCreating, setIsCreating] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
-  useEffect(() => {
-    if (user) {
-      loadTickets();
-    }
-  }, [user]);
-
-  const loadTickets = async () => {
+  const loadTickets = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     const { data, error } = await supportService.getUserTickets(user.id);
@@ -28,7 +24,14 @@ const UserSupport: React.FC = () => {
       setTickets(data || []);
     }
     setLoading(false);
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetching pattern
+      void loadTickets();
+    }
+  }, [user, loadTickets]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -181,23 +184,43 @@ const UserSupport: React.FC = () => {
                     <input 
                       type="text" 
                       placeholder="Search tickets..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
                       className="w-full bg-slate-900/40 border border-slate-800 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-indigo-500"
                     />
                   </div>
-                  <select className="bg-slate-900/40 border border-slate-800 rounded-xl px-4 py-3 text-gray-300 focus:outline-none focus:border-indigo-500">
-                    <option>All Status</option>
-                    <option>Open</option>
-                    <option>Resolved</option>
+                  <select 
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="bg-slate-900/40 border border-slate-800 rounded-xl px-4 py-3 text-gray-300 focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value="all">All Status</option>
+                    <option value="open">Open</option>
+                    <option value="pending">Pending</option>
+                    <option value="resolved">Resolved</option>
+                    <option value="closed">Closed</option>
                   </select>
                 </div>
 
                 {/* Ticket List */}
                 {loading ? (
                     <div className="text-center text-gray-400 py-10">Loading tickets...</div>
-                ) : tickets.length === 0 ? (
+                ) : tickets.filter(t => {
+                    const matchesSearch = !searchQuery || 
+                      t.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      (t.description || '').toLowerCase().includes(searchQuery.toLowerCase());
+                    const matchesStatus = statusFilter === 'all' || t.status === statusFilter;
+                    return matchesSearch && matchesStatus;
+                  }).length === 0 ? (
                     <div className="text-center text-gray-400 py-10">No tickets found.</div>
                 ) : (
-                  tickets.map(ticket => (
+                  tickets.filter(t => {
+                    const matchesSearch = !searchQuery || 
+                      t.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      (t.description || '').toLowerCase().includes(searchQuery.toLowerCase());
+                    const matchesStatus = statusFilter === 'all' || t.status === statusFilter;
+                    return matchesSearch && matchesStatus;
+                  }).map(ticket => (
                     <div 
                       key={ticket.id}
                       className="group bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 rounded-2xl p-6 hover:border-indigo-500/30 transition-all cursor-pointer hover:bg-slate-800/40"

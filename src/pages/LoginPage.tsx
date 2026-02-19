@@ -60,7 +60,7 @@ const LoginPage: React.FC = () => {
         console.warn("Profile fetch error:", profileError);
       }
 
-      const role = (profileData as any)?.role;
+      const role = (profileData as unknown as Record<string, unknown>)?.role;
 
       toast.success("Welcome back!", { id: loadingToast });
 
@@ -70,17 +70,18 @@ const LoginPage: React.FC = () => {
       } else {
         navigate("/user", { replace: true });
       }
-    } catch (err: any) {
-      console.error("Login failed:", err);
-      let errorMessage = err.message || "Unable to sign in.";
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error("Login failed:", error);
+      let errorMessage = error.message || "Unable to sign in.";
       
       // Handle known Supabase/Network errors
-      if (err.message?.toLowerCase().includes("email not confirmed")) {
+      if (error.message?.toLowerCase().includes("email not confirmed")) {
         errorMessage = "Please confirm your email address first.";
-      } else if (err.message?.toLowerCase().includes("invalid login")) {
+      } else if (error.message?.toLowerCase().includes("invalid login")) {
         errorMessage = "Invalid email or password.";
-      } else if (err.message?.includes("Connection to server failed")) {
-         errorMessage = err.message; // Use the detailed message from useAuth
+      } else if (error.message?.includes("Connection to server failed")) {
+         errorMessage = error.message; // Use the detailed message from useAuth
       }
       
       toast.error(errorMessage, { id: loadingToast, duration: 6000 });
@@ -103,14 +104,14 @@ const LoginPage: React.FC = () => {
       if (data?.url) {
         // Attempt to redirect via top window to break out of iframes if possible
         try {
-           // @ts-ignore
+           // @ts-expect-error - accessing window.top.location may fail in cross-origin iframes
            window.top.location.href = data.url; 
-        } catch (e) {
+        } catch {
            // Fallback if blocked
            window.location.href = data.url;
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Google login failed:", err);
       toast.error("Google sign in failed.");
     }

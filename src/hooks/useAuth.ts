@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-import { User } from "@supabase/supabase-js";
+import { User, Session } from "@supabase/supabase-js";
 import { useNavigate } from "react-router-dom";
 import supabase from "../lib/supabaseClient";
 
 interface SignupResult {
-  session: any | null;
-  user: any | null;
+  session: Session | null;
+  user: User | null;
 }
 
 interface AuthHook {
@@ -54,6 +54,7 @@ export const useAuth = (): AuthHook => {
     return () => {
       authListener.subscription.unsubscribe();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 🔹 Fetch role from profiles table
@@ -70,22 +71,23 @@ export const useAuth = (): AuthHook => {
         return undefined;
       }
 
-      const role = (data as any)?.role;
+      const role = (data as Record<string, unknown>)?.role as string | undefined;
       setUserRole(role);
       return role;
-    } catch (err: any) {
-      console.error("fetchUserRole error:", err.message);
+    } catch (err: unknown) {
+      console.error("fetchUserRole error:", err instanceof Error ? err.message : err);
       return undefined;
     }
   }, []);
 
 
-  const handleAuthError = (error: any) => {
+  const handleAuthError = (error: unknown) => {
     console.error("Auth error:", error);
-    let message = error.message || "An unexpected error occurred.";
+    const err = error as Record<string, unknown>;
+    let message = (err?.message as string) || "An unexpected error occurred.";
 
     // Check for network/timeout errors (Supabase 522 or similar)
-    if (error.message === "Failed to fetch" || error.status === 522 || error.status === 504) {
+    if (err?.message === "Failed to fetch" || err?.status === 522 || err?.status === 504) {
       message = "Connection to server failed. The database might be sleeping (paused) or you are offline. Please try again in a moment.";
     }
 
@@ -108,7 +110,7 @@ export const useAuth = (): AuthHook => {
           if (role === "admin") navigate("/dashboard");
           else navigate("/user");
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         throw new Error(handleAuthError(err));
       } finally {
         setLoading(false);
@@ -138,7 +140,13 @@ export const useAuth = (): AuthHook => {
             .insert({
               id: data.user.id,
               email,
-              role: "user", // normal user by default
+              role: "user" as const, // normal user by default
+              user_type: "client" as const,
+              is_admin: false,
+              is_active: true,
+              email_verified: false,
+              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              metadata: {},
             } as any);
 
           if (profileError) {
@@ -158,7 +166,7 @@ export const useAuth = (): AuthHook => {
         }
 
         return { session: data.session, user: data.user };
-      } catch (err: any) {
+      } catch (err: unknown) {
         throw new Error(handleAuthError(err));
       } finally {
         setLoading(false);
@@ -177,7 +185,7 @@ export const useAuth = (): AuthHook => {
       setUser(null);
       setUserRole(undefined);
       navigate("/login");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn("Logout error:", handleAuthError(err));
     }
   }, [navigate]);
@@ -197,7 +205,7 @@ export const useAuth = (): AuthHook => {
       }
 
       return isValid;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn("Session check failed:", handleAuthError(err));
       setIsAuthenticated(false);
       setUser(null);
@@ -217,7 +225,7 @@ export const useAuth = (): AuthHook => {
         },
       });
       if (error) throw error;
-    } catch (err: any) {
+    } catch (err: unknown) {
       throw new Error(handleAuthError(err));
     }
   }, []);
@@ -231,7 +239,7 @@ export const useAuth = (): AuthHook => {
         redirectTo: `${window.location.origin}/update-password`,
       });
       if (error) throw error;
-    } catch (err: any) {
+    } catch (err: unknown) {
       throw new Error(handleAuthError(err));
     }
   }, []);
@@ -241,7 +249,7 @@ export const useAuth = (): AuthHook => {
     try {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
-    } catch (err: any) {
+    } catch (err: unknown) {
       throw new Error(handleAuthError(err));
     }
   }, []);

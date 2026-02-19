@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Briefcase, Users, Clock, DollarSign, TrendingUp, Calendar,
-  CheckCircle2, AlertCircle, XCircle, PlayCircle, PauseCircle,
-  Target, Award, PieChart, ArrowUp, Filter, Search,
+  Briefcase, Users, DollarSign, TrendingUp, Calendar,
+  CheckCircle2, AlertCircle, XCircle, PlayCircle,
+  Target, PieChart, ArrowUp, Search,
   ChevronRight, ChevronDown, User, MessageSquare, FileText,
-  Zap, Star, MoreHorizontal, Activity, BarChart3, ArrowUpRight,
-  Sparkles, Brain, TrendingDown, AlertTriangle, Globe, Shield,
-  Code, Database, Smartphone, Monitor, Layers, GitBranch,
-  Package, Server, Cpu, Cloud, Terminal, Workflow, Box,
-  LineChart, Rocket, Settings, Bell, Download, Upload
+  Zap, Star, MoreHorizontal, Activity, ArrowUpRight,
+  Sparkles, Brain, TrendingDown, AlertTriangle, Globe,
+  Code, Database, Smartphone,
+  GitBranch, Box,
+  Rocket, Settings, Bell, Download
 } from 'lucide-react';
 
 // ============================================================================
@@ -20,7 +20,7 @@ interface MetricCard {
   value: string | number;
   change: number;
   trend: 'up' | 'down';
-  icon: any;
+  icon: React.ElementType;
   color: string;
   subtitle?: string;
 }
@@ -61,7 +61,7 @@ interface TeamMember {
 
 interface ServiceLine {
   name: string;
-  icon: any;
+  icon: React.ElementType;
   projects: number;
   revenue: number;
   margin: number;
@@ -98,6 +98,7 @@ interface Activity {
 export default function NyxDevConsultingDashboard() {
   // State Management
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'quarter' | 'year'>('month');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [selectedView, setSelectedView] = useState<'overview' | 'projects' | 'team' | 'financial'>('overview');
   const [expandedProject, setExpandedProject] = useState<string | null>(null);
   const [showAIPanel, setShowAIPanel] = useState<boolean>(true);
@@ -371,7 +372,7 @@ export default function NyxDevConsultingDashboard() {
   // ============================================================================
 
   const getColorClasses = (color: string) => {
-    const colors: Record<string, any> = {
+    const colors: Record<string, { bg: string; text: string; bgLight: string; border: string; glow: string; gradient: string }> = {
       cyan: {
         bg: 'bg-cyan-500',
         text: 'text-cyan-400',
@@ -433,7 +434,7 @@ export default function NyxDevConsultingDashboard() {
   };
 
   const getStatusConfig = (status: string) => {
-    const configs: Record<string, any> = {
+    const configs: Record<string, { label: string; color: string; icon: React.ElementType }> = {
       active: { label: 'Active', color: 'cyan', icon: PlayCircle },
       planning: { label: 'Planning', color: 'purple', icon: Target },
       development: { label: 'In Development', color: 'blue', icon: Code },
@@ -445,7 +446,7 @@ export default function NyxDevConsultingDashboard() {
   };
 
   const getHealthConfig = (health: string) => {
-    const configs: Record<string, any> = {
+    const configs: Record<string, { label: string; color: string; icon: React.ElementType }> = {
       excellent: { label: 'Excellent', color: 'emerald', icon: CheckCircle2 },
       good: { label: 'Good', color: 'blue', icon: CheckCircle2 },
       'at-risk': { label: 'At Risk', color: 'amber', icon: AlertTriangle },
@@ -455,7 +456,7 @@ export default function NyxDevConsultingDashboard() {
   };
 
   const getActivityIcon = (type: string) => {
-    const icons: Record<string, any> = {
+    const icons: Record<string, React.ElementType> = {
       deployment: Rocket,
       milestone: Target,
       client: Users,
@@ -644,7 +645,7 @@ export default function NyxDevConsultingDashboard() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {aiInsights.map((insight, idx) => {
-                  const typeConfig: Record<string, any> = {
+                  const typeConfig: Record<string, { icon: React.ElementType; color: string }> = {
                     opportunity: { icon: TrendingUp, color: 'emerald' },
                     risk: { icon: AlertTriangle, color: 'red' },
                     optimization: { icon: Zap, color: 'cyan' },
@@ -1155,7 +1156,7 @@ export default function NyxDevConsultingDashboard() {
                 {/* Timeline */}
                 <div className="absolute left-[21px] top-4 bottom-4 w-px bg-gradient-to-b from-slate-700 via-slate-700/50 to-transparent"></div>
 
-                {recentActivity.map((activity, idx) => {
+                {recentActivity.map((activity) => {
                   const Icon = getActivityIcon(activity.type);
                   const color = getActivityColor(activity.type);
                   const colors = getColorClasses(color);

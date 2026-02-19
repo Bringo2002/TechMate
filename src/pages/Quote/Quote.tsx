@@ -2,7 +2,7 @@
 import React from "react";
 import { useForm, ValidationError } from "@formspree/react";
 import { motion } from "framer-motion";
-import { Helmet, HelmetProvider } from 'react-helmet-async'; // ✅ For SEO metadata
+import { Helmet } from 'react-helmet-async'; // ✅ For SEO metadata
 
 const Quote: React.FC = () => {
   const [state, handleSubmit] = useForm("xkgzrwnz");

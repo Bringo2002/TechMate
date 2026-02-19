@@ -42,6 +42,8 @@ import UserSettings from './pages/user/UserSettings';
 import Billing from './pages/user/Billing';
 import Notifications from './pages/user/Notifications';
 import Stats from './pages/user/Stats';
+import OrderDetail from './pages/user/OrderDetail';
+import ErrorBoundary from './components/ErrorBoundary';
 import SettingsLayout from './pages/dashboard/settings/SettingsLayout';
 import TeamManagement from './pages/dashboard/settings/team/TeamManagement';
 import ProfileSettings from './pages/dashboard/settings/profile/ProfileSettings';
@@ -159,15 +161,16 @@ const App: React.FC = () => {
       </ProtectedRoute>
     }
   >
-    <Route index element={<UserOverview />} />
-    <Route path="orders" element={<UserOrders />} />
-    <Route path="profile" element={<UserProfile />} />
-    <Route path="support" element={<UserSupport />} />
-    <Route path="settings" element={<UserSettings />} />
-    <Route path="billing" element={<Billing />} />
-    <Route path="messages" element={<Messages />} />
-    <Route path="notifications" element={<Notifications />} />
-    <Route path="stats" element={<Stats />} />
+    <Route index element={<ErrorBoundary fallbackTitle="Overview failed to load"><UserOverview /></ErrorBoundary>} />
+    <Route path="orders" element={<ErrorBoundary fallbackTitle="Orders failed to load"><UserOrders /></ErrorBoundary>} />
+    <Route path="orders/:orderId" element={<ErrorBoundary fallbackTitle="Order details failed to load"><OrderDetail /></ErrorBoundary>} />
+    <Route path="profile" element={<ErrorBoundary fallbackTitle="Profile failed to load"><UserProfile /></ErrorBoundary>} />
+    <Route path="support" element={<ErrorBoundary fallbackTitle="Support failed to load"><UserSupport /></ErrorBoundary>} />
+    <Route path="settings" element={<ErrorBoundary fallbackTitle="Settings failed to load"><UserSettings /></ErrorBoundary>} />
+    <Route path="billing" element={<ErrorBoundary fallbackTitle="Billing failed to load"><Billing /></ErrorBoundary>} />
+    <Route path="messages" element={<ErrorBoundary fallbackTitle="Messages failed to load"><Messages /></ErrorBoundary>} />
+    <Route path="notifications" element={<ErrorBoundary fallbackTitle="Notifications failed to load"><Notifications /></ErrorBoundary>} />
+    <Route path="stats" element={<ErrorBoundary fallbackTitle="Stats failed to load"><Stats /></ErrorBoundary>} />
   </Route>
       </Routes>
       <Toaster 

@@ -4,9 +4,9 @@
 // ============================================================================
 
 import { useState, useEffect, useCallback } from 'react';
-import { 
-  getInquiries, 
-  getInquiryById, 
+import {
+  getInquiries,
+  getInquiryById,
   getInquiryStats,
   subscribeToInquiries,
   subscribeToInquiry,
@@ -45,7 +45,7 @@ interface UseInquiryReturn {
 }
 
 interface UseInquiryStatsReturn {
-  stats: any;
+  stats: Record<string, unknown> | null;
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
@@ -96,6 +96,7 @@ export function useInquiries(options?: UseInquiriesOptions): UseInquiriesReturn 
   // Initial fetch
   useEffect(() => {
     if (autoFetch) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetching pattern
       loadInquiries();
     }
   }, [loadInquiries, autoFetch]);
@@ -104,8 +105,8 @@ export function useInquiries(options?: UseInquiriesOptions): UseInquiriesReturn 
   useEffect(() => {
     if (!realtime) return;
 
-    const unsubscribe = subscribeToInquiries((payload) => {
-      const { eventType, new: newRecord, old: oldRecord } = payload;
+    const unsubscribe = subscribeToInquiries((payload: Record<string, unknown>) => {
+      const { eventType, new: newRecord, old: oldRecord } = payload as { eventType: string; new: Record<string, string>; old: Record<string, string> };
 
       setInquiries((current) => {
         switch (eventType) {
@@ -188,6 +189,7 @@ export function useInquiry(
   // Initial fetch
   useEffect(() => {
     if (inquiryId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetching pattern
       loadInquiry();
     }
   }, [loadInquiry, inquiryId]);
@@ -196,8 +198,8 @@ export function useInquiry(
   useEffect(() => {
     if (!realtime || !inquiryId) return;
 
-    const unsubscribe = subscribeToInquiry(inquiryId, (payload) => {
-      const { eventType, new: newRecord } = payload;
+    const unsubscribe = subscribeToInquiry(inquiryId, (payload: Record<string, unknown>) => {
+      const { eventType, new: newRecord } = payload as { eventType: string; new: Record<string, unknown> };
 
       if (eventType === 'UPDATE') {
         setInquiry(newRecord as ClientInquiryRow);
@@ -236,7 +238,7 @@ export function useInquiry(
  * ```
  */
 export function useInquiryStats(userId?: string): UseInquiryStatsReturn {
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -257,6 +259,7 @@ export function useInquiryStats(userId?: string): UseInquiryStatsReturn {
   }, [userId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetching pattern
     loadStats();
   }, [loadStats]);
 

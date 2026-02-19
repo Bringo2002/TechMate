@@ -48,6 +48,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
 
   useEffect(() => {
     if (showNotifications) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- marking notifications as read when panel opens
       setNotifications((prev) =>
         prev.map((n) => ({ ...n, read: true }))
       );

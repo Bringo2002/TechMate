@@ -137,11 +137,13 @@ export function InquiryStatusDot({
 // Helper: Get status color class (for use in other components)
 // ============================================================================
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function getStatusColorClass(status: InquiryStatus): string {
   const config = statusConfig[status];
   return config?.className || statusConfig.new.className;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function getStatusLabel(status: InquiryStatus): string {
   const config = statusConfig[status];
   return config?.label || status;

@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import supabase from '../../lib/supabaseClient';
+import { getOrderStats } from '../../services/orders.service';
 import { 
-  User, Mail, Phone, MapPin, Building, Calendar, Globe, Camera,
+  User, Mail, MapPin, Calendar, Globe, Camera,
   Save, X, Lock, Bell, Shield, Eye, EyeOff, Check,
-  AlertCircle, Briefcase, Activity, TrendingUp, Package,
-  Clock, CheckCircle, Settings, Zap, Star,
-  Target, BarChart3, TrendingDown, AlertTriangle, LogOut
+  Package, CheckCircle, Settings, Star, LogOut
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -38,13 +37,10 @@ interface SecuritySettings {
   twoFactorEnabled: boolean;
 }
 
-//Mocked for now as we don't have this in DB yet
 interface AccountStats {
   totalOrders: number;
   completedOrders: number;
   activeOrders: number;
-  monthlyRevenue: number;
-  revenueChange: number;
 }
 
 
@@ -72,19 +68,32 @@ const UserProfile: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Mock Stats (Plan to real integration later)
-  const [stats] = useState<AccountStats>({
-    totalOrders: 12,
-    completedOrders: 8,
-    activeOrders: 4,
-    monthlyRevenue: 0,
-    revenueChange: 0
+  const [stats, setStats] = useState<AccountStats>({
+    totalOrders: 0,
+    completedOrders: 0,
+    activeOrders: 0,
   });
 
   // Fetch Profile Data
   useEffect(() => {
     fetchProfile();
+    fetchStats();
   }, []);
+
+  const fetchStats = async () => {
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) return;
+      const orderStats = await getOrderStats(authUser.id);
+      setStats({
+        totalOrders: orderStats.total,
+        completedOrders: orderStats.completed,
+        activeOrders: orderStats.active,
+      });
+    } catch {
+      // Silently fail — stats are supplementary
+    }
+  };
 
   const fetchProfile = async () => {
     try {
@@ -123,13 +132,13 @@ const UserProfile: React.FC = () => {
         location: user.user_metadata?.location || 'Location',
         bio: user.user_metadata?.bio || 'Add a bio...',
         join_date: user.created_at,
-        is_premium: true, // Mocked for UI
+        is_premium: false,
         is_verified: !!user.email_confirmed_at
       };
 
       setProfile(mergedProfile);
       setFormData(mergedProfile);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching profile:', error);
       toast.error('Failed to load profile');
     } finally {
@@ -188,7 +197,7 @@ const UserProfile: React.FC = () => {
       
       toast.dismiss();
       toast.success('Avatar updated!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.dismiss();
       console.error('Error uploading avatar:', error);
       toast.error('Error uploading avatar');
@@ -232,7 +241,7 @@ const UserProfile: React.FC = () => {
       setProfile(prev => prev ? { ...prev, ...formData } : null);
       setIsEditing(false);
       toast.success('Profile updated successfully!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error updating profile:', error);
       toast.error('Failed to update profile');
     } finally {
@@ -257,8 +266,8 @@ const UserProfile: React.FC = () => {
 
       toast.success('Password updated successfully');
       setSecurity({ ...security, newPassword: '', confirmPassword: '', currentPassword: '' });
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (error: unknown) {
+      toast.error((error as Error).message);
     }
   };
 

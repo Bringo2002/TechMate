@@ -1,15 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Rocket, GitBranch, CheckCircle2, XCircle, AlertTriangle, Clock,
-  Server, Database, Cloud, Cpu, Zap, Target, TrendingUp, TrendingDown,
-  Activity, BarChart3, LineChart, PieChart, Settings, Bell, Download,
-  Play, Pause, RotateCcw, FastForward, Eye, Code, Package, Shield,
-  Globe, Layers, Terminal, Workflow, Box, Upload, ChevronRight,
-  ChevronDown, ArrowUpRight, Sparkles, Brain, AlertCircle, Users,
-  FileText, MessageSquare, ExternalLink, Lock, Unlock, RefreshCw,
-  TrendingUpDown, Gauge, HardDrive, Wifi, WifiOff, CircleDot,
-  Hash, GitCommit, GitMerge, GitPullRequest, Container, Flame,
-  Hexagon, CircleSlash, PlayCircle, StopCircle, Timer, Fingerprint
+  Server, Cloud, Zap, TrendingUp, TrendingDown,
+  Activity, Settings, Bell, Download,
+  RotateCcw, Eye, Package, Shield,
+  Globe, Terminal, Workflow, Box, ChevronRight,
+  ChevronDown, ArrowUpRight, Sparkles, Brain, Users,
+  ExternalLink, RefreshCw,
+  GitCommit,
+  CircleSlash, Timer
 } from 'lucide-react';
 
 // ============================================================================
@@ -22,7 +21,7 @@ interface DeploymentMetric {
   change?: number;
   trend?: 'up' | 'down';
   status?: 'excellent' | 'good' | 'warning' | 'critical';
-  icon: any;
+  icon: React.ElementType;
   color: string;
   subtitle?: string;
 }
@@ -83,7 +82,7 @@ interface StageStatus {
 interface PipelineStage {
   id: string;
   name: string;
-  icon: any;
+  icon: React.ElementType;
   status: 'idle' | 'active' | 'success' | 'failed';
   duration: number;
   progress: number;
@@ -110,7 +109,8 @@ export default function Deployments() {
   const [selectedDeployment, setSelectedDeployment] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'timeline' | 'pipeline'>('grid');
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
-  const [showLogs, setShowLogs] = useState<boolean>(false);
+  const [_showLogs, _setShowLogs] = useState<boolean>(false);
+  void _showLogs; void _setShowLogs;
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [animateIn, setAnimateIn] = useState<boolean>(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -132,6 +132,7 @@ export default function Deployments() {
     ctx.scale(2, 2);
 
     let animationId: number;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     let time = 0;
 
     const particles: Array<{x: number; y: number; vx: number; vy: number; life: number}> = [];
@@ -506,8 +507,8 @@ export default function Deployments() {
   // HELPER FUNCTIONS
   // ============================================================================
 
-  const getColorClasses = (color: string) => {
-    const colors: Record<string, any> = {
+    const getColorClasses = (color: string) => {
+    const colors: Record<string, { bg: string; text: string; bgLight: string; border: string; glow: string; gradient: string }> = {
       cyan: {
         bg: 'bg-cyan-500',
         text: 'text-cyan-400',
@@ -569,7 +570,7 @@ export default function Deployments() {
   };
 
   const getStatusConfig = (status: string) => {
-    const configs: Record<string, any> = {
+    const configs: Record<string, { label: string; color: string; icon: React.ElementType }> = {
       success: { label: 'Success', color: 'emerald', icon: CheckCircle2 },
       failed: { label: 'Failed', color: 'red', icon: XCircle },
       deploying: { label: 'Deploying', color: 'cyan', icon: Rocket },
@@ -580,7 +581,7 @@ export default function Deployments() {
   };
 
   const getEnvironmentStatus = (status: string) => {
-    const configs: Record<string, any> = {
+    const configs: Record<string, { label: string; color: string; icon: React.ElementType }> = {
       healthy: { label: 'Healthy', color: 'emerald', icon: CheckCircle2 },
       degraded: { label: 'Degraded', color: 'amber', icon: AlertTriangle },
       down: { label: 'Down', color: 'red', icon: XCircle },
@@ -590,7 +591,7 @@ export default function Deployments() {
   };
 
   const getStageStatus = (status: string) => {
-    const configs: Record<string, any> = {
+    const configs: Record<string, { color: string; icon: React.ElementType }> = {
       success: { color: 'emerald', icon: CheckCircle2 },
       running: { color: 'cyan', icon: Loader },
       failed: { color: 'red', icon: XCircle },
@@ -739,7 +740,7 @@ export default function Deployments() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
               {aiInsights.map((insight, idx) => {
-                const typeConfig: Record<string, any> = {
+                const typeConfig: Record<string, { icon: React.ElementType; color: string }> = {
                   prediction: { icon: TrendingUp, color: 'cyan' },
                   optimization: { icon: Zap, color: 'purple' },
                   alert: { icon: AlertTriangle, color: 'red' },
@@ -891,7 +892,7 @@ export default function Deployments() {
                 </div>
 
                 <div className="relative grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                  {pipelineStages.map((stage, idx) => {
+                  {pipelineStages.map((stage) => {
                     const colors = getColorClasses(
                       stage.status === 'success' ? 'emerald' :
                       stage.status === 'active' ? 'cyan' :

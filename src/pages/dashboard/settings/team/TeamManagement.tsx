@@ -139,7 +139,7 @@ export default function TeamManagement() {
     showNotif('Team members exported successfully', 'success');
   };
 
-  const filteredAndSortedMembers = useMemo(() => {
+  const filteredAndSortedMembers = (() => {
     const filtered = teamMembers. filter(m => {
       const matchesSearch = m.name. toLowerCase().includes(searchQuery.toLowerCase()) ||
                            m.email.toLowerCase().includes(searchQuery. toLowerCase());
@@ -161,7 +161,7 @@ export default function TeamManagement() {
       if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [teamMembers, searchQuery, sortField, sortDirection, statusFilter, roleFilter]);
+  })();
 
   const stats = useMemo(() => ({
     total: teamMembers.length,

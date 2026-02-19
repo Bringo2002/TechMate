@@ -1,15 +1,149 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import supabase from '../lib/supabaseClient';
 import { NavLink } from 'react-router-dom';
 import { 
   Home, Package, User, HelpCircle, LogOut, MessageSquare, Bell, 
-  BarChart3, CreditCard, Settings, Menu, X, Sparkles
+  BarChart3, CreditCard, Settings, Menu, X, Sparkles, Activity
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import toast from 'react-hot-toast';
+import { getUnreadCount as getUnreadNotifications } from '../services/notifications.service';
+import { getUnreadMessageCount } from '../services/messages.service';
 
 const UserDashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [activeOrders, setActiveOrders] = useState<{id: string; title: string; progress: number; status: string}[]>([]);
   
+  // ============================================================================
+  // FETCH UNREAD COUNTS
+  // ============================================================================
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchCounts = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !mounted) return;
+
+      const [msgCount, notifCount] = await Promise.all([
+        getUnreadMessageCount(user.id),
+        getUnreadNotifications(user.id),
+      ]);
+
+      if (mounted) {
+        setUnreadMessages(msgCount);
+        setUnreadNotifications(notifCount);
+      }
+    };
+
+    fetchCounts();
+
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchCounts, 30000);
+
+    // Fetch active orders
+    const fetchActiveOrders = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !mounted) return;
+
+      const { data } = await supabase
+        .from('orders')
+        .select('id, title, progress, status')
+        .eq('user_id', user.id)
+        .in('status', ['in_progress', 'review'])
+        .order('updated_at', { ascending: false })
+        .limit(3);
+
+      if (mounted && data) {
+        setActiveOrders(data);
+      }
+    };
+
+    fetchActiveOrders();
+
+    // Real-time subscriptions for instant updates
+    const setupRealtime = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const notifChannel = supabase
+        .channel('sidebar-notifications')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        }, () => {
+          if (mounted) fetchCounts();
+        })
+        .subscribe();
+
+      const msgChannel = supabase
+        .channel('sidebar-messages')
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `recipient_id=eq.${user.id}`,
+        }, () => {
+          if (mounted) fetchCounts();
+        })
+        .subscribe();
+
+      // Real-time order progress updates
+      const orderChannel = supabase
+        .channel('sidebar-orders')
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'orders',
+          filter: `user_id=eq.${user.id}`,
+        }, (payload) => {
+          if (!mounted) return;
+          const updated = payload.new as {id: string; title: string; progress: number; status: string};
+
+          // Update the active orders list
+          setActiveOrders(prev => {
+            const exists = prev.find(o => o.id === updated.id);
+            if (exists) {
+              // Show toast if progress changed
+              if (updated.progress !== exists.progress) {
+                toast(`${updated.title}: ${updated.progress}% complete`, {
+                  icon: '🚀',
+                  style: { borderRadius: '12px', background: '#1a1a2e', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' },
+                });
+              }
+              return prev.map(o => o.id === updated.id
+                ? { ...o, progress: updated.progress, status: updated.status, title: updated.title }
+                : o
+              ).filter(o => ['in_progress', 'review'].includes(o.status));
+            }
+            // New active order
+            if (['in_progress', 'review'].includes(updated.status)) {
+              return [{ id: updated.id, title: updated.title, progress: updated.progress, status: updated.status }, ...prev].slice(0, 3);
+            }
+            return prev;
+          });
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(notifChannel);
+        supabase.removeChannel(msgChannel);
+        supabase.removeChannel(orderChannel);
+      };
+    };
+
+    const cleanupPromise = setupRealtime();
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+      cleanupPromise.then(cleanup => cleanup?.());
+    };
+  }, []);
+
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) {
@@ -25,8 +159,8 @@ const UserDashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children
     { id: 'profile', label: 'Profile', icon: User, path: '/user/profile' },
     { id: 'support', label: 'Support', icon: HelpCircle, path: '/user/support' },
     { id: 'divider-1', label: '', icon: null, path: null, isDivider: true },
-    { id: 'messages', label: 'Messages', icon: MessageSquare, path: '/user/messages' },
-    { id: 'notifications', label: 'Notifications', icon: Bell, path: '/user/notifications' },
+    { id: 'messages', label: 'Messages', icon: MessageSquare, path: '/user/messages', badge: unreadMessages },
+    { id: 'notifications', label: 'Notifications', icon: Bell, path: '/user/notifications', badge: unreadNotifications },
     { id: 'stats', label: 'Statistics', icon: BarChart3, path: '/user/stats' },
     { id: 'billing', label: 'Billing', icon: CreditCard, path: '/user/billing' },
     { id: 'settings', label: 'Settings', icon: Settings, path: '/user/settings' }
@@ -100,6 +234,7 @@ const UserDashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children
             }
 
             const Icon = item.icon as React.ElementType;
+            const badgeCount = (item as Record<string, unknown>).badge as number || 0;
 
             return (
               <NavLink
@@ -118,6 +253,10 @@ const UserDashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children
                   <>
                     <div className={`relative z-10 p-1 rounded-lg transition-colors ${isActive ? 'bg-cyan-500/20 text-cyan-300' : 'text-slate-400 group-hover:text-white'}`}>
                         <Icon size={20} />
+                        {/* Badge dot when collapsed */}
+                        {badgeCount > 0 && isCollapsed && (
+                          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-cyan-400 rounded-full shadow-[0_0_8px_rgba(34,211,238,0.6)] animate-pulse" />
+                        )}
                     </div>
                     
                     <AnimatePresence>
@@ -126,12 +265,23 @@ const UserDashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children
                                 initial={{ opacity: 0, width: 0 }}
                                 animate={{ opacity: 1, width: "auto" }}
                                 exit={{ opacity: 0, width: 0 }}
-                                className="font-medium whitespace-nowrap z-10"
+                                className="font-medium whitespace-nowrap z-10 flex-1"
                             >
                                 {item.label}
                             </motion.span>
                         )}
                     </AnimatePresence>
+
+                    {/* Badge count when expanded */}
+                    {badgeCount > 0 && !isCollapsed && (
+                      <motion.span
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        className="px-1.5 py-0.5 min-w-[20px] text-center bg-cyan-500 text-white text-[10px] font-bold rounded-full shadow-lg shadow-cyan-500/30 z-10"
+                      >
+                        {badgeCount > 99 ? '99+' : badgeCount}
+                      </motion.span>
+                    )}
 
                     {/* Active indicator glow */}
                     {isActive && !isCollapsed && (
@@ -146,6 +296,68 @@ const UserDashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children
             );
           })}
         </nav>
+
+        {/* Active Orders Progress Widget */}
+        {activeOrders.length > 0 && (
+          <div className="px-3 pb-3 border-t border-white/5">
+            <AnimatePresence>
+              {!isCollapsed ? (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="space-y-2 pt-3"
+                >
+                  <div className="flex items-center gap-2 px-1 mb-1">
+                    <Activity size={12} className="text-cyan-400" />
+                    <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Active Orders</span>
+                  </div>
+                  {activeOrders.map((order) => (
+                    <NavLink
+                      key={order.id}
+                      to={`/user/orders/${order.id}`}
+                      className="block p-2.5 bg-slate-800/30 hover:bg-slate-800/50 rounded-lg border border-white/5 hover:border-cyan-500/20 transition-all group"
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[11px] text-slate-300 truncate max-w-[120px] group-hover:text-white transition-colors">{order.title}</span>
+                        <span className="text-[10px] font-mono text-cyan-400 shrink-0">{order.progress}%</span>
+                      </div>
+                      <div className="h-1 bg-slate-700 rounded-full overflow-hidden">
+                        <motion.div
+                          className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${order.progress}%` }}
+                          transition={{ duration: 0.8, ease: 'easeOut' }}
+                        />
+                      </div>
+                    </NavLink>
+                  ))}
+                </motion.div>
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex flex-col items-center pt-3 gap-1.5"
+                >
+                  {activeOrders.map((order) => (
+                    <NavLink
+                      key={order.id}
+                      to={`/user/orders/${order.id}`}
+                      className="relative w-8 h-8 rounded-lg bg-slate-800/50 border border-white/5 hover:border-cyan-500/20 flex items-center justify-center transition-all"
+                      title={`${order.title} — ${order.progress}%`}
+                    >
+                      <span className="text-[9px] font-mono text-cyan-400 font-bold">{order.progress}</span>
+                      <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-slate-700 rounded-b-lg overflow-hidden">
+                        <div className="h-full bg-cyan-500" style={{ width: `${order.progress}%` }} />
+                      </div>
+                    </NavLink>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
 
         {/* User Info & Logout - Bottom Section */}
         <div className="p-3 md:p-4 border-t border-white/5 space-y-3 bg-[#0a0a16]/50">

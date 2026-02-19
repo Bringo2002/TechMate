@@ -34,6 +34,7 @@ export function useRequests() {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetching pattern
     fetchRequests()
 
     // Realtime subscription

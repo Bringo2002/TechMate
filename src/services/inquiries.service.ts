@@ -8,8 +8,11 @@ import type {
     ClientInquiryRow,
     ClientInquiryInsert,
     ClientInquiryUpdate,
-    InquiryStatus
+    InquiryStatus,
+    Priority,
+    ProjectType
 } from '../types/database.types';
+import type { ServiceResponse, ServiceError } from '../types/api.types';
 
 // ============================================================================
 // Types
@@ -18,14 +21,20 @@ import type {
 interface InquiryFilters {
     status?: InquiryStatus;
     assigned_to?: string;
-    priority?: string;
-    project_type?: string;
+    priority?: Priority;
+    project_type?: ProjectType;
 }
 
-interface ServiceResponse<T> {
-    data: T | null;
-    error: any;
-}
+// Helper to format errors
+const formatError = (error: unknown): ServiceError => {
+    const err = error as Record<string, string | undefined>;
+    return {
+        code: err?.code || 'UNKNOWN',
+        message: err?.message || 'An unknown error occurred',
+        details: err?.details,
+        hint: err?.hint
+    };
+};
 
 // ============================================================================
 // Query Functions
@@ -71,10 +80,10 @@ export async function getInquiries(
 
         if (error) throw error;
 
-        return { data: data as any, error: null };
+        return { data: data as ClientInquiryRow[], error: null };
     } catch (error) {
         console.error('Error in getInquiries:', error);
-        return { data: null, error };
+        return { data: null, error: formatError(error) };
     }
 }
 
@@ -119,10 +128,10 @@ export async function getInquiryById(
 
         if (error) throw error;
 
-        return { data: data as any, error: null };
+        return { data: data as ClientInquiryRow, error: null };
     } catch (error) {
         console.error('Error in getInquiryById:', error);
-        return { data: null, error };
+        return { data: null, error: formatError(error) };
     }
 }
 
@@ -145,7 +154,7 @@ export async function getClientInquiries(
         return { data: data as ClientInquiryRow[], error: null };
     } catch (error) {
         console.error('Error in getClientInquiries:', error);
-        return { data: null, error };
+        return { data: null, error: formatError(error) };
     }
 }
 
@@ -160,9 +169,10 @@ export async function createInquiry(
     inquiryData: ClientInquiryInsert
 ): Promise<ServiceResponse<ClientInquiryRow>> {
     try {
+        // cast to any to avoid complex schema-driven never errors if some optional fields are missing
         const { data, error } = await supabase
             .from('client_inquiries')
-            .insert(inquiryData as any)
+            .insert(inquiryData as unknown as Record<string, unknown>)
             .select()
             .single();
 
@@ -171,7 +181,7 @@ export async function createInquiry(
         return { data: data as ClientInquiryRow, error: null };
     } catch (error) {
         console.error('Error in createInquiry:', error);
-        return { data: null, error };
+        return { data: null, error: formatError(error) };
     }
 }
 
@@ -188,7 +198,7 @@ export async function updateInquiry(
             .update({
                 ...updates,
                 updated_at: new Date().toISOString(),
-            } as any)
+            } as unknown as Record<string, unknown>)
             .eq('id', inquiryId)
             .select()
             .single();
@@ -198,7 +208,7 @@ export async function updateInquiry(
         return { data: data as ClientInquiryRow, error: null };
     } catch (error) {
         console.error('Error in updateInquiry:', error);
-        return { data: null, error };
+        return { data: null, error: formatError(error) };
     }
 }
 
@@ -210,7 +220,7 @@ export async function updateInquiryStatus(
     status: InquiryStatus
 ): Promise<ServiceResponse<ClientInquiryRow>> {
     try {
-        const updates: any = {
+        const updates: Record<string, string> = {
             status,
             updated_at: new Date().toISOString(),
         };
@@ -223,7 +233,7 @@ export async function updateInquiryStatus(
                 .eq('id', inquiryId)
                 .single();
 
-            if (inquiry && !inquiry.viewed_by_admin_at) {
+            if (inquiry && !(inquiry as Record<string, unknown>).viewed_by_admin_at) {
                 updates.viewed_by_admin_at = new Date().toISOString();
             }
         }
@@ -240,7 +250,7 @@ export async function updateInquiryStatus(
         return { data: data as ClientInquiryRow, error: null };
     } catch (error) {
         console.error('Error in updateInquiryStatus:', error);
-        return { data: null, error };
+        return { data: null, error: formatError(error) };
     }
 }
 
@@ -252,7 +262,7 @@ export async function assignInquiry(
     userId: string
 ): Promise<ServiceResponse<ClientInquiryRow>> {
     try {
-        const updates: any = {
+        const updates: Record<string, string> = {
             assigned_to: userId,
             updated_at: new Date().toISOString(),
         };
@@ -264,7 +274,7 @@ export async function assignInquiry(
             .eq('id', inquiryId)
             .single();
 
-        if (inquiry && !inquiry.first_response_at) {
+        if (inquiry && !(inquiry as Record<string, unknown>).first_response_at) {
             updates.first_response_at = new Date().toISOString();
         }
 
@@ -280,7 +290,7 @@ export async function assignInquiry(
         return { data: data as ClientInquiryRow, error: null };
     } catch (error) {
         console.error('Error in assignInquiry:', error);
-        return { data: null, error };
+        return { data: null, error: formatError(error) };
     }
 }
 
@@ -296,7 +306,7 @@ export async function unassignInquiry(
             .update({
                 assigned_to: null,
                 updated_at: new Date().toISOString(),
-            } as any)
+            } as unknown as Record<string, unknown>)
             .eq('id', inquiryId)
             .select()
             .single();
@@ -306,7 +316,7 @@ export async function unassignInquiry(
         return { data: data as ClientInquiryRow, error: null };
     } catch (error) {
         console.error('Error in unassignInquiry:', error);
-        return { data: null, error };
+        return { data: null, error: formatError(error) };
     }
 }
 
@@ -322,7 +332,7 @@ export async function deleteInquiry(
             .update({
                 deleted_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
-            } as any)
+            } as unknown as Record<string, unknown>)
             .eq('id', inquiryId);
 
         if (error) throw error;
@@ -330,7 +340,7 @@ export async function deleteInquiry(
         return { data: true, error: null };
     } catch (error) {
         console.error('Error in deleteInquiry:', error);
-        return { data: false, error };
+        return { data: false, error: formatError(error) };
     }
 }
 
@@ -344,19 +354,20 @@ export async function deleteInquiry(
  */
 export async function getInquiryStats(
     userId?: string
-): Promise<ServiceResponse<any>> {
+): Promise<ServiceResponse<Record<string, unknown>>> {
     try {
+        // use unknown cast for the object to match the rpc definition which might be strict
         const { data, error } = await supabase
             .rpc('get_inquiry_stats', {
-                p_user_id: userId || null
-            });
+                p_user_id: userId ?? null
+            } as unknown as Record<string, unknown>);
 
         if (error) throw error;
 
         return { data, error: null };
     } catch (error) {
         console.error('Error in getInquiryStats:', error);
-        return { data: null, error };
+        return { data: null, error: formatError(error) };
     }
 }
 
@@ -370,7 +381,7 @@ export async function getInquiryStats(
  * @returns Unsubscribe function
  */
 export function subscribeToInquiries(
-    callback: (payload: any) => void
+    callback: (payload: Record<string, unknown>) => void
 ): () => void {
     const subscription = supabase
         .channel('client_inquiries_changes')
@@ -402,7 +413,7 @@ export function subscribeToInquiries(
  */
 export function subscribeToInquiry(
     inquiryId: string,
-    callback: (payload: any) => void
+    callback: (payload: Record<string, unknown>) => void
 ): () => void {
     const subscription = supabase
         .channel(`inquiry_${inquiryId}`)

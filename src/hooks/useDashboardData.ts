@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import supabase from '../lib/supabaseClient';
 
 export interface DashboardData {
-    profile: any;
-    orders: any[];
-    invoices: any[];
-    deliverables: any[];
+    profile: Record<string, unknown> | null;
+    orders: Record<string, unknown>[];
+    invoices: Record<string, unknown>[];
+    deliverables: Record<string, unknown>[];
     loading: boolean;
     error: string | null;
 }
@@ -56,9 +56,9 @@ export const useDashboardData = () => {
                     error: null
                 });
 
-            } catch (err: any) {
+            } catch (err: unknown) {
                 console.error('Error fetching dashboard data:', err);
-                setData(prev => ({ ...prev, loading: false, error: err.message }));
+                setData(prev => ({ ...prev, loading: false, error: err instanceof Error ? err.message : 'Unknown error' }));
             }
         };
 

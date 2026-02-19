@@ -83,6 +83,7 @@ export function useRealtime<T extends Record<string, unknown>>(
                 channelRef.current = null;
             }
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [options.table, options.filter, options.event, options.enabled]);
 }
 

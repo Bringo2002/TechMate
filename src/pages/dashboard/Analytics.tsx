@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { TrendingUp, TrendingDown, ArrowUp, ArrowDown, DollarSign, Users, Rocket, Zap, Activity, Calendar, Download, Filter, ChevronRight, Eye, Target, Award, Clock, CheckCircle2, AlertCircle, BarChart3, PieChart, LineChart as LineChartIcon, Globe, Code, Smartphone, Database, Cloud, Layers, Sparkles, Brain, CircleDot } from 'lucide-react';
+import { TrendingUp, ArrowUp, ArrowDown, DollarSign, Users, Rocket, Activity, Download, ChevronRight, Target, Award, CheckCircle2, AlertCircle, BarChart3, PieChart, LineChartIcon, Globe, Smartphone, Database, Cloud, Layers, Sparkles, Brain } from 'lucide-react';
 
 const Analytics = () => {
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d' | '1y'>('30d');
-  const [view, setView] = useState<'overview' | 'revenue' | 'projects' | 'clients'>('overview');
+
 
   // Mock data
   const kpis = [
@@ -116,7 +116,7 @@ const Analytics = () => {
     { stage: 'Closed Won', count: 42, percentage: 17, color: 'emerald' }
   ];
 
-  const Sparkline = ({ data, color }: { data: number[], color: string }) => {
+  const renderSparkline = (data: number[], color: string) => {
     const max = Math.max(...data);
     const min = Math.min(...data);
     const range = max - min || 1;
@@ -137,7 +137,7 @@ const Analytics = () => {
     );
   };
 
-  const RevenueChart = () => {
+  const renderRevenueChart = () => {
     const maxRevenue = Math.max(...monthlyRevenue.map(m => m.revenue));
     
     return (
@@ -177,7 +177,7 @@ const Analytics = () => {
     );
   };
 
-  const ServiceBreakdown = () => {
+  const renderServiceBreakdown = () => {
     const total = revenueByService.reduce((sum, s) => sum + s.value, 0);
     
     return (
@@ -221,7 +221,7 @@ const Analytics = () => {
     );
   };
 
-  const ConversionFunnel = () => {
+  const renderConversionFunnel = () => {
     return (
       <div className="space-y-3">
         {conversionFunnel.map((stage, idx) => (
@@ -319,7 +319,7 @@ const Analytics = () => {
                   <span>{timeRange === '7d' ? 'vs last week' : timeRange === '30d' ? 'vs last month' : 'vs last period'}</span>
                 </div>
                 
-                <Sparkline data={kpi.sparkline} color={kpi.color} />
+                {renderSparkline(kpi.sparkline, kpi.color)}
               </div>
             </div>
           );
@@ -344,7 +344,7 @@ const Analytics = () => {
             </button>
           </div>
           
-          <RevenueChart />
+          {renderRevenueChart()}
         </div>
 
         {/* Project Status */}
@@ -401,7 +401,7 @@ const Analytics = () => {
             <p className="text-sm text-gray-400 mt-1">Service line performance breakdown</p>
           </div>
           
-          <ServiceBreakdown />
+          {renderServiceBreakdown()}
         </div>
 
         {/* Conversion Funnel */}
@@ -414,7 +414,7 @@ const Analytics = () => {
             <p className="text-sm text-gray-400 mt-1">Lead to customer conversion</p>
           </div>
           
-          <ConversionFunnel />
+          {renderConversionFunnel()}
           
           <div className="mt-6 p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-xl">
             <div className="flex items-center gap-2 mb-2">

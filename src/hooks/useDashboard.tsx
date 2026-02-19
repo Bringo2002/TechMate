@@ -140,6 +140,7 @@ export const useDashboard = (): DashboardData => {
       { id: 4, service: "Performance Audit", client: "Delta LLC", status: "Pending", date: "2025-08-18" },
     ];
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initializing mock data
     setData({
       metrics: mockMetrics,
       services: mockServices,

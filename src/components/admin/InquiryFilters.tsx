@@ -13,7 +13,7 @@ interface InquiryFiltersProps {
     assigned_to?: string;
     project_type?: string;
   };
-  onFilterChange: (filters: any) => void;
+  onFilterChange: (filters: { status?: InquiryStatus; priority?: string; assigned_to?: string; project_type?: string }) => void;
   className?: string;
 }
 
@@ -25,7 +25,7 @@ export function InquiryFilters({
   const handleStatusChange = (status: string) => {
     onFilterChange({ 
       ...filters, 
-      status: status === 'all' ? undefined : status 
+      status: status === 'all' ? undefined : status as InquiryStatus 
     });
   };
 
@@ -226,7 +226,7 @@ export function CompactInquiryFilters({
       
       <select
         value={filters.status || 'all'}
-        onChange={(e) => onFilterChange({ ...filters, status: e.target.value === 'all' ? undefined : e.target.value })}
+        onChange={(e) => onFilterChange({ ...filters, status: e.target.value === 'all' ? undefined : e.target.value as InquiryStatus })}
         className="text-sm rounded border-gray-300 py-1 px-2"
       >
         <option value="all">All</option>

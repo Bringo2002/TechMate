@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { AdminDashboardMetrics, GrowthDataPoint, RevenueDataPoint } from '../types/api.types';
-import type { ProjectRow, OrderRow, ProfileRow, RequestRow, ServiceCategoryRow } from '../types/database.types';
+import type { ProjectRow, OrderRow, ProfileRow, RequestRow, ServiceCategoryRow, ActivityLogRow } from '../types/database.types';
 import * as adminService from '../services/admin.service';
 
 interface AdminDashboardData {
@@ -24,7 +24,7 @@ interface AdminDashboardData {
         overdueRevenue: number;
         monthlyRevenue: number;
     };
-    recentActivity: any[];
+    recentActivity: ActivityLogRow[];
     loading: boolean;
     error: string | null;
     refresh: () => Promise<void>;
@@ -42,7 +42,7 @@ export function useAdmin(): AdminDashboardData {
     const [revenueStats, setRevenueStats] = useState({
         totalRevenue: 0, paidRevenue: 0, pendingRevenue: 0, overdueRevenue: 0, monthlyRevenue: 0,
     });
-    const [recentActivity, setRecentActivity] = useState<any[]>([]); // TODO: Define strict type
+    const [recentActivity, setRecentActivity] = useState<ActivityLogRow[]>([]); // TODO: Define strict type
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 

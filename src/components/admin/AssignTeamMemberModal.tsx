@@ -58,7 +58,7 @@ export function AssignTeamMemberModal({
       if (err) throw err;
 
       setTeamMembers(data || []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error loading team members:', err);
       setError('Failed to load team members');
     } finally {
@@ -90,9 +90,9 @@ export function AssignTeamMemberModal({
 
       onSuccess();
       onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error assigning inquiry:', err);
-      setError(err.message || 'Failed to assign inquiry');
+      setError(err instanceof Error ? err.message : 'Failed to assign inquiry');
     } finally {
       setLoading(false);
     }

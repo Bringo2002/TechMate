@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { toast } from "react-hot-toast";
 import { validateEmail, validatePassword } from "../utils/validateForm";
 import supabase from "../lib/supabaseClient"; 
+import { Database } from "../types/database.types";
 import AuthLayout from "../layouts/AuthLayout";
 
 const SignupPage: React.FC = () => {
@@ -72,12 +73,15 @@ const SignupPage: React.FC = () => {
 
       // ---------- 2) Insert profile row into "profiles" table ----------
       if (userId) {
-        const { error: profileError } = await supabase.from("profiles").insert({
+        // Explicitly type the payload to ensure it matches the schema
+        const newProfile: Database['public']['Tables']['profiles']['Insert'] = {
           id: userId,
           email: formData.email,
           full_name: formData.name,
           role: "user",
-        });
+        };
+
+        const { error: profileError } = await supabase.from("profiles").insert(newProfile);
 
         if (profileError) {
             console.error("Profile creation error:", profileError);
@@ -114,9 +118,10 @@ const SignupPage: React.FC = () => {
       // Clear sensitive fields
       setFormData(prev => ({ ...prev, password: "", confirmPassword: "" }));
 
-    } catch (err: any) {
-      console.error("Signup flow error:", err);
-      toast.error(err?.message || "Registration failed. Please try again.", { id: loadingToast });
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error("Signup flow error:", error);
+      toast.error(error?.message || "Registration failed. Please try again.", { id: loadingToast });
     } finally {
       setLoading(false);
     }
@@ -136,13 +141,13 @@ const SignupPage: React.FC = () => {
 
       if (data?.url) {
         try {
-           // @ts-ignore
+           // @ts-expect-error - accessing window.top.location may fail in cross-origin iframes
            window.top.location.href = data.url; 
-        } catch (e) {
+        } catch {
            window.location.href = data.url;
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Google signup error:", err);
       toast.error("Google sign up failed.");
     }

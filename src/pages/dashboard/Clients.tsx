@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Building2, TrendingUp, DollarSign, Star, Award, AlertTriangle, CheckCircle2, Clock, MessageSquare, Briefcase, Target, Activity, Brain, Sparkles, Heart, Zap, TrendingDown, ArrowUp, ArrowDown, Plus, Search, Filter, Download, Eye, MoreVertical, Mail, Phone, Calendar, FileText, BarChart3, PieChart, CircleDot, Flame, Shield, Package, Gift, ChevronRight, Settings, XCircle, AlertCircle } from 'lucide-react';
+import { Users, TrendingUp, DollarSign, Star, Award, AlertTriangle, CheckCircle2, MessageSquare, Brain, Sparkles, Plus, Search, Download, MoreVertical, CircleDot } from 'lucide-react';
 
 const Clients = () => {
   const [selectedClient, setSelectedClient] = useState<number | null>(null);
@@ -175,7 +175,7 @@ const Clients = () => {
   };
 
   const getRelationshipBadge = (relationship: string) => {
-    const configs: Record<string, { color: string; icon: any }> = {
+    const configs: Record<string, { color: string; icon: React.ElementType }> = {
       'Exceptional': { color: 'emerald', icon: Award },
       'Strong': { color: 'blue', icon: CheckCircle2 },
       'Good': { color: 'cyan', icon: CircleDot },
@@ -432,7 +432,7 @@ const Clients = () => {
           <select
             title="Sort clients"
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
+            onChange={(e) => setSortBy(e.target.value as 'revenue' | 'satisfaction' | 'ltv')}
             className="px-4 py-2 bg-gray-900/50 border border-gray-800 rounded-xl text-sm text-gray-300 focus:outline-none focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 transition-all"
           >
             <option value="revenue">Sort by Revenue</option>

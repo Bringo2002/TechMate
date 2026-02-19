@@ -20,7 +20,6 @@ import {
   Trash2,
   Plus,
   Check,
-  Globe,
   Activity
 } from 'lucide-react';
 

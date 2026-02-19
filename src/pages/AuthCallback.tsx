@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../lib/supabaseClient";
+import { ProfileRow, UserRole } from "../types/database.types";
 import { motion } from "framer-motion";
 
 const AuthCallback: React.FC = () => {
@@ -25,7 +26,7 @@ const AuthCallback: React.FC = () => {
         // 2️⃣ Check if profile exists
         const { data: profileData, error: profileError } = await supabase
           .from("profiles")
-          .select("role")
+          .select("*")
           .eq("id", user.id)
           .single();
 
@@ -35,18 +36,29 @@ const AuthCallback: React.FC = () => {
         }
 
         // 3️⃣ Insert profile if first-time Google signup
-        let role = "user"; // default
+        let role: UserRole = "user"; // default
         if (!profileData) {
+          if (!user.email) {
+            throw new Error("User email is missing.");
+          }
+
+          const fullName = user.user_metadata?.full_name || user.user_metadata?.name || "";
+
           const { error: insertError } = await supabase.from("profiles").insert({
             id: user.id,
             email: user.email,
             role: role,
-            name: user.user_metadata?.full_name || user.user_metadata?.name || "",
-          });
+            full_name: fullName,
+            user_type: "client",
+            is_admin: false,
+            is_active: true,
+            email_verified: true,
+            timezone: "UTC",
+          } as any);
 
           if (insertError) throw insertError;
         } else {
-          role = profileData.role;
+          role = (profileData as ProfileRow).role;
         }
 
         // 4️⃣ Redirect based on role
@@ -57,10 +69,11 @@ const AuthCallback: React.FC = () => {
           if (role === "admin") navigate("/dashboard", { replace: true });
           else navigate("/user", { replace: true });
         }, 1500);
-      } catch (err: any) {
-        console.error("Auth callback error:", err);
+      } catch (err: unknown) {
+        const error = err as Error;
+        console.error("Auth callback error:", error);
         setStatus("error");
-        setMessage(err.message || "Something went wrong during verification.");
+        setMessage(error.message || "Something went wrong during verification.");
       }
     };
 

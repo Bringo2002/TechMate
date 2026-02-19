@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { 
-  Search, Plus, AlertTriangle, Clock, DollarSign, 
+  Search, Plus, AlertTriangle, DollarSign, 
   Briefcase, Sparkles, Brain, Command, ChevronRight, 
-  LayoutGrid, List, Calendar, Users, Target, TrendingUp,
-  ArrowUp, ArrowDown, Zap, CheckCircle2, XCircle, Filter,
-  Download, RefreshCw, BarChart3, MessageSquare, Send, X
+  LayoutGrid, List, Users, Target, TrendingUp,
+  ArrowUp, ArrowDown, Zap, CheckCircle2, XCircle,
+  RefreshCw, BarChart3, MessageSquare, Send, X
 } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts';
 
@@ -43,6 +43,7 @@ const COLORS = {
 const Projects = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [showNewProjectDialog, setShowNewProjectDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -89,6 +90,7 @@ const Projects = () => {
     if (projects.length > 0 && aiInsights.length === 0) {
       generateRealAiInsights();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projects. length]); // Changed from [projects] to avoid infinite loop
 
   const fetchProjects = async () => {
@@ -502,9 +504,10 @@ Based on this context, answer the user's questions and provide helpful project m
           return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
         case 'budget':
           return b.budget - a.budget;
-        case 'priority':
+        case 'priority': {
           const priorityOrder = { critical: 0, high: 1, medium:  2, low: 3 };
           return priorityOrder[a.priority] - priorityOrder[b.priority];
+        }
         default:
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       }
@@ -749,7 +752,7 @@ Based on this context, answer the user's questions and provide helpful project m
               id="sortBy"
               aria-label="Sort by"
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
+              onChange={(e) => setSortBy(e.target.value as 'deadline' | 'budget' | 'created' | 'priority')}
               className="px-4 py-3 bg-slate-900/50 border border-slate-800/50 rounded-lg text-white focus:outline-none focus:border-emerald-500/50"
             >
               <option value="created">Latest</option>

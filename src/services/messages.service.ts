@@ -4,7 +4,7 @@
 // ============================================================================
 
 import supabase from '../lib/supabaseClient';
-import type { MessageRow, MessageInsert } from '../types/database.types';
+import type { MessageRow, MessageInsert, } from '../types/database.types';
 import type { ProfileRow } from '../types/database.types';
 import type { ServiceResponse } from '../types/api.types';
 
@@ -28,7 +28,8 @@ export async function getConversations(userId: string): Promise<ServiceResponse<
         .select('*')
         .or(`sender_id.eq.${userId},recipient_id.eq.${userId}`)
         .is('deleted_at', null)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .returns<MessageRow[]>();
 
     if (error) {
         return { data: null, error: { code: error.code, message: error.message } };
@@ -55,7 +56,8 @@ export async function getConversations(userId: string): Promise<ServiceResponse<
     const { data: profiles } = await supabase
         .from('profiles')
         .select('id, full_name, avatar_url')
-        .in('id', contactIds);
+        .in('id', contactIds)
+        .returns<ProfileRow[]>();
 
     const profileMap = new Map<string, ProfileRow>();
     for (const p of profiles ?? []) {
@@ -100,7 +102,8 @@ export async function getMessages(
         )
         .is('deleted_at', null)
         .order('created_at', { ascending: true })
-        .limit(limit);
+        .limit(limit)
+        .returns<MessageRow[]>();
 
     if (error) {
         return { data: null, error: { code: error.code, message: error.message } };

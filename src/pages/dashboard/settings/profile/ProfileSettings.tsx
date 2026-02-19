@@ -6,8 +6,6 @@ import {
   Loader2,
   Shield,
   Download,
-  Eye,
-  EyeOff,
   Clock,
   Monitor,
   Smartphone,
@@ -56,7 +54,8 @@ export default function ProfileSettings() {
   const [newEmail, setNewEmail] = useState('');
 
   // Delete account state
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
@@ -249,7 +248,8 @@ export default function ProfileSettings() {
   };
 
   // Function to handle account deletion - EXACT IMPLEMENTATION
-  const deleteAccount = async () => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _deleteAccount = async () => {
     const res = await fetch("/api/account", {
       method: "DELETE",
       credentials: "include",

@@ -5,7 +5,7 @@ import supabase from '../../lib/supabaseClient';
 
 interface NewProjectDialogProps {
   onClose: () => void;
-  onProjectCreated: (project: any) => void;
+  onProjectCreated: (project: Record<string, unknown>) => void;
 }
 
 export default function NewProjectDialog({ onClose, onProjectCreated }: NewProjectDialogProps) {
@@ -86,9 +86,9 @@ export default function NewProjectDialog({ onClose, onProjectCreated }: NewProje
 
       onProjectCreated(data);
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating project:', error);
-      setError(error.message || 'Failed to create project');
+      setError(error instanceof Error ? error.message : 'Failed to create project');
     } finally {
       setIsCreating(false);
     }

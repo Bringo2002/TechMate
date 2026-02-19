@@ -53,17 +53,20 @@ const LiveTerminal: React.FC<{
         setLines((prev) => [...prev.slice(-5), msg]);
         setCurrentLine("");
         setIsTyping(false);
-        onComplete && onComplete();
+        onComplete?.();
       }
     }, 30);
   };
 
+   
   useEffect(() => {
     if (incomingQuestion && !isTyping) {
       typeMessage(`> ${incomingQuestion}`, () => {
         if (incomingAnswer) typeMessage(`> ${incomingAnswer}`);
       });
     }
+    // isTyping intentionally omitted to avoid re-triggering on typing state change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [incomingQuestion, incomingAnswer]);
 
   useEffect(() => {
@@ -173,12 +176,13 @@ const ParticlesBackground: React.FC = () => {
     };
     window.addEventListener('resize', handleResize);
 
+    const mountNode = mountRef.current;
     return () => {
       window.removeEventListener('resize', handleResize);
       renderer.dispose();
       geometry.dispose();
       starMaterial.dispose();
-      if (mountRef.current?.contains(renderer.domElement)) mountRef.current.removeChild(renderer.domElement);
+      if (mountNode?.contains(renderer.domElement)) mountNode.removeChild(renderer.domElement);
     };
   }, []);
 

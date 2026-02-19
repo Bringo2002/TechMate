@@ -11,6 +11,19 @@ const particleLayer = Array.from({ length: 30 }, (_, i) => ({
   speed: Math.random() * 0.5 + 0.1,
 }));
 
+// Pre-generated network particle configs (outside component for stability)
+const networkParticleConfigs = Array.from({ length: 50 }, (_, i) => ({
+  id: i,
+  width: Math.random() * 3 + 1,
+  height: Math.random() * 3 + 1,
+  left: `${Math.random() * 100}%`,
+  top: `${Math.random() * 100}%`,
+  animateX: [0, (Math.random() - 0.5) * 50, 0],
+  animateY: [0, (Math.random() - 0.5) * 50, 0],
+  duration: 10 + Math.random() * 5,
+  delay: Math.random() * 2,
+}));
+
 const fadeInUp = (delay = 0) => ({
   initial: { opacity: 0, y: 40 },
   animate: {
@@ -59,26 +72,26 @@ const About: React.FC = () => {
     <section ref={containerRef} className="relative w-full min-h-screen bg-slate-900 text-white overflow-hidden">
       {/* Neon Holographic Network Background */}
       <div className="absolute inset-0 pointer-events-none">
-        {Array.from({ length: 50 }, (_, i) => (
+        {networkParticleConfigs.map((p) => (
           <motion.div
-            key={`network-${i}`}
+            key={`network-${p.id}`}
             className="absolute rounded-full bg-blue-400/30"
             style={{
-              width: Math.random() * 3 + 1,
-              height: Math.random() * 3 + 1,
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
+              width: p.width,
+              height: p.height,
+              left: p.left,
+              top: p.top,
             }}
             animate={{
-              x: [0, (Math.random() - 0.5) * 50, 0],
-              y: [0, (Math.random() - 0.5) * 50, 0],
+              x: p.animateX,
+              y: p.animateY,
               opacity: [0.3, 0.7, 0.3],
             }}
             transition={{
               repeat: Infinity,
-              duration: 10 + Math.random() * 5,
+              duration: p.duration,
               ease: "easeInOut",
-              delay: Math.random() * 2,
+              delay: p.delay,
             }}
           />
         ))}

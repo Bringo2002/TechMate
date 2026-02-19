@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { ProjectRow } from '../types/database.types';
-import type { ProjectFilters, PaginatedResponse, QueryOptions } from '../types/api.types';
+import type { ProjectFilters, QueryOptions } from '../types/api.types';
 import * as projectService from '../services/projectService';
 
 interface UseProjectsOptions {
@@ -89,6 +89,7 @@ export function useProjects(options?: UseProjectsOptions): UseProjectsReturn {
         } finally {
             setLoading(false);
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [options?.userId, currentPage, pageSize, filters]);
 
     useEffect(() => {

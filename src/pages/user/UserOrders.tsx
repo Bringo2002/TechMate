@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
+import Pagination from '../../components/Pagination';
 
 // --- Types ---
 interface Order {
@@ -43,7 +44,7 @@ interface Order {
 
 // --- Icons Helper ---
 const getProjectTypeIcon = (type: string) => {
-  const icons: any = {
+  const icons: Record<string, typeof Code> = {
     website: Code,
     app: Smartphone,
     consulting: Brain,
@@ -56,7 +57,7 @@ const getProjectTypeIcon = (type: string) => {
 
 // --- Status Config ---
 const getStatusConfig = (status: string) => {
-  const configs: any = {
+  const configs: Record<string, { label: string; color: string; bg: string; border: string; icon: typeof Clock }> = {
     pending: { label: 'Pending', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', icon: Clock },
     in_progress: { label: 'In Progress', color: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/20', icon: RefreshCw },
     review: { label: 'Under Review', color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20', icon: Eye },
@@ -74,6 +75,8 @@ const UserOrders: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortConfig] = useState<{ key: keyof Order; direction: 'asc' | 'desc' }>({ key: 'created_at', direction: 'desc' });
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
   useEffect(() => {
     fetchOrders();
@@ -116,6 +119,12 @@ const UserOrders: React.FC = () => {
       const comparison = aValue! > bValue! ? 1 : -1;
       return sortConfig.direction === 'asc' ? comparison : -comparison;
     });
+
+  const totalPages = Math.ceil(filteredOrders.length / pageSize);
+  const paginatedOrders = filteredOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  // Reset page when filters change
+  useEffect(() => { setCurrentPage(1); }, [searchQuery, statusFilter]);
 
   const totalSpent = orders.reduce((acc, curr) => acc + (curr.spent || 0), 0);
 
@@ -215,8 +224,8 @@ const UserOrders: React.FC = () => {
         {/* Orders List */}
         <div className="space-y-4">
             <AnimatePresence mode='popLayout'>
-                {filteredOrders.length > 0 ? (
-                    filteredOrders.map((order, i) => {
+                {paginatedOrders.length > 0 ? (
+                    paginatedOrders.map((order, i) => {
                         const Icon = getProjectTypeIcon(order.type);
                         const status = getStatusConfig(order.status);
                         const isExpanded = expandedId === order.id;
@@ -333,8 +342,22 @@ const UserOrders: React.FC = () => {
                                             </div>
                                             
                                             <div className="p-4 md:p-6 border-t border-white/5 flex gap-3 justify-end">
-                                                <button className="px-4 py-2 hover:bg-slate-800 rounded-lg text-sm text-slate-300 transition-colors">View Details</button>
-                                                <button className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-white transition-colors flex items-center gap-2">
+                                                <button 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        navigate(`/user/orders/${order.id}`);
+                                                    }}
+                                                    className="px-4 py-2 hover:bg-slate-800 rounded-lg text-sm text-slate-300 transition-colors flex items-center gap-2"
+                                                >
+                                                    <Eye size={16} /> View Details
+                                                </button>
+                                                <button 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        navigate('/user/billing');
+                                                    }}
+                                                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-white transition-colors flex items-center gap-2"
+                                                >
                                                     <FileText size={16} /> Invoice
                                                 </button>
                                             </div>
@@ -358,6 +381,14 @@ const UserOrders: React.FC = () => {
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filteredOrders.length}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+            />
         </div>
       </div>
     </div>

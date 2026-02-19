@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Download, CheckCircle, AlertTriangle, XCircle, Filter, Calendar } from 'lucide-react';
+import { Search, Download, CheckCircle, AlertTriangle, XCircle, Calendar } from 'lucide-react';
 
 interface AuditLog {
   id: string;

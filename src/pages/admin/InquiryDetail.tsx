@@ -88,8 +88,8 @@ export function InquiryDetail() {
             <div className="rounded-lg border bg-white p-6 shadow-sm">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Requirements</h2>
               <ul className="list-disc list-inside space-y-2 text-gray-700">
-                {inquiry.requirements.map((req: any, idx: number) => (
-                  <li key={idx}>{req.description || req}</li>
+                {inquiry.requirements.map((req: string | { description: string }, idx: number) => (
+                  <li key={idx}>{typeof req === 'string' ? req : req.description}</li>
                 ))}
               </ul>
             </div>

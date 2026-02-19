@@ -10,11 +10,16 @@ const BlogPost: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const post = blogPosts.find((p) => p.slug === slug);
 
+  // External redirect handler — must be called unconditionally (before any early return)
+  React.useEffect(() => {
+    if (post?.url && !post?.content) {
+      window.location.href = post.url;
+    }
+  }, [post?.url, post?.content]);
+
   if (!post) return <p className="text-white text-center mt-20">Post not found.</p>;
 
-  // External redirect handler
   if (post.url && !post.content) {
-    window.location.href = post.url;
     return null;
   }
 

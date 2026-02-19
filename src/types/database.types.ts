@@ -1,115 +1,140 @@
+
 // ============================================================================
 // TechMate Database Types - Phase 1 Updated
 // TypeScript types matching the Supabase database schema
 // NEW: Agency model types added for client_inquiries, proposals, assignments, updates
 // ============================================================================
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type Json = any;
+export type Json =
+    | string
+    | number
+    | boolean
+    | null
+    | { [key: string]: Json | undefined }
+    | Json[]
 
-// ============================================================================
-// Database Schema Type (for typed Supabase client)
-// ============================================================================
-export type Database = {
+export interface Database {
     public: {
         Tables: {
+            client_inquiries: {
+                Row: ClientInquiryRow;
+                Insert: ClientInquiryInsert;
+                Update: ClientInquiryUpdate;
+                Relationships: [];
+            };
             profiles: {
                 Row: ProfileRow;
                 Insert: ProfileInsert;
                 Update: ProfileUpdate;
+                Relationships: [];
             };
             businesses: {
                 Row: BusinessRow;
                 Insert: BusinessInsert;
                 Update: BusinessUpdate;
+                Relationships: [];
             };
             projects: {
                 Row: ProjectRow;
                 Insert: ProjectInsert;
                 Update: ProjectUpdate;
+                Relationships: [];
             };
+            /*
             orders: {
                 Row: OrderRow;
                 Insert: OrderInsert;
                 Update: OrderUpdate;
+                Relationships: [];
             };
+            */
             deliverables: {
                 Row: DeliverableRow;
                 Insert: DeliverableInsert;
                 Update: DeliverableUpdate;
+                Relationships: [];
             };
+            /*
             invoices: {
                 Row: InvoiceRow;
                 Insert: InvoiceInsert;
                 Update: InvoiceUpdate;
+                Relationships: [];
             };
-            // OLD marketplace tables (will be deprecated in Phase 7)
+            */
             requests: {
                 Row: RequestRow;
                 Insert: RequestInsert;
                 Update: RequestUpdate;
+                Relationships: [];
             };
             responses: {
                 Row: ResponseRow;
                 Insert: ResponseInsert;
                 Update: ResponseUpdate;
+                Relationships: [];
             };
-            // NEW agency model tables
-            client_inquiries: {
-                Row: ClientInquiryRow;
-                Insert: ClientInquiryInsert;
-                Update: ClientInquiryUpdate;
-            };
+            /*
             proposals: {
                 Row: ProposalRow;
                 Insert: ProposalInsert;
                 Update: ProposalUpdate;
+                Relationships: [];
             };
             project_assignments: {
                 Row: ProjectAssignmentRow;
                 Insert: ProjectAssignmentInsert;
                 Update: ProjectAssignmentUpdate;
+                Relationships: [];
             };
             project_updates: {
                 Row: ProjectUpdateRow;
                 Insert: ProjectUpdateInsert;
                 Update: ProjectUpdateUpdate;
+                Relationships: [];
             };
-            // Other tables
+            */
             notifications: {
                 Row: NotificationRow;
                 Insert: NotificationInsert;
                 Update: NotificationUpdate;
+                Relationships: [];
             };
             messages: {
                 Row: MessageRow;
                 Insert: MessageInsert;
                 Update: MessageUpdate;
+                Relationships: [];
             };
             activity_logs: {
                 Row: ActivityLogRow;
                 Insert: ActivityLogInsert;
-                Update: never;
+                Update: ActivityLogUpdate;
+                Relationships: [];
             };
             admin_metrics: {
                 Row: AdminMetricRow;
                 Insert: AdminMetricInsert;
                 Update: AdminMetricUpdate;
+                Relationships: [];
             };
             service_categories: {
                 Row: ServiceCategoryRow;
                 Insert: ServiceCategoryInsert;
                 Update: ServiceCategoryUpdate;
+                Relationships: [];
             };
             user_settings: {
                 Row: UserSettingsRow;
                 Insert: UserSettingsInsert;
                 Update: UserSettingsUpdate;
+                Relationships: [];
             };
             support_tickets: {
                 Row: SupportTicketRow;
                 Insert: SupportTicketInsert;
                 Update: SupportTicketUpdate;
+                Relationships: [];
             };
         };
         Views: {
@@ -155,10 +180,7 @@ export type Database = {
 // Enum Types (Updated)
 // ============================================================================
 export type UserRole = 'user' | 'admin' | 'moderator';
-
-// UPDATED: New user types for agency model
 export type UserType = 'client' | 'admin' | 'technical_lead' | 'developer' | 'designer';
-
 export type ProjectStatus = 'planning' | 'active' | 'review' | 'completed' | 'on_hold' | 'cancelled';
 export type OrderStatus = 'pending' | 'in_progress' | 'review' | 'completed' | 'cancelled';
 export type OrderType = 'website' | 'app' | 'consulting' | 'design' | 'backend' | 'fullstack';
@@ -173,8 +195,6 @@ export type TicketCategory = 'general' | 'billing' | 'technical' | 'account' | '
 export type TicketPriority = 'low' | 'medium' | 'high' | 'urgent';
 export type TicketStatus = 'open' | 'in_progress' | 'waiting' | 'resolved' | 'closed';
 export type Theme = 'dark' | 'light' | 'system';
-
-// NEW: Agency model specific enums
 export type InquiryStatus = 'new' | 'reviewing' | 'discovery_call_scheduled' | 'discovery_call_completed' | 'quoted' | 'proposal_sent' | 'accepted' | 'declined' | 'on_hold';
 export type ProposalStatus = 'draft' | 'sent' | 'viewed' | 'accepted' | 'rejected' | 'expired' | 'withdrawn';
 export type AssignmentStatus = 'assigned' | 'in_progress' | 'review' | 'completed' | 'blocked' | 'cancelled';
@@ -185,7 +205,7 @@ export type RiskLevel = 'low' | 'medium' | 'high';
 // ============================================================================
 // PROFILES (Updated)
 // ============================================================================
-export interface ProfileRow {
+export type ProfileRow = {
     id: string;
     email: string;
     full_name: string | null;
@@ -205,8 +225,8 @@ export interface ProfileRow {
     email_verified: boolean;
     last_login_at: string | null;
     // NEW: Agency model fields
-    internal_role: string | null; // 'founder', 'senior_dev', 'junior_dev', etc.
-    hourly_rate: number | null; // For internal cost tracking
+    internal_role: string | null;
+    hourly_rate: number | null;
     availability_hours_per_week: number | null;
     skills: string[] | null;
     // Timestamps
@@ -214,11 +234,33 @@ export interface ProfileRow {
     updated_at: string;
     deleted_at: string | null;
     metadata: Json;
-}
+};
 
-export type ProfileInsert = Omit<ProfileRow, 'created_at' | 'updated_at'> & {
+export type ProfileInsert = Omit<ProfileRow, 'created_at' | 'updated_at' | 'full_name' | 'avatar_url' | 'username' | 'phone' | 'bio' | 'company' | 'job_title' | 'location' | 'website' | 'last_login_at' | 'internal_role' | 'hourly_rate' | 'availability_hours_per_week' | 'skills' | 'deleted_at' | 'metadata' | 'timezone' | 'user_type' | 'is_admin' | 'is_active' | 'email_verified' | 'role'> & {
     created_at?: string;
     updated_at?: string;
+    full_name?: string | null;
+    avatar_url?: string | null;
+    username?: string | null;
+    phone?: string | null;
+    bio?: string | null;
+    company?: string | null;
+    job_title?: string | null;
+    location?: string | null;
+    website?: string | null;
+    last_login_at?: string | null;
+    internal_role?: string | null;
+    hourly_rate?: number | null;
+    availability_hours_per_week?: number | null;
+    skills?: string[] | null;
+    deleted_at?: string | null;
+    metadata?: Json;
+    timezone?: string;
+    user_type?: UserType;
+    is_admin?: boolean;
+    is_active?: boolean;
+    email_verified?: boolean;
+    role?: UserRole;
 };
 
 export type ProfileUpdate = Partial<Omit<ProfileRow, 'id' | 'created_at'>>;
@@ -226,7 +268,7 @@ export type ProfileUpdate = Partial<Omit<ProfileRow, 'id' | 'created_at'>>;
 // ============================================================================
 // BUSINESSES (Unchanged)
 // ============================================================================
-export interface BusinessRow {
+export type BusinessRow = {
     id: string;
     owner_id: string;
     name: string;
@@ -243,7 +285,7 @@ export interface BusinessRow {
     updated_at: string;
     deleted_at: string | null;
     metadata: Json;
-}
+};
 
 export type BusinessInsert = Omit<BusinessRow, 'id' | 'created_at' | 'updated_at'> & {
     id?: string;
@@ -256,7 +298,7 @@ export type BusinessUpdate = Partial<Omit<BusinessRow, 'id' | 'created_at'>>;
 // ============================================================================
 // PROJECTS (Updated)
 // ============================================================================
-export interface ProjectRow {
+export type ProjectRow = {
     id: string;
     user_id: string; // This is the client_id
     business_id: string | null;
@@ -288,7 +330,7 @@ export interface ProjectRow {
     updated_at: string;
     deleted_at: string | null;
     metadata: Json;
-}
+};
 
 export type ProjectInsert = Omit<ProjectRow, 'id' | 'created_at' | 'updated_at'> & {
     id?: string;
@@ -301,7 +343,7 @@ export type ProjectUpdate = Partial<Omit<ProjectRow, 'id' | 'created_at'>>;
 // ============================================================================
 // CLIENT INQUIRIES (NEW)
 // ============================================================================
-export interface ClientInquiryRow {
+export type ClientInquiryRow = {
     id: string;
     client_id: string;
     // Inquiry details
@@ -325,12 +367,11 @@ export interface ClientInquiryRow {
     // Tracking
     viewed_by_admin_at: string | null;
     first_response_at: string | null;
-    // Timestamps
     created_at: string;
     updated_at: string;
     deleted_at: string | null;
     metadata: Json;
-}
+};
 
 export type ClientInquiryInsert = {
     id?: string;
@@ -360,163 +401,9 @@ export type ClientInquiryInsert = {
 export type ClientInquiryUpdate = Partial<Omit<ClientInquiryRow, 'id' | 'created_at'>>;
 
 // ============================================================================
-// PROPOSALS (NEW)
-// ============================================================================
-export interface ProposalRow {
-    id: string;
-    inquiry_id: string | null;
-    proposal_number: string;
-    created_by: string;
-    // Proposal content
-    title: string;
-    executive_summary: string | null;
-    scope_of_work: string;
-    deliverables: Json; // Array of deliverable objects
-    timeline_weeks: number;
-    milestones: Json; // Array of milestone objects
-    assumptions: string | null;
-    exclusions: string | null;
-    // Pricing
-    total_cost: number;
-    payment_schedule: Json | null;
-    payment_terms: string | null;
-    currency: string;
-    // Status
-    status: ProposalStatus;
-    sent_at: string | null;
-    viewed_at: string | null;
-    responded_at: string | null;
-    expires_at: string | null;
-    // Client response
-    client_notes: string | null;
-    rejection_reason: string | null;
-    // Version control
-    version: number;
-    previous_version_id: string | null;
-    // Timestamps
-    created_at: string;
-    updated_at: string;
-    deleted_at: string | null;
-    metadata: Json;
-}
-
-export type ProposalInsert = Omit<ProposalRow, 'id' | 'proposal_number' | 'created_at' | 'updated_at' | 'version'> & {
-    id?: string;
-    proposal_number?: string;
-    version?: number;
-    created_at?: string;
-    updated_at?: string;
-};
-
-export type ProposalUpdate = Partial<Omit<ProposalRow, 'id' | 'proposal_number' | 'created_at'>>;
-
-// ============================================================================
-// PROJECT ASSIGNMENTS (NEW)
-// ============================================================================
-export interface ProjectAssignmentRow {
-    id: string;
-    project_id: string;
-    assigned_to: string;
-    assigned_by: string;
-    // Assignment details
-    role: string;
-    task_description: string | null;
-    // Time tracking
-    hours_estimated: number | null;
-    hours_actual: number;
-    // Status
-    status: AssignmentStatus;
-    priority: Priority | null;
-    // Dates
-    start_date: string | null;
-    due_date: string | null;
-    completed_at: string | null;
-    // Notes
-    notes: string | null;
-    blocker_description: string | null;
-    // Timestamps
-    created_at: string;
-    updated_at: string;
-    deleted_at: string | null;
-    metadata: Json;
-}
-
-export type ProjectAssignmentInsert = Omit<ProjectAssignmentRow, 'id' | 'created_at' | 'updated_at' | 'hours_actual'> & {
-    id?: string;
-    hours_actual?: number;
-    created_at?: string;
-    updated_at?: string;
-};
-
-export type ProjectAssignmentUpdate = Partial<Omit<ProjectAssignmentRow, 'id' | 'created_at' | 'assigned_by'>>;
-
-// ============================================================================
-// PROJECT UPDATES (NEW)
-// ============================================================================
-export interface ProjectUpdateRow {
-    id: string;
-    project_id: string;
-    created_by: string;
-    // Update content
-    title: string;
-    content: string;
-    update_type: UpdateType | null;
-    // Visibility
-    is_visible_to_client: boolean;
-    // Attachments
-    attachments: Json;
-    // Timestamps
-    created_at: string;
-    deleted_at: string | null;
-    metadata: Json;
-}
-
-export type ProjectUpdateInsert = Omit<ProjectUpdateRow, 'id' | 'created_at'> & {
-    id?: string;
-    created_at?: string;
-};
-
-export type ProjectUpdateUpdate = Partial<Omit<ProjectUpdateRow, 'id' | 'created_at' | 'created_by'>>;
-
-// ============================================================================
-// ORDERS (Unchanged)
-// ============================================================================
-export interface OrderRow {
-    id: string;
-    user_id: string;
-    project_id: string | null;
-    title: string;
-    description: string | null;
-    category: string | null;
-    type: OrderType;
-    status: OrderStatus;
-    progress: number;
-    priority: Priority;
-    budget: number;
-    spent: number;
-    health_score: number;
-    due_date: string | null;
-    started_at: string | null;
-    completed_at: string | null;
-    next_milestone: string | null;
-    created_at: string;
-    updated_at: string;
-    deleted_at: string | null;
-    metadata: Json;
-}
-
-export type OrderInsert = Omit<OrderRow, 'id' | 'created_at' | 'updated_at'> & {
-    id?: string;
-    created_at?: string;
-    updated_at?: string;
-};
-
-export type OrderUpdate = Partial<Omit<OrderRow, 'id' | 'created_at'>>;
-
-// ============================================================================
 // DELIVERABLES (Unchanged)
 // ============================================================================
-export interface DeliverableRow {
+export type DeliverableRow = {
     id: string;
     order_id: string | null;
     project_id: string | null;
@@ -537,7 +424,7 @@ export interface DeliverableRow {
     updated_at: string;
     deleted_at: string | null;
     metadata: Json;
-}
+};
 
 export type DeliverableInsert = Omit<DeliverableRow, 'id' | 'created_at' | 'updated_at'> & {
     id?: string;
@@ -550,7 +437,7 @@ export type DeliverableUpdate = Partial<Omit<DeliverableRow, 'id' | 'created_at'
 // ============================================================================
 // INVOICES (Unchanged)
 // ============================================================================
-export interface InvoiceRow {
+export type InvoiceRow = {
     id: string;
     invoice_number: string;
     user_id: string;
@@ -571,7 +458,7 @@ export interface InvoiceRow {
     updated_at: string;
     deleted_at: string | null;
     metadata: Json;
-}
+};
 
 export type InvoiceInsert = Omit<InvoiceRow, 'id' | 'invoice_number' | 'total_amount' | 'created_at' | 'updated_at'> & {
     id?: string;
@@ -585,7 +472,7 @@ export type InvoiceUpdate = Partial<Omit<InvoiceRow, 'id' | 'invoice_number' | '
 // ============================================================================
 // REQUESTS (OLD - Will be deprecated in Phase 7)
 // ============================================================================
-export interface RequestRow {
+export type RequestRow = {
     id: string;
     requester_id: string;
     business_id: string | null;
@@ -609,7 +496,7 @@ export interface RequestRow {
     updated_at: string;
     deleted_at: string | null;
     metadata: Json;
-}
+};
 
 export type RequestInsert = Omit<RequestRow, 'id' | 'created_at' | 'updated_at' | 'views_count' | 'responses_count'> & {
     id?: string;
@@ -622,7 +509,7 @@ export type RequestUpdate = Partial<Omit<RequestRow, 'id' | 'created_at' | 'view
 // ============================================================================
 // RESPONSES (OLD - Will be deprecated in Phase 7)
 // ============================================================================
-export interface ResponseRow {
+export type ResponseRow = {
     id: string;
     request_id: string;
     responder_id: string;
@@ -637,7 +524,7 @@ export interface ResponseRow {
     updated_at: string;
     deleted_at: string | null;
     metadata: Json;
-}
+};
 
 export type ResponseInsert = Omit<ResponseRow, 'id' | 'created_at' | 'updated_at'> & {
     id?: string;
@@ -650,7 +537,7 @@ export type ResponseUpdate = Partial<Omit<ResponseRow, 'id' | 'created_at'>>;
 // ============================================================================
 // NOTIFICATIONS (Unchanged)
 // ============================================================================
-export interface NotificationRow {
+export type NotificationRow = {
     id: string;
     user_id: string;
     title: string;
@@ -662,7 +549,7 @@ export interface NotificationRow {
     read_at: string | null;
     created_at: string;
     metadata: Json;
-}
+};
 
 export type NotificationInsert = Omit<NotificationRow, 'id' | 'created_at'> & {
     id?: string;
@@ -674,7 +561,7 @@ export type NotificationUpdate = Partial<Pick<NotificationRow, 'is_read' | 'read
 // ============================================================================
 // MESSAGES (Unchanged)
 // ============================================================================
-export interface MessageRow {
+export type MessageRow = {
     id: string;
     sender_id: string;
     recipient_id: string;
@@ -690,12 +577,24 @@ export interface MessageRow {
     updated_at: string;
     deleted_at: string | null;
     metadata: Json;
-}
+};
 
-export type MessageInsert = Omit<MessageRow, 'id' | 'created_at' | 'updated_at'> & {
+export type MessageInsert = {
     id?: string;
+    sender_id: string;
+    recipient_id: string;
+    subject?: string | null;
+    content: string;
+    thread_id?: string | null;
+    request_id?: string | null;
+    project_id?: string | null;
+    is_read?: boolean;
+    read_at?: string | null;
+    attachments?: Json;
     created_at?: string;
     updated_at?: string;
+    deleted_at?: string | null;
+    metadata?: Json;
 };
 
 export type MessageUpdate = Partial<Omit<MessageRow, 'id' | 'created_at'>>;
@@ -703,7 +602,7 @@ export type MessageUpdate = Partial<Omit<MessageRow, 'id' | 'created_at'>>;
 // ============================================================================
 // ACTIVITY LOGS (Unchanged)
 // ============================================================================
-export interface ActivityLogRow {
+export type ActivityLogRow = {
     id: string;
     user_id: string | null;
     entity_type: string;
@@ -713,17 +612,20 @@ export interface ActivityLogRow {
     ip_address: string | null;
     user_agent: string | null;
     created_at: string;
-}
+};
 
 export type ActivityLogInsert = Omit<ActivityLogRow, 'id' | 'created_at'> & {
     id?: string;
     created_at?: string;
 };
 
+export type ActivityLogUpdate = Partial<Omit<ActivityLogRow, 'id' | 'created_at'>>;
+
+
 // ============================================================================
 // ADMIN METRICS (Unchanged)
 // ============================================================================
-export interface AdminMetricRow {
+export type AdminMetricRow = {
     id: string;
     metric_date: string;
     total_users: number;
@@ -740,7 +642,7 @@ export interface AdminMetricRow {
     created_at: string;
     updated_at: string;
     metadata: Json;
-}
+};
 
 export type AdminMetricInsert = Omit<AdminMetricRow, 'id' | 'created_at' | 'updated_at'> & {
     id?: string;
@@ -753,7 +655,7 @@ export type AdminMetricUpdate = Partial<Omit<AdminMetricRow, 'id' | 'created_at'
 // ============================================================================
 // SERVICE CATEGORIES (Unchanged)
 // ============================================================================
-export interface ServiceCategoryRow {
+export type ServiceCategoryRow = {
     id: string;
     name: string;
     description: string | null;
@@ -762,7 +664,7 @@ export interface ServiceCategoryRow {
     is_active: boolean;
     sort_order: number;
     created_at: string;
-}
+};
 
 export type ServiceCategoryInsert = Omit<ServiceCategoryRow, 'id' | 'created_at'> & {
     id?: string;
@@ -774,7 +676,7 @@ export type ServiceCategoryUpdate = Partial<Omit<ServiceCategoryRow, 'id' | 'cre
 // ============================================================================
 // USER SETTINGS (Unchanged)
 // ============================================================================
-export interface UserSettingsRow {
+export type UserSettingsRow = {
     id: string;
     user_id: string;
     theme: Theme;
@@ -791,7 +693,7 @@ export interface UserSettingsRow {
     notification_sms: boolean;
     created_at: string;
     updated_at: string;
-}
+};
 
 export type UserSettingsInsert = Omit<UserSettingsRow, 'id' | 'created_at' | 'updated_at'> & {
     id?: string;
@@ -804,7 +706,7 @@ export type UserSettingsUpdate = Partial<Omit<UserSettingsRow, 'id' | 'user_id' 
 // ============================================================================
 // SUPPORT TICKETS (Unchanged)
 // ============================================================================
-export interface SupportTicketRow {
+export type SupportTicketRow = {
     id: string;
     user_id: string;
     subject: string;
@@ -818,7 +720,7 @@ export interface SupportTicketRow {
     updated_at: string;
     deleted_at: string | null;
     metadata: Json;
-}
+};
 
 export type SupportTicketInsert = Omit<SupportTicketRow, 'id' | 'created_at' | 'updated_at'> & {
     id?: string;
@@ -833,50 +735,50 @@ export type SupportTicketUpdate = Partial<Omit<SupportTicketRow, 'id' | 'created
 // ============================================================================
 
 // Deliverable object structure (used in JSONB fields)
-export interface Deliverable {
+export type Deliverable = {
     id: string;
     name: string;
     description?: string;
     due_date?: string;
     status?: 'pending' | 'in_progress' | 'completed';
-}
+};
 
 // Milestone object structure (used in proposals)
-export interface Milestone {
+export type Milestone = {
     id: string;
     name: string;
     description?: string;
     deadline?: string;
     payment_percentage?: number;
-}
+};
 
 // Payment schedule item (used in proposals)
-export interface PaymentScheduleItem {
+export type PaymentScheduleItem = {
     milestone: string;
     amount: number;
     percentage: number;
     due_date?: string;
-}
+};
 
 // Requirement object (used in inquiries)
-export interface Requirement {
+export type Requirement = {
     id: string;
     description: string;
     priority?: 'must_have' | 'should_have' | 'nice_to_have';
-}
+};
 
 // Attachment object (used in multiple tables)
-export interface Attachment {
+export type Attachment = {
     id: string;
     file_name: string;
     file_url: string;
     file_size: number;
     file_type: string;
     uploaded_at: string;
-}
+};
 
 // Statistics return types
-export interface InquiryStats {
+export type InquiryStats = {
     total_inquiries: number;
     new_inquiries?: number;
     in_review?: number;
@@ -885,9 +787,9 @@ export interface InquiryStats {
     declined: number;
     pending?: number;
     avg_response_time_hours?: number;
-}
+};
 
-export interface DeveloperStats {
+export type DeveloperStats = {
     total_assignments: number;
     assigned: number;
     in_progress: number;
@@ -897,4 +799,4 @@ export interface DeveloperStats {
     total_hours_estimated: number;
     total_hours_actual: number;
     overdue_tasks: number;
-}
+};

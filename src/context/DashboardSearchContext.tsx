@@ -6,6 +6,7 @@ interface DashboardSearchContextValue {
 
 const DashboardSearchContext = createContext<DashboardSearchContextValue | null>(null);
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useDashboardSearch = (): DashboardSearchContextValue => {
 
     const ctx = useContext(DashboardSearchContext);

@@ -3,9 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useDashboardData } from '../../hooks/useDashboardData';
 import { 
   Package, 
-  CheckCircle, 
-  Clock, 
-  TrendingUp,
+  Clock,
   DollarSign,
   Sparkles,
   Target,
@@ -21,25 +19,10 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// --- Type Definitions (aligned with DB) ---
-// You typically import these from a shared types file, but defining here for clarity
-interface Order {
-  id: number;
-  title: string;
-  category?: string;
-  type: string;
-  status: string;
-  progress: number;
-  due_date: string; // ISO string
-  budget: number;
-  spent: number;
-  next_milestone?: string;
-  updated_at: string;
-}
 
 // --- Icons Helper ---
 const getProjectTypeIcon = (type: string) => {
-  const icons: any = {
+  const icons: Record<string, typeof Code> = {
     website: Code,
     app: Smartphone,
     consulting: Brain,
@@ -52,7 +35,7 @@ const getProjectTypeIcon = (type: string) => {
 
 const UserOverview: React.FC = () => {
   const navigate = useNavigate();
-  const { profile, orders, invoices, loading, error } = useDashboardData();
+  const { profile, orders, loading, error } = useDashboardData();
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
   // Mouse move effect for background
@@ -65,10 +48,10 @@ const UserOverview: React.FC = () => {
   }, []);
 
   // Calculate totals
-  const totalBudget = orders?.reduce((acc: number, order: any) => acc + (order.budget || 0), 0) || 0;
-  const totalSpent = orders?.reduce((acc: number, order: any) => acc + (order.spent || 0), 0) || 0;
+  const totalBudget = orders?.reduce((acc: number, order: Record<string, number>) => acc + (order.budget || 0), 0) || 0;
+  const totalSpent = orders?.reduce((acc: number, order: Record<string, number>) => acc + (order.spent || 0), 0) || 0;
   const budgetUsedPercent = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
-  const activeOrdersCount = orders?.filter((o: any) => o.status === 'in_progress').length || 0;
+  const activeOrdersCount = orders?.filter((o: Record<string, string>) => o.status === 'in_progress').length || 0;
 
   if (loading) {
     return (
@@ -211,7 +194,7 @@ const UserOverview: React.FC = () => {
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <AnimatePresence>
-            {orders?.map((order: any, i: number) => {
+            {orders?.map((order: Record<string, string | number>, i: number) => {
                const Icon = getProjectTypeIcon(order.type);
                return (
                 <motion.div

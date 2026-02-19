@@ -1,6 +1,3 @@
-// src/components/dashboard/charts/RequestBreakdownPie.tsx
-// Futuristic animated pie chart for TechMate dashboard
-
 import React, { useState } from "react";
 
 export interface PieData {
@@ -18,7 +15,12 @@ export const RequestBreakdownPie: React.FC<RequestBreakdownPieProps> = ({ data }
   const [hovered, setHovered] = useState<number | null>(null);
 
   const total = data.reduce((sum, d) => sum + d.value, 0);
-  let cumulativePercent = 0;
+
+  const slices = data.map((d, i) => {
+    const percent = d.value / total;
+    const startPercent = data.slice(0, i).reduce((sum, prev) => sum + prev.value / total, 0);
+    return { percent, startPercent };
+  });
 
   const createPath = (percent: number, cumulative: number, radius = 50) => {
     const startAngle = cumulative * 2 * Math.PI;
@@ -41,11 +43,9 @@ export const RequestBreakdownPie: React.FC<RequestBreakdownPieProps> = ({ data }
       <div className="relative flex items-center justify-center">
         <svg viewBox="0 0 100 100" className="w-56 h-56">
           {data.map((d, i) => {
-            const percent = d.value / total;
-            const path = createPath(percent, cumulativePercent);
+            const { percent, startPercent } = slices[i];
+            const path = createPath(percent, startPercent);
             const isHovered = hovered === i;
-
-            cumulativePercent += percent;
 
             return (
               <path

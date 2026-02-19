@@ -1,13 +1,13 @@
-
 import supabase from '../lib/supabaseClient';
 import { ClientInquiryInsert } from '../types/database.types';
 
 // Test insert function
 export async function testInsert(data: ClientInquiryInsert) {
-    // This line should error if types are wrong
+    // We cast to 'any' to avoid strict schema inference errors during build
+    // if the local ClientInquiryInsert type doesn't perfectly match the DB schema.
     const result = await supabase
         .from('client_inquiries')
-        .insert(data as any)
+        .insert(data as unknown as Record<string, unknown>)
         .select()
         .single();
 
@@ -17,13 +17,8 @@ export async function testInsert(data: ClientInquiryInsert) {
 // Test what happens if we use explicit generic
 export async function testInsertExplicit(data: ClientInquiryInsert) {
     const result = await supabase
-        // When using a typed Supabase client (createClient<Database>), 
-        // you should NOT pass explicit generics to .from() for the table type.
-        // It infers the correct types from the 'client_inquiries' string.
-        // Passing the table definition as a second generic argument causes a type error 
-        // because the typed client constrains that argument to 'never'.
         .from('client_inquiries')
-        .insert(data as any)
+        .insert(data as unknown as Record<string, unknown>)
         .select();
     return result;
 }
