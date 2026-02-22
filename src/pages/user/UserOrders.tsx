@@ -24,15 +24,12 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import Pagination from '../../components/Pagination';
-import { OrderType, OrderStatus } from '../../types/database.types';
 
-// --- Types ---
-interface Order {
+interface ProjectListItem {
   id: string;
   title: string;
-  category: string | null;
-  type: OrderType;
-  status: OrderStatus;
+  type: string;
+  status: string;
   progress: number;
   due_date: string | null;
   budget: number;
@@ -42,6 +39,7 @@ interface Order {
   health_score: number;
   next_milestone?: string | null;
   metadata?: any;
+  source: 'order' | 'inquiry';
 }
 
 // --- Icons Helper ---
@@ -49,16 +47,36 @@ const getProjectTypeIcon = (type: string) => {
   const icons: Record<string, typeof Code> = {
     website: Code,
     app: Smartphone,
+    mobile_app: Smartphone,
     consulting: Brain,
     design: Palette,
     backend: Activity,
-    fullstack: Zap
+    fullstack: Zap,
+    web_app: Code,
+    other: Package,
   };
   return icons[type] || Package;
 };
 
 // --- Status Config ---
-const getStatusConfig = (status: string) => {
+const getStatusConfig = (status: string, source: 'order' | 'inquiry') => {
+  if (source === 'inquiry') {
+    // Show status for inquiries ('new', 'reviewing', etc)
+    const inquiryConfigs: Record<string, { label: string; color: string; bg: string; border: string; icon: typeof Clock }> = {
+      new: { label: 'Submitted', color: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/20', icon: Sparkles },
+      reviewing: { label: 'Reviewing', color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20', icon: Eye },
+      quoted: { label: 'Quoted', color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20', icon: FileText },
+      accepted: { label: 'Accepted', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', icon: CheckCircle },
+      declined: { label: 'Declined', color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20', icon: XCircle },
+      on_hold: { label: 'On Hold', color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/20', icon: Clock },
+      proposal_sent: { label: 'Proposal Sent', color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20', icon: FileText },
+      discovery_call_scheduled: { label: 'Discovery Call', color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/20', icon: Calendar },
+      discovery_call_completed: { label: 'Discovery Call Done', color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20', icon: CheckCircle },
+    };
+    return inquiryConfigs[status] || inquiryConfigs['new'];
+  }
+
+  // Order status
   const configs: Record<string, { label: string; color: string; bg: string; border: string; icon: typeof Clock }> = {
     pending: { label: 'Pending', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', icon: Clock },
     in_progress: { label: 'In Progress', color: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/20', icon: RefreshCw },
@@ -71,46 +89,91 @@ const getStatusConfig = (status: string) => {
 
 const UserOrders: React.FC = () => {
   const navigate = useNavigate();
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<ProjectListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [sortConfig] = useState<{ key: keyof Order; direction: 'asc' | 'desc' }>({ key: 'created_at', direction: 'desc' });
+  const [sortConfig] = useState<{ key: keyof ProjectListItem; direction: 'asc' | 'desc' }>({ key: 'created_at', direction: 'desc' });
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
   useEffect(() => {
-    fetchOrders();
+    fetchOrdersAndInquiries();
   }, []);
 
-  const fetchOrders = async () => {
+  const fetchOrdersAndInquiries = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data, error } = await supabase
+      // Fetch orders
+      const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setOrders(data || []);
+      if (ordersError) throw ordersError;
+
+      // Fetch client inquiries (new project requests)
+      const { data: inquiriesData, error: inquiriesError } = await supabase
+        .from('client_inquiries')
+        .select('*')
+        .eq('client_id', user.id)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false });
+
+      if (inquiriesError) throw inquiriesError;
+
+      // Map both to a common shape
+      const ordersMapped: ProjectListItem[] = (ordersData ?? []).map((o: any) => ({
+        id: o.id,
+        title: o.title,
+        type: o.type,
+        status: o.status,
+        progress: o.progress ?? 0,
+        due_date: o.due_date ?? null,
+        budget: o.budget ?? 0,
+        spent: o.spent ?? 0,
+        created_at: o.created_at,
+        updated_at: o.updated_at,
+        health_score: o.health_score ?? 100,
+        next_milestone: o.next_milestone,
+        metadata: o.metadata,
+        source: 'order'
+      }));
+
+      const inquiriesMapped: ProjectListItem[] = (inquiriesData ?? []).map((i: any) => ({
+        id: i.id,
+        title: i.title,
+        type: i.project_type, // maps to type field
+        status: i.status,
+        progress: 0, // For inquiries, maybe set to 0
+        due_date: i.deadline,
+        budget: i.budget_min ?? 0, // use budget_min or 0
+        spent: 0,
+        created_at: i.created_at,
+        updated_at: i.updated_at,
+        health_score: 100,
+        next_milestone: undefined,
+        metadata: i.metadata,
+        source: 'inquiry'
+      }));
+
+      setOrders([...ordersMapped, ...inquiriesMapped]);
     } catch (error) {
-      console.error('Error fetching orders:', error);
+      console.error('Error fetching orders/inquiries:', error);
       toast.error('Failed to load orders');
     } finally {
       setLoading(false);
     }
   };
 
-
-
   const filteredOrders = orders
     .filter(order => {
       const matchesSearch = order.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                           order.type.toLowerCase().includes(searchQuery.toLowerCase());
+                           (order.type && order.type.toLowerCase().includes(searchQuery.toLowerCase()));
       const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
       return matchesSearch && matchesStatus;
     })
@@ -158,7 +221,7 @@ const UserOrders: React.FC = () => {
                 <h1 className="text-3xl font-bold text-white mb-2 font-orbitron flex items-center gap-3">
                     <Package className="text-cyan-400" /> My Orders
                 </h1>
-                <p className="text-slate-400">Manage your active projects and billing history.</p>
+                <p className="text-slate-400">Manage your active projects, requests, and billing history.</p>
             </div>
             <button 
                 onClick={() => navigate('/user/new-project')}
@@ -170,19 +233,25 @@ const UserOrders: React.FC = () => {
         {/* Stats Strip */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             <div className="bg-[#0a0a16]/60 backdrop-blur-xl border border-white/5 p-4 rounded-xl">
-                <p className="text-slate-400 text-xs font-medium mb-1">Total Orders</p>
+                <p className="text-slate-400 text-xs font-medium mb-1">Total Orders & Requests</p>
                 <p className="text-2xl font-bold text-white font-orbitron">{orders.length}</p>
             </div>
             <div className="bg-[#0a0a16]/60 backdrop-blur-xl border border-white/5 p-4 rounded-xl">
                 <p className="text-slate-400 text-xs font-medium mb-1">Active</p>
                 <p className="text-2xl font-bold text-cyan-400 font-orbitron">
-                    {orders.filter(o => ['in_progress', 'review'].includes(o.status)).length}
+                    {orders.filter(o => 
+                      (o.source === 'order' && ['in_progress', 'review'].includes(o.status)) ||
+                      (o.source === 'inquiry' && ['reviewing', 'quoted', 'proposal_sent', 'discovery_call_scheduled', 'discovery_call_completed'].includes(o.status))
+                    ).length}
                 </p>
             </div>
             <div className="bg-[#0a0a16]/60 backdrop-blur-xl border border-white/5 p-4 rounded-xl">
                 <p className="text-slate-400 text-xs font-medium mb-1">Completed</p>
                 <p className="text-2xl font-bold text-emerald-400 font-orbitron">
-                    {orders.filter(o => o.status === 'completed').length}
+                    {orders.filter(o =>
+                      (o.source === 'order' && o.status === 'completed') ||
+                      (o.source === 'inquiry' && o.status === 'accepted')
+                    ).length}
                 </p>
             </div>
             <div className="bg-[#0a0a16]/60 backdrop-blur-xl border border-white/5 p-4 rounded-xl">
@@ -199,7 +268,7 @@ const UserOrders: React.FC = () => {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
                 <input 
                     type="text" 
-                    placeholder="Search orders..." 
+                    placeholder="Search orders & requests..." 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full bg-slate-900/50 border border-white/10 rounded-lg pl-10 pr-4 py-2.5 text-white focus:outline-none focus:border-cyan-500/50 transition-colors placeholder:text-slate-600"
@@ -218,6 +287,10 @@ const UserOrders: React.FC = () => {
                         <option value="in_progress">In Progress</option>
                         <option value="review">Review</option>
                         <option value="completed">Completed</option>
+                        <option value="new">Submitted</option>
+                        <option value="reviewing">Reviewing (Req.)</option>
+                        <option value="quoted">Quoted (Req.)</option>
+                        <option value="accepted">Accepted (Req.)</option>
                     </select>
                 </div>
             </div>
@@ -229,7 +302,7 @@ const UserOrders: React.FC = () => {
                 {paginatedOrders.length > 0 ? (
                     paginatedOrders.map((order, i) => {
                         const Icon = getProjectTypeIcon(order.type);
-                        const status = getStatusConfig(order.status);
+                        const status = getStatusConfig(order.status, order.source);
                         const isExpanded = expandedId === order.id;
 
                         return (
@@ -255,6 +328,9 @@ const UserOrders: React.FC = () => {
                                                     <span className="capitalize">{order.type}</span>
                                                     <span>•</span>
                                                     <span>Created {new Date(order.created_at).toLocaleDateString()}</span>
+                                                    {order.source === 'inquiry' && (
+                                                      <span className="ml-2 bg-cyan-700/20 px-2 py-0.5 rounded text-xs text-cyan-400 font-mono">REQUEST</span>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -349,21 +425,27 @@ const UserOrders: React.FC = () => {
                                                 <button 
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        navigate(`/user/orders/${order.id}`);
+                                                        if (order.source === 'order') {
+                                                            navigate(`/user/orders/${order.id}`);
+                                                        } else {
+                                                            navigate(`/user/requests/${order.id}`);
+                                                        }
                                                     }}
                                                     className="px-4 py-2 hover:bg-slate-800 rounded-lg text-sm text-slate-300 transition-colors flex items-center gap-2"
                                                 >
                                                     <Eye size={16} /> View Details
                                                 </button>
-                                                <button 
+                                                {order.source === 'order' && (
+                                                  <button 
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         navigate('/user/billing');
                                                     }}
                                                     className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-white transition-colors flex items-center gap-2"
-                                                >
+                                                  >
                                                     <FileText size={16} /> Invoice
-                                                </button>
+                                                  </button>
+                                                )}
                                             </div>
                                         </motion.div>
                                     )}
@@ -380,8 +462,8 @@ const UserOrders: React.FC = () => {
                         <div className="w-20 h-20 bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-4">
                             <Package size={32} className="text-slate-600" />
                         </div>
-                        <h3 className="text-xl font-bold text-white mb-2">No projects found</h3>
-                        <p className="text-slate-400">Try adjusting your filters or create a new order.</p>
+                        <h3 className="text-xl font-bold text-white mb-2">No projects or requests found</h3>
+                        <p className="text-slate-400">Try adjusting your filters or create a new order/request.</p>
                     </motion.div>
                 )}
             </AnimatePresence>
