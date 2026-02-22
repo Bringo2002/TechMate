@@ -20,7 +20,7 @@ export async function createTicket(ticket: SupportTicketInsert): Promise<Service
     // Casting to 'any' to bypass strict schema validation errors during build
     const { data, error } = await supabase
         .from('support_tickets')
-        .insert(ticket as unknown as Record<string, unknown>)
+        .insert(ticket)
         .select()
         .single();
 

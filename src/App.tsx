@@ -50,6 +50,7 @@ import ProfileSettings from './pages/dashboard/settings/profile/ProfileSettings'
 import SecuritySettings from './pages/dashboard/settings/security/SecuritySettings';
 import NotificationSettings from './pages/dashboard/settings/notifications/NotificationSettings';
 import ActivityLogs from './pages/dashboard/settings/activity/ActivityLogs';
+import NewProject from './pages/user/NewProject';
 
 
 // Scroll to top and update title on route change
@@ -171,6 +172,7 @@ const App: React.FC = () => {
     <Route path="messages" element={<ErrorBoundary fallbackTitle="Messages failed to load"><Messages /></ErrorBoundary>} />
     <Route path="notifications" element={<ErrorBoundary fallbackTitle="Notifications failed to load"><Notifications /></ErrorBoundary>} />
     <Route path="stats" element={<ErrorBoundary fallbackTitle="Stats failed to load"><Stats /></ErrorBoundary>} />
+    <Route path="new-project" element={<ErrorBoundary fallbackTitle="New Project failed to load"><NewProject /></ErrorBoundary>} />
   </Route>
       </Routes>
       <Toaster 

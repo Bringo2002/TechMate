@@ -40,28 +40,24 @@ export interface Database {
                 Update: ProjectUpdate;
                 Relationships: [];
             };
-            /*
             orders: {
                 Row: OrderRow;
                 Insert: OrderInsert;
                 Update: OrderUpdate;
                 Relationships: [];
             };
-            */
             deliverables: {
                 Row: DeliverableRow;
                 Insert: DeliverableInsert;
                 Update: DeliverableUpdate;
                 Relationships: [];
             };
-            /*
             invoices: {
                 Row: InvoiceRow;
                 Insert: InvoiceInsert;
                 Update: InvoiceUpdate;
                 Relationships: [];
             };
-            */
             requests: {
                 Row: RequestRow;
                 Insert: RequestInsert;
@@ -339,6 +335,41 @@ export type ProjectInsert = Omit<ProjectRow, 'id' | 'created_at' | 'updated_at'>
 };
 
 export type ProjectUpdate = Partial<Omit<ProjectRow, 'id' | 'created_at'>>;
+
+// ============================================================================
+// ORDERS (NEWly restored)
+// ============================================================================
+export type OrderRow = {
+    id: string;
+    user_id: string;
+    project_id: string | null;
+    title: string;
+    description: string | null;
+    category: string | null;
+    type: OrderType;
+    status: OrderStatus;
+    progress: number;
+    priority: Priority;
+    budget: number;
+    spent: number;
+    health_score: number;
+    due_date: string | null;
+    started_at: string | null;
+    completed_at: string | null;
+    next_milestone: string | null;
+    created_at: string;
+    updated_at: string;
+    deleted_at: string | null;
+    metadata: Json;
+};
+
+export type OrderInsert = Omit<OrderRow, 'id' | 'created_at' | 'updated_at'> & {
+    id?: string;
+    created_at?: string;
+    updated_at?: string;
+};
+
+export type OrderUpdate = Partial<Omit<OrderRow, 'id' | 'created_at'>>;
 
 // ============================================================================
 // CLIENT INQUIRIES (NEW)
@@ -722,10 +753,17 @@ export type SupportTicketRow = {
     metadata: Json;
 };
 
-export type SupportTicketInsert = Omit<SupportTicketRow, 'id' | 'created_at' | 'updated_at'> & {
+export type SupportTicketInsert = Omit<SupportTicketRow, 'id' | 'created_at' | 'updated_at' | 'description' | 'assigned_to' | 'resolved_at' | 'deleted_at' | 'metadata' | 'status' | 'priority'> & {
     id?: string;
+    description?: string | null;
+    status?: TicketStatus;
+    priority?: TicketPriority;
+    assigned_to?: string | null;
+    resolved_at?: string | null;
     created_at?: string;
     updated_at?: string;
+    deleted_at?: string | null;
+    metadata?: Json;
 };
 
 export type SupportTicketUpdate = Partial<Omit<SupportTicketRow, 'id' | 'created_at'>>;
