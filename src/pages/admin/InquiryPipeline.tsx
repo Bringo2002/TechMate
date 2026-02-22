@@ -3,7 +3,7 @@
 // Main admin page for managing client inquiries
 // ============================================================================
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useInquiries } from '../../hooks/useInquiries';
 import { InquiryStatsCards } from '../../components/admin/InquiryStatsCards';
@@ -28,7 +28,7 @@ export function InquiryPipeline() {
   });
 
   const handleInquiryClick = (inquiryId: string) => {
-    navigate(`/admin/inquiries/${inquiryId}`);
+    navigate(`/dashboard/inquiries/${inquiryId}`);
   };
 
   return (

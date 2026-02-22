@@ -24,22 +24,24 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import Pagination from '../../components/Pagination';
+import { OrderType, OrderStatus } from '../../types/database.types';
 
 // --- Types ---
 interface Order {
-  id: number;
+  id: string;
   title: string;
-  category: string;
-  type: string;
-  status: string;
+  category: string | null;
+  type: OrderType;
+  status: OrderStatus;
   progress: number;
-  due_date: string;
+  due_date: string | null;
   budget: number;
   spent: number;
   created_at: string;
   updated_at: string;
   health_score: number;
-  next_milestone?: string;
+  next_milestone?: string | null;
+  metadata?: any;
 }
 
 // --- Icons Helper ---
@@ -74,7 +76,7 @@ const UserOrders: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortConfig] = useState<{ key: keyof Order; direction: 'asc' | 'desc' }>({ key: 'created_at', direction: 'desc' });
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
@@ -159,7 +161,7 @@ const UserOrders: React.FC = () => {
                 <p className="text-slate-400">Manage your active projects and billing history.</p>
             </div>
             <button 
-                onClick={() => navigate('/job-discovery')}
+                onClick={() => navigate('/user/new-project')}
                 className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white px-6 py-3 rounded-xl font-bold shadow-[0_0_20px_rgba(6,182,212,0.3)] transition-all flex items-center gap-2 hover:scale-105 active:scale-95">
                 <Sparkles size={18} /> New Order
             </button>
@@ -303,7 +305,9 @@ const UserOrders: React.FC = () => {
                                                             <div className="p-2 bg-slate-800 rounded-lg text-slate-400"><Calendar size={16} /></div>
                                                             <div>
                                                                 <p className="text-white">Due Date</p>
-                                                                <p className="text-slate-500">{new Date(order.due_date).toLocaleDateString()}</p>
+                                                                <p className="text-slate-500">
+                                                                {order.due_date ? new Date(order.due_date).toLocaleDateString() : 'Not set'}
+                                                              </p>
                                                             </div>
                                                         </div>
                                                         <div className="flex items-center gap-3 text-sm">

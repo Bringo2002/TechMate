@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useInquiry } from '../../hooks/useInquiries';
 import { updateInquiryStatus } from '../../services/inquiries.service';
+import type { InquiryStatus } from '../../types/database.types';
 import { InquiryStatusBadge } from '../../components/admin/InquiryStatusBadge';
 import { AssignTeamMemberModal } from '../../components/admin/AssignTeamMemberModal';
 
@@ -12,7 +13,7 @@ export function InquiryDetail() {
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [updating, setUpdating] = useState(false);
 
-  const handleStatusChange = async (newStatus: string) => {
+  const handleStatusChange = async (newStatus: InquiryStatus) => {
     if (!inquiryId) return;
 
     setUpdating(true);
@@ -41,7 +42,7 @@ export function InquiryDetail() {
         <h3 className="text-lg font-semibold text-red-900">Error</h3>
         <p className="mt-2 text-red-700">{error || 'Inquiry not found'}</p>
         <button
-          onClick={() => navigate('/admin/inquiries')}
+          onClick={() => navigate('/dashboard/inquiries')}
           className="mt-4 text-sm text-red-600 hover:text-red-800"
         >
           ← Back to Pipeline
@@ -56,7 +57,7 @@ export function InquiryDetail() {
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <button
-            onClick={() => navigate('/admin/inquiries')}
+            onClick={() => navigate('/dashboard/inquiries')}
             className="mb-4 text-sm text-blue-600 hover:text-blue-800"
           >
             ← Back to Pipeline
@@ -88,8 +89,8 @@ export function InquiryDetail() {
             <div className="rounded-lg border bg-white p-6 shadow-sm">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Requirements</h2>
               <ul className="list-disc list-inside space-y-2 text-gray-700">
-                {inquiry.requirements.map((req: string | { description: string }, idx: number) => (
-                  <li key={idx}>{typeof req === 'string' ? req : req.description}</li>
+                {(inquiry.requirements as any[]).map((req: any, idx: number) => (
+                  <li key={idx}>{typeof req === 'string' ? req : (req as any)?.description || 'Invalid requirement format'}</li>
                 ))}
               </ul>
             </div>
@@ -122,7 +123,7 @@ export function InquiryDetail() {
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Update Status</h2>
             <select
               value={inquiry.status}
-              onChange={(e) => handleStatusChange(e.target.value)}
+              onChange={(e) => handleStatusChange(e.target.value as InquiryStatus)}
               disabled={updating}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
             >
@@ -175,6 +176,7 @@ export function InquiryDetail() {
       {showAssignModal && (
         <AssignTeamMemberModal
           inquiryId={inquiry.id}
+          inquiryTitle={inquiry.title}
           currentAssignedTo={inquiry.assigned_to || undefined}
           onClose={() => setShowAssignModal(false)}
           onSuccess={refresh}

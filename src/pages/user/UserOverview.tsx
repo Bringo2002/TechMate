@@ -286,7 +286,7 @@ const UserOverview: React.FC = () => {
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: i * 0.1 + 0.4 }}
                 // ── Fix #11: Added onClick to navigate to order detail ──
-                onClick={() => navigate(`/dashboard/orders/${order.id}`)}
+                onClick={() => navigate(`/user/orders/${order.id}`)}
                 className="bg-[#0a0a16]/40 backdrop-blur-sm border border-white/5 p-6 rounded-2xl
                            hover:bg-[#0a0a16]/60 hover:border-cyan-500/30 hover:shadow-[0_0_30px_rgba(6,182,212,0.1)]
                            transition-all duration-300 group cursor-pointer relative overflow-hidden"
