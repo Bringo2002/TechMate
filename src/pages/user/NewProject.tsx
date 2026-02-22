@@ -25,7 +25,6 @@ import * as inquiriesService from '../../services/inquiries.service';
 import { ProjectType } from '../../types/database.types';
 import { useAuth } from '../../hooks/useAuth';
 
-
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface FormData {
@@ -150,9 +149,9 @@ const FadeSection: React.FC<{ children: React.ReactNode; delay?: number }> = ({ 
   return (
     <motion.div
       ref={ref}
-      initial={{ opacity: 0, y: 32 }}
-      animate={inView ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.6, delay, ease: [0.22, 1, 0.36, 1] }}
+      initial={{ opacity:0, y:32 }}
+      animate={inView ? { opacity:1, y:0 } : {}}
+      transition={{ duration:0.6, delay, ease:[0.22,1,0.36,1] }}
     >
       {children}
     </motion.div>
@@ -263,15 +262,15 @@ const NewProject: React.FC = () => {
     return (
       <div className="min-h-screen flex items-center justify-center p-8">
         <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+          initial={{ opacity:0, scale:0.9 }}
+          animate={{ opacity:1, scale:1 }}
+          transition={{ duration:0.6, ease:[0.22,1,0.36,1] }}
           className="text-center max-w-md"
         >
           <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
+            initial={{ scale:0 }}
+            animate={{ scale:1 }}
+            transition={{ delay:0.2, type:'spring', stiffness:200 }}
             className="w-24 h-24 rounded-full bg-cyan-500/10 border-2 border-cyan-500/40 flex items-center justify-center mx-auto mb-8 shadow-[0_0_60px_rgba(6,182,212,0.3)]"
           >
             <CheckCircle2 size={48} className="text-cyan-400" />
@@ -404,7 +403,7 @@ const NewProject: React.FC = () => {
                 onChange={(e) => update('projectName', e.target.value)}
                 className={`
                   w-full px-4 py-3 rounded-xl bg-white/4 border transition-all outline-none
-                  text-white placeholder:text-slate-600 font-medium
+                  text-black placeholder:text-slate-600 font-medium
                   focus:bg-white/6 focus:border-cyan-500/50 focus:shadow-[0_0_0_3px_rgba(6,182,212,0.1)]
                   ${errors.projectName ? 'border-red-500/50' : 'border-white/8'}
                 `}
@@ -427,7 +426,7 @@ const NewProject: React.FC = () => {
                 onChange={(e) => update('description', e.target.value)}
                 className={`
                   w-full px-4 py-3 rounded-xl bg-white/4 border transition-all outline-none resize-none
-                  text-white placeholder:text-slate-600 leading-relaxed
+                  text-black placeholder:text-slate-600 leading-relaxed
                   focus:bg-white/6 focus:border-cyan-500/50 focus:shadow-[0_0_0_3px_rgba(6,182,212,0.1)]
                   ${errors.description ? 'border-red-500/50' : 'border-white/8'}
                 `}
@@ -551,8 +550,8 @@ const NewProject: React.FC = () => {
             <motion.button
               onClick={handleSubmit}
               disabled={submitting}
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
+              whileHover={{ scale:1.03 }}
+              whileTap={{ scale:0.97 }}
               className={`
                 flex items-center gap-3 px-8 py-4 rounded-xl font-bold text-base transition-all
                 ${submitting
@@ -564,8 +563,8 @@ const NewProject: React.FC = () => {
               {submitting ? (
                 <>
                   <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+                    animate={{ rotate:360 }}
+                    transition={{ repeat:Infinity, duration:1, ease:'linear' }}
                     className="w-5 h-5 border-2 border-current border-t-transparent rounded-full"
                   />
                   Submitting...
