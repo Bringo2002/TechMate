@@ -172,7 +172,7 @@ export async function createInquiry(
         // cast to any to avoid complex schema-driven never errors if some optional fields are missing
         const { data, error } = await supabase
             .from('client_inquiries')
-            .insert(inquiryData as unknown as Record<string, unknown>)
+            .insert(inquiryData as any)
             .select()
             .single();
 
@@ -198,7 +198,7 @@ export async function updateInquiry(
             .update({
                 ...updates,
                 updated_at: new Date().toISOString(),
-            } as unknown as Record<string, unknown>)
+            } as any)
             .eq('id', inquiryId)
             .select()
             .single();
@@ -220,7 +220,7 @@ export async function updateInquiryStatus(
     status: InquiryStatus
 ): Promise<ServiceResponse<ClientInquiryRow>> {
     try {
-        const updates: Record<string, string> = {
+        const updates: any = {
             status,
             updated_at: new Date().toISOString(),
         };
@@ -262,7 +262,7 @@ export async function assignInquiry(
     userId: string
 ): Promise<ServiceResponse<ClientInquiryRow>> {
     try {
-        const updates: Record<string, string> = {
+        const updates: any = {
             assigned_to: userId,
             updated_at: new Date().toISOString(),
         };
@@ -306,7 +306,7 @@ export async function unassignInquiry(
             .update({
                 assigned_to: null,
                 updated_at: new Date().toISOString(),
-            } as unknown as Record<string, unknown>)
+            } as any)
             .eq('id', inquiryId)
             .select()
             .single();
@@ -332,7 +332,7 @@ export async function deleteInquiry(
             .update({
                 deleted_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
-            } as unknown as Record<string, unknown>)
+            } as any)
             .eq('id', inquiryId);
 
         if (error) throw error;
@@ -364,7 +364,7 @@ export async function getInquiryStats(
 
         if (error) throw error;
 
-        return { data, error: null };
+        return { data: data as Record<string, unknown>, error: null };
     } catch (error) {
         console.error('Error in getInquiryStats:', error);
         return { data: null, error: formatError(error) };

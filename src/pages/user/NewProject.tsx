@@ -285,7 +285,7 @@ const NewProject: React.FC = () => {
           </p>
           <div className="flex gap-3 justify-center">
             <button
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate('/user')}
               className="px-6 py-3 bg-cyan-500 hover:bg-cyan-400 text-black font-bold rounded-xl transition-all hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(6,182,212,0.3)]"
             >
               Back to Dashboard
