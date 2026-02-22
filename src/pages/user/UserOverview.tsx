@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDashboardData } from '../../hooks/useDashboardData';
+import supabase from '../../lib/supabaseClient';
 import {
   Package,
   Clock,
@@ -21,19 +21,34 @@ import { motion } from 'framer-motion';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface Order {
+type UserProfile = {
+  id: string;
+  email: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  username: string | null;
+  phone: string | null;
+  bio: string | null;
+  company: string | null;
+  job_title: string | null;
+  [key: string]: any;
+};
+
+// For order and inquiry items
+interface ProjectListItem {
   id: string;
   title: string;
-  type: 'website' | 'app' | 'consulting' | 'design' | 'backend' | 'fullstack' | string;
-  status: 'in_progress' | 'completed' | 'pending' | 'cancelled' | string;
+  type: string;
+  status: string;
   progress: number;
   budget: number;
   spent: number;
   due_date: string | null;
   next_milestone: string | null;
+  source: 'order' | 'inquiry';
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Helpers ────────────────────────────────────────────────────────────────────
 
 const getProjectTypeIcon = (type: string) => {
   const icons: Record<string, typeof Code> = {
@@ -43,6 +58,9 @@ const getProjectTypeIcon = (type: string) => {
     design: Palette,
     backend: Activity,
     fullstack: Zap,
+    mobile_app: Smartphone,
+    web_app: Code,
+    other: Package,
   };
   return icons[type] ?? Package;
 };
@@ -78,26 +96,37 @@ const getStatusStyles = (status: string): string => {
       return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
     case 'cancelled':
       return 'bg-red-500/10 text-red-400 border-red-500/20';
+    case 'new':
+      return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20';
+    case 'reviewing':
+      return 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+    case 'accepted':
+      return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+    case 'declined':
+      return 'bg-red-500/10 text-red-400 border-red-500/20';
     default:
       return 'bg-slate-800 text-slate-400 border-slate-700';
   }
 };
 
-// Sort orders by soonest due date (nulls pushed to end)
-const getSoonestOrder = (orders: Order[]): Order | undefined => {
+const getSoonestOrder = (orders: ProjectListItem[]): ProjectListItem | undefined => {
   return [...orders]
     .filter((o) => o.due_date)
     .sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime())[0];
 };
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// ─── Component ─────────────────────────────────────────────────────────────────
 
 const UserOverview: React.FC = () => {
   const navigate = useNavigate();
-  const { profile, orders, loading, error } = useDashboardData();
+
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [orders, setOrders] = useState<ProjectListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<any>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
-  // ── Fix #1: Correct parallax calculation using viewport ratio ──
+  // Parallax mouse effect
   const handleMouseMove = useCallback((e: MouseEvent) => {
     setMousePosition({
       x: (e.clientX / window.innerWidth) * 100,
@@ -110,18 +139,86 @@ const UserOverview: React.FC = () => {
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, [handleMouseMove]);
 
-  // ── Fix #2: Properly typed order calculations ──
-  const typedOrders = (orders ?? []) as unknown as Order[];
+  // Fetch profile and order/inquiry data
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not found');
 
-  const totalBudget = typedOrders.reduce((acc, o) => acc + (o.budget ?? 0), 0);
-  const totalSpent = typedOrders.reduce((acc, o) => acc + (o.spent ?? 0), 0);
+        // Profile
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        setProfile(profileData);
+
+        // Orders
+        const { data: ordersData, error: oErr } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+        if (oErr) throw oErr;
+
+        // Inquiries
+        const { data: inquiriesData, error: iErr } = await supabase
+          .from('client_inquiries')
+          .select('*')
+          .eq('client_id', user.id)
+          .is('deleted_at', null)
+          .order('created_at', { ascending: false });
+        if (iErr) throw iErr;
+
+        // Map both to common format
+        const ordersMapped: ProjectListItem[] = (ordersData ?? []).map((o: any) => ({
+          id: o.id,
+          title: o.title,
+          type: o.type,
+          status: o.status,
+          progress: o.progress ?? 0,
+          budget: o.budget ?? 0,
+          spent: o.spent ?? 0,
+          due_date: o.due_date ?? null,
+          next_milestone: o.next_milestone ?? null,
+          source: 'order'
+        }));
+
+        const inquiriesMapped: ProjectListItem[] = (inquiriesData ?? []).map((i: any) => ({
+          id: i.id,
+          title: i.title,
+          type: i.project_type ?? 'other',
+          status: i.status,
+          progress: 0,
+          budget: i.budget_min ?? 0,
+          spent: 0,
+          due_date: i.deadline ?? null,
+          next_milestone: null,
+          source: 'inquiry'
+        }));
+
+        setOrders([...ordersMapped, ...inquiriesMapped]);
+      } catch (err) {
+        setError(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const totalBudget = orders.reduce((acc, o) => acc + (o.budget ?? 0), 0);
+  const totalSpent = orders.reduce((acc, o) => acc + (o.spent ?? 0), 0);
   const budgetUsedPercent = totalBudget > 0 ? Math.min((totalSpent / totalBudget) * 100, 100) : 0;
-  const activeOrdersCount = typedOrders.filter((o) => o.status === 'in_progress').length;
+  const activeOrdersCount = orders.filter((o) =>
+    o.status === 'in_progress' || o.status === 'reviewing'
+  ).length;
 
-  // ── Fix #7: Get soonest milestone by due date instead of orders[0] ──
-  const soonestOrder = getSoonestOrder(typedOrders);
+  const soonestOrder = getSoonestOrder(orders);
 
-  // ─── Loading State ──────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center p-20">
@@ -133,8 +230,6 @@ const UserOverview: React.FC = () => {
       </div>
     );
   }
-
-  // ─── Error State ────────────────────────────────────────────────────────────
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-red-400 gap-4">
@@ -145,10 +240,9 @@ const UserOverview: React.FC = () => {
     );
   }
 
-  // ─── Main Render ────────────────────────────────────────────────────────────
+  // --- Render ---
   return (
     <div className="space-y-8 relative">
-      {/* ── Fix #1: Corrected parallax background ── */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none opacity-20 z-0">
         <div
           className="absolute w-[600px] h-[600px] bg-cyan-500/10 rounded-full blur-[100px]"
@@ -159,8 +253,6 @@ const UserOverview: React.FC = () => {
           }}
         />
       </div>
-
-      {/* ── Header ── */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -169,22 +261,17 @@ const UserOverview: React.FC = () => {
       >
         <div>
           <h1 className="text-4xl font-bold text-white mb-2 font-orbitron tracking-wide">
-            Welcome, {typeof profile?.full_name === 'string' ? profile.full_name.split(' ')[0] : 'User'}
+            Welcome, {typeof profile?.full_name === 'string' && profile.full_name ? profile.full_name.split(' ')[0] : 'User'}
           </h1>
           <p className="text-slate-400">Overview of your active projects and milestones.</p>
         </div>
-
-        {/* ── Fix #5: Navigate to correct route ── */}
         <button
           onClick={() => navigate('/user/new-project')}
-          className="bg-cyan-500 hover:bg-cyan-400 text-black font-bold py-2 px-6 rounded-lg
-                     shadow-[0_0_20px_rgba(6,182,212,0.4)] transition-all hover:scale-105 active:scale-95"
+          className="bg-cyan-500 hover:bg-cyan-400 text-black font-bold py-2 px-6 rounded-lg shadow-[0_0_20px_rgba(6,182,212,0.4)] transition-all hover:scale-105 active:scale-95"
         >
           + New Project
         </button>
       </motion.div>
-
-      {/* ── Metrics Grid ── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
         {/* Active Projects */}
         <motion.div
@@ -205,7 +292,6 @@ const UserOverview: React.FC = () => {
           <h3 className="text-slate-400 text-sm font-medium mb-1">Active Projects</h3>
           <div className="text-3xl font-bold text-white font-orbitron">{activeOrdersCount}</div>
         </motion.div>
-
         {/* Budget Utilized */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -218,7 +304,6 @@ const UserOverview: React.FC = () => {
             <div className="p-3 bg-purple-500/10 rounded-lg text-purple-400">
               <DollarSign size={24} />
             </div>
-            {/* ── Fix #6: Show raw numbers if budget tracking is unavailable ── */}
             {totalBudget === 0 && (
               <span className="text-xs text-slate-500 bg-slate-800 px-2 py-1 rounded">
                 No budget set
@@ -238,8 +323,7 @@ const UserOverview: React.FC = () => {
             </div>
           )}
         </motion.div>
-
-        {/* Next Milestone — Fix #7 & #8 */}
+        {/* Next Milestone */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -251,7 +335,6 @@ const UserOverview: React.FC = () => {
             <div className="p-3 bg-emerald-500/10 rounded-lg text-emerald-400">
               <Target size={24} />
             </div>
-            {/* ── Fix #8: Dynamic days remaining ── */}
             {soonestOrder?.due_date && (
               <span className="text-xs text-emerald-400 flex items-center gap-1">
                 <Clock size={12} />
@@ -268,16 +351,13 @@ const UserOverview: React.FC = () => {
           )}
         </motion.div>
       </div>
-
-      {/* ── Projects List ── */}
+      {/* Projects List */}
       <div className="relative z-10">
         <h2 className="text-xl font-bold text-white mb-6 font-orbitron flex items-center gap-2">
-          <Sparkles size={20} className="text-cyan-400" /> Current Projects
+          <Sparkles size={20} className="text-cyan-400" /> Current Projects & Requests
         </h2>
-
-        {/* ── Fix #9: AnimatePresence removed from static list; kept for proper exit if needed ── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {typedOrders.map((order, i) => {
+          {orders.map((order, i) => {
             const Icon = getProjectTypeIcon(order.type);
             return (
               <motion.div
@@ -285,14 +365,16 @@ const UserOverview: React.FC = () => {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: i * 0.1 + 0.4 }}
-                // ── Fix #11: Added onClick to navigate to order detail ──
-                onClick={() => navigate(`/user/orders/${order.id}`)}
-                className="bg-[#0a0a16]/40 backdrop-blur-sm border border-white/5 p-6 rounded-2xl
-                           hover:bg-[#0a0a16]/60 hover:border-cyan-500/30 hover:shadow-[0_0_30px_rgba(6,182,212,0.1)]
-                           transition-all duration-300 group cursor-pointer relative overflow-hidden"
+                onClick={() => {
+                  if (order.source === 'order') {
+                    navigate(`/user/orders/${order.id}`);
+                  } else {
+                    navigate(`/user/requests/${order.id}`);
+                  }
+                }}
+                className="bg-[#0a0a16]/40 backdrop-blur-sm border border-white/5 p-6 rounded-2xl hover:bg-[#0a0a16]/60 hover:border-cyan-500/30 hover:shadow-[0_0_30px_rgba(6,182,212,0.1)] transition-all duration-300 group cursor-pointer relative overflow-hidden"
               >
                 <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-cyan-500 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity" />
-
                 <div className="flex items-start justify-between mb-6">
                   <div className="flex gap-4">
                     <div className="w-12 h-12 rounded-xl bg-slate-800/50 flex items-center justify-center text-cyan-400 border border-white/5 shadow-inner">
@@ -302,15 +384,15 @@ const UserOverview: React.FC = () => {
                       <h3 className="font-bold text-lg text-white group-hover:text-cyan-400 transition-colors">
                         {order.title}
                       </h3>
-                      <p className="text-sm text-slate-500 capitalize">{order.type} Development</p>
+                      <p className="text-sm text-slate-500 capitalize">
+                        {order.type} Development{order.source === 'inquiry' && ' (Request)'}
+                      </p>
                     </div>
                   </div>
-                  {/* ── Fix #3: Safe status formatting ── */}
                   <div className={`px-3 py-1 rounded-full text-xs font-bold border ${getStatusStyles(order.status)}`}>
                     {formatStatus(order.status)}
                   </div>
                 </div>
-
                 <div className="space-y-4">
                   <div>
                     <div className="flex justify-between text-xs mb-2">
@@ -320,15 +402,13 @@ const UserOverview: React.FC = () => {
                     <div className="w-full bg-slate-800/50 h-2 rounded-full overflow-hidden">
                       <div
                         className={`bg-gradient-to-r from-cyan-500 to-blue-600 h-full rounded-full shadow-[0_0_10px_rgba(6,182,212,0.5)] group-hover:shadow-[0_0_15px_rgba(6,182,212,0.8)] transition-all duration-500`}
-                        data-progress={order.progress ?? 0}
+                        style={{ width: `${order.progress ?? 0}%` }}
                       />
                     </div>
                   </div>
-
                   <div className="flex items-center justify-between pt-4 border-t border-white/5">
                     <div className="flex items-center gap-2 text-xs text-slate-500">
                       <Calendar size={14} />
-                      {/* ── Fix #4: Safe date formatting ── */}
                       <span>Due {formatDueDate(order.due_date)}</span>
                     </div>
                     <div className="flex items-center gap-1 text-xs text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity font-medium">
@@ -340,11 +420,9 @@ const UserOverview: React.FC = () => {
             );
           })}
         </div>
-
-        {/* ── Fix #5: Empty state uses correct route ── */}
-        {typedOrders.length === 0 && (
+        {orders.length === 0 && (
           <div className="col-span-full py-12 text-center border border-dashed border-slate-700 rounded-2xl bg-white/5">
-            <p className="text-slate-400">No active projects found.</p>
+            <p className="text-slate-400">No active projects or requests found.</p>
             <button
                onClick={() => navigate('/user/new-project')}
               className="mt-4 text-cyan-400 text-sm hover:underline"
@@ -359,19 +437,3 @@ const UserOverview: React.FC = () => {
 };
 
 export default UserOverview;
-
-/* Add this style block at the bottom of the file or move to a CSS/SCSS file and import it */
-const style = document.createElement('style');
-style.innerHTML = `
-  [data-progress] {
-    width: 0%;
-    transition: width 0.5s;
-  }
-  [data-progress]:not([data-progress=""]) {
-    width: attr(data-progress percentage);
-  }
-`;
-if (typeof document !== 'undefined' && !document.getElementById('user-overview-progress-style')) {
-  style.id = 'user-overview-progress-style';
-  document.head.appendChild(style);
-}
