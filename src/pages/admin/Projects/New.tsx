@@ -114,6 +114,7 @@ const AdminCreateProject: React.FC = () => {
     async function fetchClients() {
       setLoadingClients(true);
       const { data, error } = await getAllClients();
+      console.log("Fetched clients:", data);
       if (error) {
         toast.error("Failed to load clients list");
       } else {
