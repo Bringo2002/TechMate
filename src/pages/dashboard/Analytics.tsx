@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { TrendingUp, ArrowUp, ArrowDown, DollarSign, Users, Rocket, Activity, Download, ChevronRight, Target, Award, CheckCircle2, AlertCircle, BarChart3, PieChart, LineChartIcon, Globe, Smartphone, Database, Cloud, Layers, Sparkles, Brain } from 'lucide-react';
 
 const Analytics = () => {

@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Search, Plus, AlertTriangle, DollarSign, 
   Briefcase, Sparkles, Brain, Command, ChevronRight, 
@@ -41,10 +42,9 @@ const COLORS = {
 };
 
 const Projects = () => {
+  const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [showNewProjectDialog, setShowNewProjectDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
@@ -562,7 +562,7 @@ Based on this context, answer the user's questions and provide helpful project m
               <kbd className="px-1. 5 py-0.5 bg-white/20 rounded text-xs">⌘I</kbd>
             </button>
             <button 
-              onClick={() => setShowNewProjectDialog(true)} 
+              onClick={() => navigate('/dashboard/create-project')} 
               className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-semibold transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/25"
             >
               <Plus size={20} />
@@ -784,7 +784,7 @@ Based on this context, answer the user's questions and provide helpful project m
             <h3 className="text-xl font-semibold text-white mb-2">No projects found</h3>
             <p className="text-slate-400 mb-6">Try adjusting your filters or create a new project</p>
             <button 
-              onClick={() => setShowNewProjectDialog(true)}
+              onClick={() => navigate('/dashboard/create-project')}
               className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-semibold transition-all inline-flex items-center gap-2"
             >
               <Plus size={20} />
