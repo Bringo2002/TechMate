@@ -38,6 +38,7 @@ const RISK_LEVEL_OPTIONS = [
 interface ProjectForm {
   name: string;
   client: string;
+  client_id: string;
   type: string;
   budget: string;
   deadline: string;
@@ -62,6 +63,7 @@ const AdminCreateProject: React.FC = () => {
   const [form, setForm] = useState<ProjectForm>({
     name: "",
     client: "",
+    client_id: "",
     type: "",
     budget: "",
     deadline: "",
@@ -91,6 +93,7 @@ const AdminCreateProject: React.FC = () => {
           ...f,
           name: inquiry.title || "",
           client: inquiry.client?.full_name || "",
+          client_id: inquiry.client_id || "",
           type: inquiry.project_type || "",
           budget: inquiry.budget_min?.toString() ?? "",
           deadline: inquiry.deadline ? inquiry.deadline.split("T")[0] : "",
@@ -114,12 +117,17 @@ const AdminCreateProject: React.FC = () => {
     try {
       const projectPayload: any = {
         name: form.name,
+        user_id: form.client_id,
         client: form.client,
         type: form.type,
-        budget: form.budget ? Number(form.budget) : null,
+        budget: form.budget ? Number(form.budget) : 0,
+        spent: 0,
         deadline: form.deadline ? new Date(form.deadline).toISOString() : null,
         priority: form.priority,
         status: form.status,
+        progress: 0,
+        client_visible_progress: 0,
+        health_score: 100,
         description: form.description,
         technologies: form.technologies
           ? form.technologies.split(",").map((t) => t.trim())
@@ -127,7 +135,15 @@ const AdminCreateProject: React.FC = () => {
         inquiry_id: form.inquiry_id || null,
         payment_status: form.payment_status,
         risk_level: form.risk_level,
+        deliverables: {},
+        metadata: {},
       };
+
+      if (!projectPayload.user_id) {
+        toast.error("Client ID is missing. Cannot create project.");
+        setLoading(false);
+        return;
+      }
 
       const { error } = await createProject(projectPayload);
       if (error) {
@@ -337,6 +353,7 @@ const AdminCreateProject: React.FC = () => {
               onClick={() => setForm({
                 name: "",
                 client: "",
+                client_id: "",
                 type: "",
                 budget: "",
                 deadline: "",

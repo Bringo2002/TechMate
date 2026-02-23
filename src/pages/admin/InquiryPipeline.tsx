@@ -10,7 +10,7 @@ import { InquiryStatsCards } from '../../components/admin/InquiryStatsCards';
 import { InquiryFilters } from '../../components/admin/InquiryFilters';
 import { InquiryCard } from '../../components/admin/InquiryCard';
 import type { InquiryStatus } from '../../types/database.types';
-import type { InquiryFilters as InquiryFilterParams } from '../../services/inquiries.service';
+import type { InquiryFilters as InquiryFilterParams } from '../../types/api.types';
 
 export function InquiryPipeline() {
   const navigate = useNavigate();

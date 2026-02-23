@@ -10,21 +10,14 @@ import type {
     ClientInquiryInsert,
     ClientInquiryUpdate,
     InquiryStatus,
-    Priority,
-    ProjectType
 } from '../types/database.types';
-import type { ServiceResponse, ServiceError } from '../types/api.types';
+import type { ServiceResponse, ServiceError, InquiryFilters } from '../types/api.types';
+export type { InquiryFilters };
 
 // ============================================================================
 // Types
 // ============================================================================
 
-export interface InquiryFilters {
-    status?: InquiryStatus;
-    assigned_to?: string;
-    priority?: Priority;
-    project_type?: ProjectType;
-}
 
 // Helper to format errors
 const formatError = (error: unknown): ServiceError => {

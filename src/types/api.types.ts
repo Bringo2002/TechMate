@@ -1,7 +1,18 @@
-// ============================================================================
-// TechMate API Types
-// Request/Response types for service layer and hooks
-// ============================================================================
+import type {
+    ProjectStatus,
+    Priority,
+    ProjectType,
+    OrderStatus,
+    OrderType,
+    InvoiceStatus,
+    RequestStatus,
+    InquiryStatus,
+    TicketStatus,
+    TicketCategory,
+    TicketPriority,
+    UserRole,
+    UserType
+} from './database.types';
 
 // ============================================================================
 // Pagination
@@ -39,41 +50,41 @@ export interface DateRangeFilter {
 }
 
 export interface ProjectFilters {
-    status?: string;
-    priority?: string;
-    type?: string;
+    status?: ProjectStatus;
+    priority?: Priority;
+    type?: ProjectType | string;
     search?: string;
     userId?: string;
     dateRange?: DateRangeFilter;
 }
 
 export interface OrderFilters {
-    status?: string;
-    priority?: string;
-    type?: string;
+    status?: OrderStatus;
+    priority?: Priority;
+    type?: OrderType;
     search?: string;
     userId?: string;
     dateRange?: DateRangeFilter;
 }
 
 export interface UserFilters {
-    role?: string;
-    userType?: string;
+    role?: UserRole;
+    userType?: UserType;
     isActive?: boolean;
     search?: string;
     dateRange?: DateRangeFilter;
 }
 
 export interface InvoiceFilters {
-    status?: string;
+    status?: InvoiceStatus;
     userId?: string;
     dateRange?: DateRangeFilter;
 }
 
 export interface RequestFilters {
-    status?: string;
+    status?: RequestStatus;
     category?: string;
-    priority?: string;
+    priority?: Priority;
     isPublic?: boolean;
     search?: string;
     dateRange?: DateRangeFilter;
@@ -92,10 +103,17 @@ export interface MessageFilters {
 }
 
 export interface TicketFilters {
-    status?: string;
-    category?: string;
-    priority?: string;
+    status?: TicketStatus;
+    category?: TicketCategory;
+    priority?: TicketPriority;
     search?: string;
+}
+
+export interface InquiryFilters {
+    status?: InquiryStatus;
+    assigned_to?: string;
+    priority?: Priority;
+    project_type?: ProjectType;
 }
 
 // ============================================================================
