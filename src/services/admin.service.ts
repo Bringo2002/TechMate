@@ -117,25 +117,36 @@ export async function getRecentUsers(limit: number = 10): Promise<ServiceRespons
 }
 
 /**
- * Get all client profiles for selection
+ * Get all unique clients who have submitted inquiries
  */
 export async function getAllClients(): Promise<ServiceResponse<ProfileRow[]>> {
-    // Broaden to include all users who are not explicitly admins to see more results
-    // Or just fetch all active profiles if the user_type isn't strictly enforced yet
+    // Fetch inquiries with client profiles joined
     const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .is('deleted_at', null)
-        .order('full_name', { ascending: true });
+        .from('client_inquiries')
+        .select('client:profiles!client_id(*)')
+        .is('deleted_at', null);
 
     if (error) {
         return { data: null, error: { code: error.code, message: error.message } };
     }
 
-    // Filter in memory for now to see what's available
-    const clients = (data ?? []).filter(p => p.role === 'user' || p.user_type === 'client');
+    // Extract unique clients and sort them
+    const clientMap = new Map<string, ProfileRow>();
+    (data ?? []).forEach((row: any) => {
+        if (row.client) {
+            // Support both direct object or array if Supabase returns differently
+            const client = Array.isArray(row.client) ? row.client[0] : row.client;
+            if (client && client.id) {
+                clientMap.set(client.id, client as ProfileRow);
+            }
+        }
+    });
 
-    return { data: clients, error: null };
+    const uniqueClients = Array.from(clientMap.values()).sort((a, b) =>
+        (a.full_name || a.email).localeCompare(b.full_name || b.email)
+    );
+
+    return { data: uniqueClients, error: null };
 }
 
 export async function getRecentInvoices(limit: number = 10): Promise<ServiceResponse<InvoiceRow[]>> {
