@@ -4,7 +4,7 @@
 // ============================================================================
 
 import supabase from '../lib/supabaseClient';
-import type { ProfileRow, ProjectRow, OrderRow, InvoiceRow, RequestRow, SupportTicketRow } from '../types/database.types';
+import type { ProfileRow, ProjectRow, OrderRow, InvoiceRow, RequestRow, SupportTicketRow, ActivityLogRow, ActivityLogRowWithProfile } from '../types/database.types';
 import type {
     AdminDashboardMetrics,
     GrowthDataPoint,
@@ -28,7 +28,7 @@ export async function getAdminMetrics(): Promise<ServiceResponse<AdminDashboardM
 // Chart Data
 // ============================================================================
 export async function getUserGrowth(months: number = 12): Promise<ServiceResponse<GrowthDataPoint[]>> {
-    const { data, error } = await supabase.rpc<'get_user_growth'>('get_user_growth', { p_months: months });
+    const { data, error } = await supabase.rpc('get_user_growth', { p_months: months });
 
     if (error) {
         return { data: null, error: { code: error.code, message: error.message } };
@@ -131,9 +131,7 @@ export async function getRecentInvoices(limit: number = 10): Promise<ServiceResp
 }
 
 
-import type { ActivityLogRow } from '../types/database.types';
-
-export async function getRecentActivity(limit: number = 10): Promise<ServiceResponse<ActivityLogRow[]>> {
+export async function getRecentActivity(limit: number = 10): Promise<ServiceResponse<ActivityLogRowWithProfile[]>> {
     const { data, error } = await supabase
         .from('activity_logs')
         .select('*, profiles(full_name, avatar_url, email)')
@@ -143,7 +141,7 @@ export async function getRecentActivity(limit: number = 10): Promise<ServiceResp
     if (error) {
         return { data: null, error: { code: error.code, message: error.message } };
     }
-    return { data: data ?? [], error: null };
+    return { data: (data as any) ?? [], error: null };
 }
 
 // ============================================================================

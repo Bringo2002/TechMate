@@ -22,7 +22,7 @@ import Cookies from './pages/Cookies';
 import AuthCallback from './pages/AuthCallback';
 import AdminDashboardLayout from "./layouts/AdminDashboardLayout";
 import UserDashboardLayout from './layouts/UserDashboardLayout';
-import Overview from "./pages/dashboard/Overview";
+import AdminOverview from "./pages/dashboard/AdminOverview";
 import Projects from "./pages/dashboard/Projects";
 import Services from "./pages/dashboard/Services";
 import Analytics from "./pages/dashboard/Analytics";
@@ -127,7 +127,7 @@ const App: React.FC = () => {
       </ProtectedRoute>
     }
   >
-    <Route index element={<Overview />} />
+    <Route index element={<AdminOverview />} />
     <Route path="projects" element={<Projects />} />
     <Route path="inquiries" element={<InquiryPipeline />} />
     <Route path="inquiries/:inquiryId" element={<InquiryDetail />} />

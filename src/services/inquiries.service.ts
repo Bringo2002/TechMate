@@ -6,6 +6,7 @@
 import supabase from '../lib/supabaseClient';
 import type {
     ClientInquiryRow,
+    ClientInquiryWithClient,
     ClientInquiryInsert,
     ClientInquiryUpdate,
     InquiryStatus,
@@ -18,7 +19,7 @@ import type { ServiceResponse, ServiceError } from '../types/api.types';
 // Types
 // ============================================================================
 
-interface InquiryFilters {
+export interface InquiryFilters {
     status?: InquiryStatus;
     assigned_to?: string;
     priority?: Priority;
@@ -45,7 +46,7 @@ const formatError = (error: unknown): ServiceError => {
  */
 export async function getInquiries(
     filters?: InquiryFilters
-): Promise<ServiceResponse<ClientInquiryRow[]>> {
+): Promise<ServiceResponse<ClientInquiryWithClient[]>> {
     try {
         let query = supabase
             .from('client_inquiries')
@@ -80,7 +81,7 @@ export async function getInquiries(
 
         if (error) throw error;
 
-        return { data: data as ClientInquiryRow[], error: null };
+        return { data: (data as unknown) as ClientInquiryWithClient[], error: null };
     } catch (error) {
         console.error('Error in getInquiries:', error);
         return { data: null, error: formatError(error) };
@@ -92,7 +93,7 @@ export async function getInquiries(
  */
 export async function getInquiryById(
     inquiryId: string
-): Promise<ServiceResponse<ClientInquiryRow>> {
+): Promise<ServiceResponse<ClientInquiryWithClient>> {
     try {
         const { data, error } = await supabase
             .from('client_inquiries')
@@ -128,7 +129,7 @@ export async function getInquiryById(
 
         if (error) throw error;
 
-        return { data: data as ClientInquiryRow, error: null };
+        return { data: (data as unknown) as ClientInquiryWithClient, error: null };
     } catch (error) {
         console.error('Error in getInquiryById:', error);
         return { data: null, error: formatError(error) };

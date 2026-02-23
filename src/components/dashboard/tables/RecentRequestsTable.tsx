@@ -1,18 +1,26 @@
-// src/components/dashboard/tables/RecentRequestsTable.tsx
 import React from "react";
 import { motion } from "framer-motion";
-import { Request } from "../../../types/dashboard";
+import { ClientInquiryWithClient } from "../../../types/database.types";
 
-// Futuristic status badge styles
-const statusColors: Record<Request["status"], string> = {
+// Status badge styling for inquiry statuses
+const statusColors: Record<string, string> = {
   Pending: "bg-yellow-400/10 text-yellow-300 border border-yellow-400/40 shadow-[0_0_8px_2px_rgba(250,204,21,0.3)]",
   "In Progress": "bg-blue-400/10 text-blue-300 border border-blue-400/40 shadow-[0_0_8px_2px_rgba(59,130,246,0.3)]",
   Completed: "bg-green-400/10 text-green-300 border border-green-400/40 shadow-[0_0_8px_2px_rgba(34,197,94,0.3)]",
 };
 
+// Map DB inquiry status to UI status labels
+function mapInquiryStatus(status: string): "Pending" | "In Progress" | "Completed" {
+  switch (status) {
+    case "new": return "Pending";
+    case "reviewing": return "In Progress";
+    case "accepted": return "Completed";
+    default: return "Pending";
+  }
+}
+
 interface RecentRequestsTableProps {
-  data: Request[];
-    futuristic?: boolean;
+  data: ClientInquiryWithClient[];
 }
 
 export const RecentRequestsTable: React.FC<RecentRequestsTableProps> = ({ data }) => {
@@ -47,31 +55,43 @@ export const RecentRequestsTable: React.FC<RecentRequestsTableProps> = ({ data }
               visible: { transition: { staggerChildren: 0.1 } },
             }}
           >
-            {data.map((req, idx) => (
-              <motion.tr
-                key={req.id}
-                variants={{
-                  hidden: { opacity: 0, y: 10 },
-                  visible: { opacity: 1, y: 0 },
-                }}
-                whileHover={{ scale: 1.02, backgroundColor: "rgba(59,130,246,0.05)" }}
-                className={`transition-colors ${idx % 2 === 0 ? "bg-gray-900/40" : "bg-gray-800/30"}`}
-              >
-                <td className="px-4 py-3">{req.service}</td>
-                <td className="px-4 py-3">{req.client}</td>
-
-                {/* Status badge */}
-                <td className="px-4 py-3">
-                  <span
-                    className={`px-3 py-1 rounded-full text-xs font-semibold tracking-wide animate-pulse ${statusColors[req.status]}`}
-                  >
-                    {req.status}
-                  </span>
-                </td>
-
-                <td className="px-4 py-3 text-gray-400">{req.date}</td>
-              </motion.tr>
-            ))}
+            {data.map((inquiry, idx) => {
+              const statusLabel = mapInquiryStatus(inquiry.status);
+              return (
+                <motion.tr
+                  key={inquiry.id}
+                  variants={{
+                    hidden: { opacity: 0, y: 10 },
+                    visible: { opacity: 1, y: 0 },
+                  }}
+                  whileHover={{
+                    scale: 1.02,
+                    backgroundColor: "rgba(59,130,246,0.05)",
+                  }}
+                  className={`transition-colors ${
+                    idx % 2 === 0 ? "bg-gray-900/40" : "bg-gray-800/30"
+                  }`}
+                >
+                  <td className="px-4 py-3">{inquiry.project_type}</td>
+                  <td className="px-4 py-3">
+                    {/* Show client name if available */}
+                    {inquiry.client?.full_name || inquiry.client_id}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-semibold tracking-wide animate-pulse ${
+                        statusColors[statusLabel]
+                      }`}
+                    >
+                      {statusLabel}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-400">
+                    {new Date(inquiry.created_at).toLocaleDateString()}
+                  </td>
+                </motion.tr>
+              );
+            })}
           </motion.tbody>
         </table>
       </div>

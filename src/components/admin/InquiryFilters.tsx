@@ -4,16 +4,12 @@
 // ============================================================================
 
 import React from 'react';
-import type { InquiryStatus } from '../../types/database.types';
+import type { InquiryStatus, Priority, ProjectType } from '../../types/database.types';
+import type { InquiryFilters as InquiryFilterParams } from '../../services/inquiries.service';
 
 interface InquiryFiltersProps {
-  filters: {
-    status?: InquiryStatus;
-    priority?: string;
-    assigned_to?: string;
-    project_type?: string;
-  };
-  onFilterChange: (filters: { status?: InquiryStatus; priority?: string; assigned_to?: string; project_type?: string }) => void;
+  filters: InquiryFilterParams;
+  onFilterChange: (filters: InquiryFilterParams) => void;
   className?: string;
 }
 
@@ -32,14 +28,14 @@ export function InquiryFilters({
   const handlePriorityChange = (priority: string) => {
     onFilterChange({ 
       ...filters, 
-      priority: priority === 'all' ? undefined : priority 
+      priority: priority === 'all' ? undefined : priority as Priority 
     });
   };
 
   const handleProjectTypeChange = (projectType: string) => {
     onFilterChange({ 
       ...filters, 
-      project_type: projectType === 'all' ? undefined : projectType 
+      project_type: projectType === 'all' ? undefined : projectType as ProjectType 
     });
   };
 
@@ -237,7 +233,7 @@ export function CompactInquiryFilters({
 
       <select
         value={filters.priority || 'all'}
-        onChange={(e) => onFilterChange({ ...filters, priority: e.target.value === 'all' ? undefined : e.target.value })}
+        onChange={(e) => onFilterChange({ ...filters, priority: e.target.value === 'all' ? undefined : e.target.value as Priority })}
         className="text-sm rounded border-gray-300 py-1 px-2"
       >
         <option value="all">Any Priority</option>

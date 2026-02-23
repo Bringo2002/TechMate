@@ -3,19 +3,11 @@
 // Card component displaying individual inquiry in the pipeline
 // ============================================================================
 
-import React from 'react';
 import { InquiryStatusBadge } from './InquiryStatusBadge';
-import type { ClientInquiryRow } from '../../types/database.types';
+import type { ClientInquiryRow, ClientInquiryWithClient } from '../../types/database.types';
 
 interface InquiryCardProps {
-  inquiry: ClientInquiryRow & {
-    client?: {
-      full_name: string;
-      email: string;
-      company?: string;
-      avatar_url?: string;
-    };
-  };
+  inquiry: ClientInquiryWithClient;
   onClick?: () => void;
   className?: string;
 }
@@ -113,20 +105,20 @@ export function InquiryCard({ inquiry, onClick, className = '' }: InquiryCardPro
             {inquiry.client.avatar_url ? (
               <img
                 src={inquiry.client.avatar_url}
-                alt={inquiry.client.full_name}
+                alt={inquiry.client.full_name || 'Client'}
                 className="h-8 w-8 rounded-full object-cover"
               />
             ) : (
               <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
                 <span className="text-xs font-semibold text-white">
-                  {inquiry.client.full_name.split(' ').map(n => n[0]).join('')}
+                  {(inquiry.client.full_name || 'Guest').split(' ').map(n => n[0]).join('')}
                 </span>
               </div>
             )}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-gray-900 truncate">
-              {inquiry.client.full_name}
+              {inquiry.client.full_name || 'Anonymous Client'}
             </p>
             {inquiry.client.company && (
               <p className="text-xs text-gray-500 truncate">

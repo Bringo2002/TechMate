@@ -431,6 +431,17 @@ export type ClientInquiryInsert = {
 
 export type ClientInquiryUpdate = Partial<Omit<ClientInquiryRow, 'id' | 'created_at'>>;
 
+export type ClientInquiryWithClient = ClientInquiryRow & {
+    client: {
+        id: string;
+        full_name: string | null;
+        email: string;
+        company: string | null;
+        phone?: string | null;
+        avatar_url: string | null;
+    } | null;
+};
+
 // ============================================================================
 // DELIVERABLES (Unchanged)
 // ============================================================================
@@ -651,6 +662,14 @@ export type ActivityLogInsert = Omit<ActivityLogRow, 'id' | 'created_at'> & {
 };
 
 export type ActivityLogUpdate = Partial<Omit<ActivityLogRow, 'id' | 'created_at'>>;
+
+export type ActivityLogRowWithProfile = ActivityLogRow & {
+    profiles: {
+        full_name: string | null;
+        avatar_url: string | null;
+        email: string;
+    } | null;
+};
 
 
 // ============================================================================

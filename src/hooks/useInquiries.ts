@@ -10,19 +10,15 @@ import {
   getInquiryStats,
   subscribeToInquiries,
   subscribeToInquiry,
+  InquiryFilters,
 } from '../services/inquiries.service';
-import type { ClientInquiryRow, InquiryStatus } from '../types/database.types';
+import type { ClientInquiryWithClient } from '../types/database.types';
 
 // ============================================================================
 // Types
 // ============================================================================
 
-interface InquiryFilters {
-  status?: InquiryStatus;
-  assigned_to?: string;
-  priority?: string;
-  project_type?: string;
-}
+// Interface InquiryFilters is now imported from inquiries.service
 
 interface UseInquiriesOptions {
   filters?: InquiryFilters;
@@ -31,14 +27,14 @@ interface UseInquiriesOptions {
 }
 
 interface UseInquiriesReturn {
-  inquiries: ClientInquiryRow[];
+  inquiries: ClientInquiryWithClient[];
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
 }
 
 interface UseInquiryReturn {
-  inquiry: ClientInquiryRow | null;
+  inquiry: ClientInquiryWithClient | null;
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
@@ -67,7 +63,7 @@ interface UseInquiryStatsReturn {
  * ```
  */
 export function useInquiries(options?: UseInquiriesOptions): UseInquiriesReturn {
-  const [inquiries, setInquiries] = useState<ClientInquiryRow[]>([]);
+  const [inquiries, setInquiries] = useState<ClientInquiryWithClient[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -106,18 +102,22 @@ export function useInquiries(options?: UseInquiriesOptions): UseInquiriesReturn 
     if (!realtime) return;
 
     const unsubscribe = subscribeToInquiries((payload: Record<string, unknown>) => {
-      const { eventType, new: newRecord, old: oldRecord } = payload as { eventType: string; new: Record<string, string>; old: Record<string, string> };
+      const { eventType, new: newRecord, old: oldRecord } = payload as {
+        eventType: string;
+        new: ClientInquiryWithClient;
+        old: ClientInquiryWithClient
+      };
 
       setInquiries((current) => {
         switch (eventType) {
           case 'INSERT':
             // Add new inquiry to the beginning
-            return [newRecord as ClientInquiryRow, ...current];
+            return [newRecord as ClientInquiryWithClient, ...current];
 
           case 'UPDATE':
             // Update existing inquiry
             return current.map((inquiry) =>
-              inquiry.id === newRecord.id ? (newRecord as ClientInquiryRow) : inquiry
+              inquiry.id === newRecord.id ? (newRecord as ClientInquiryWithClient) : inquiry
             );
 
           case 'DELETE':
@@ -158,7 +158,7 @@ export function useInquiry(
   inquiryId: string | undefined,
   options?: { realtime?: boolean }
 ): UseInquiryReturn {
-  const [inquiry, setInquiry] = useState<ClientInquiryRow | null>(null);
+  const [inquiry, setInquiry] = useState<ClientInquiryWithClient | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -202,7 +202,7 @@ export function useInquiry(
       const { eventType, new: newRecord } = payload as { eventType: string; new: Record<string, unknown> };
 
       if (eventType === 'UPDATE') {
-        setInquiry(newRecord as ClientInquiryRow);
+        setInquiry(newRecord as unknown as ClientInquiryWithClient);
       } else if (eventType === 'DELETE') {
         setInquiry(null);
         setError('This inquiry has been deleted');
