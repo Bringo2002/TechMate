@@ -4,6 +4,7 @@ import {
   Rocket, Activity, ChevronRight, CircleDot, Flame, Loader2,
   Clock, AlertTriangle, AlertCircle, Sparkles
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import useAdmin from '../../hooks/useAdmin';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -13,6 +14,7 @@ const fmt = (n: number) =>
 
 const AdminOverview = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [selectedMetric, setSelectedMetric] = useState<number | null>(null);
 
@@ -383,9 +385,12 @@ const AdminOverview = () => {
               </h3>
               <p className="text-sm text-gray-400 mt-1">AI-powered project monitoring & predictions</p>
             </div>
-            <button className="text-sm text-emerald-400 hover:text-emerald-300 font-medium flex items-center gap-1 transition-colors">
-              View All
-              <ChevronRight className="w-4 h-4" />
+            <button
+              className="text-sm text-emerald-400 hover:text-emerald-300 font-medium flex items-center gap-1 transition-colors"
+              onClick={() => navigate('/dashboard/create-project')}
+            >
+              + New Project
+              <Rocket className="w-4 h-4" />
             </button>
           </div>
           <div className="space-y-4">
@@ -638,7 +643,10 @@ const AdminOverview = () => {
             </div>
           </div>
           <div className="flex flex-col gap-3">
-            <button className="px-8 py-4 bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white rounded-xl font-bold text-lg transition-all flex items-center gap-3 shadow-2xl shadow-emerald-500/30">
+            <button
+              className="px-8 py-4 bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white rounded-xl font-bold text-lg transition-all flex items-center gap-3 shadow-2xl shadow-emerald-500/30"
+              onClick={() => navigate('/dashboard/create-project')}
+            >
               <Rocket className="w-6 h-6" />
               Launch New Project
             </button>

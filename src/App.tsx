@@ -30,7 +30,6 @@ import Clients from "./pages/dashboard/Clients";
 import Revenue from "./pages/dashboard/Revenue";
 import Consulting from "./pages/dashboard/Consulting";
 import Deployments from "./pages/dashboard/Deployments";
-// Admin Pages
 import { InquiryPipeline } from './pages/admin/InquiryPipeline';
 import { InquiryDetail } from './pages/admin/InquiryDetail';
 import Messages from './pages/user/Messages';
@@ -51,6 +50,7 @@ import SecuritySettings from './pages/dashboard/settings/security/SecuritySettin
 import NotificationSettings from './pages/dashboard/settings/notifications/NotificationSettings';
 import ActivityLogs from './pages/dashboard/settings/activity/ActivityLogs';
 import NewProject from './pages/user/NewProject';
+import AdminCreateProject from './pages/admin/Projects/New';
 
 
 // Scroll to top and update title on route change
@@ -128,6 +128,7 @@ const App: React.FC = () => {
     }
   >
     <Route index element={<AdminOverview />} />
+    <Route path="create-project" element={<AdminCreateProject />} />
     <Route path="projects" element={<Projects />} />
     <Route path="inquiries" element={<InquiryPipeline />} />
     <Route path="inquiries/:inquiryId" element={<InquiryDetail />} />
