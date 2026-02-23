@@ -116,6 +116,23 @@ export async function getRecentUsers(limit: number = 10): Promise<ServiceRespons
     return { data: data ?? [], error: null };
 }
 
+/**
+ * Get all client profiles for selection
+ */
+export async function getAllClients(): Promise<ServiceResponse<ProfileRow[]>> {
+    const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_type', 'client')
+        .is('deleted_at', null)
+        .order('full_name', { ascending: true });
+
+    if (error) {
+        return { data: null, error: { code: error.code, message: error.message } };
+    }
+    return { data: data ?? [], error: null };
+}
+
 export async function getRecentInvoices(limit: number = 10): Promise<ServiceResponse<InvoiceRow[]>> {
     const { data, error } = await supabase
         .from('invoices')

@@ -3,6 +3,8 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Loader2, ChevronLeft, Save, RefreshCcw, ClipboardCheck } from "lucide-react";
 import { createProject } from "../../../services/projectService";
 import { getInquiryById } from "../../../services/inquiries.service";
+import { getAllClients } from "../../../services/admin.service";
+import { ProfileRow } from "../../../types/database.types";
 import toast from "react-hot-toast";
 
 // --- Project Schema Fields ---
@@ -76,6 +78,8 @@ const AdminCreateProject: React.FC = () => {
     risk_level: "medium",
   });
   const [loading, setLoading] = useState(false);
+  const [clients, setClients] = useState<ProfileRow[]>([]);
+  const [loadingClients, setLoadingClients] = useState(false);
 
   // Prefill from inquiry if provided
   useEffect(() => {
@@ -105,9 +109,43 @@ const AdminCreateProject: React.FC = () => {
     prefillFromInquiry();
   }, [inquiryId]);
 
+  // Load clients for selection
+  useEffect(() => {
+    async function fetchClients() {
+      setLoadingClients(true);
+      const { data, error } = await getAllClients();
+      if (error) {
+        toast.error("Failed to load clients list");
+      } else {
+        setClients(data || []);
+      }
+      setLoadingClients(false);
+    }
+    fetchClients();
+  }, []);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setForm((old) => ({ ...old, [name]: value }));
+  };
+
+  const handleClientChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedId = e.target.value;
+    const selectedClient = clients.find(c => c.id === selectedId);
+    
+    if (selectedClient) {
+      setForm(old => ({
+        ...old,
+        client_id: selectedClient.id,
+        client: selectedClient.full_name || selectedClient.email
+      }));
+    } else {
+      setForm(old => ({
+        ...old,
+        client_id: "",
+        client: ""
+      }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -199,16 +237,37 @@ const AdminCreateProject: React.FC = () => {
               required
             />
           </div>
-          {/* Client */}
+          {/* Client Selection */}
           <div>
-            <label className="block mb-1 text-gray-400 font-semibold">Client Name</label>
-            <input
+            <label className="block mb-1 text-gray-400 font-semibold">Select Client</label>
+            <select
               className="w-full px-3 py-2 rounded-lg border border-blue-400/30 bg-gray-900 text-white focus:outline-none focus:ring focus:ring-blue-300/30"
+              name="client_id"
+              value={form.client_id}
+              onChange={handleClientChange}
+              required
+              disabled={loadingClients}
+            >
+              <option value="">-- Choose a Client --</option>
+              {clients.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.full_name || c.email} {c.company ? `(${c.company})` : ""}
+                </option>
+              ))}
+            </select>
+            {loadingClients && <p className="text-xs text-blue-400 mt-1 animate-pulse">Loading clients...</p>}
+          </div>
+
+          {/* Client Name (Read-only or auto-filled) */}
+          <div>
+            <label className="block mb-1 text-gray-400 font-semibold">Client Name Display</label>
+            <input
+              className="w-full px-3 py-2 rounded-lg border border-blue-400/10 bg-gray-900/50 text-gray-400 focus:outline-none cursor-not-allowed"
               name="client"
               type="text"
               value={form.client}
-              onChange={handleChange}
-              required
+              readOnly
+              placeholder="Select a client above"
             />
           </div>
           {/* Type */}
