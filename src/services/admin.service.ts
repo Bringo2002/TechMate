@@ -4,7 +4,7 @@
 // ============================================================================
 
 import supabase from '../lib/supabaseClient';
-import type { ProfileRow, ProjectRow, OrderRow, InvoiceRow, RequestRow, SupportTicketRow, ActivityLogRow, ActivityLogRowWithProfile } from '../types/database.types';
+import type { ProfileRow, ProjectRow, OrderRow, InvoiceRow, RequestRow, SupportTicketRow, ActivityLogRowWithProfile } from '../types/database.types';
 import type {
     AdminDashboardMetrics,
     GrowthDataPoint,

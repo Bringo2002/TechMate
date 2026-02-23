@@ -326,6 +326,14 @@ export type ProjectRow = {
     updated_at: string;
     deleted_at: string | null;
     metadata: Json;
+    // Optional dashboard specific fields (computed or metadata-extracted)
+    blockers?: string | null;
+    risks?: string[] | null;
+    opportunities?: string[] | null;
+    techStack?: string[] | null;
+    metrics?: { commits: number; prs: number; bugs: number; tests: number } | null;
+    nextMilestone?: string | null;
+    predictedCompletion?: string | null;
 };
 
 export type ProjectInsert = Omit<ProjectRow, 'id' | 'created_at' | 'updated_at'> & {
