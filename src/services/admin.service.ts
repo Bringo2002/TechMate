@@ -117,36 +117,43 @@ export async function getRecentUsers(limit: number = 10): Promise<ServiceRespons
 }
 
 /**
- * Get all unique clients who have submitted inquiries
+ * Get all client profiles for selection
  */
 export async function getAllClients(): Promise<ServiceResponse<ProfileRow[]>> {
-    // Fetch inquiries with client profiles joined
-    const { data, error } = await supabase
-        .from('client_inquiries')
-        .select('client:profiles!client_id(*)')
+    // 1. Fetch all profiles
+    const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('*')
         .is('deleted_at', null);
 
-    if (error) {
-        return { data: null, error: { code: error.code, message: error.message } };
+    if (profilesError) {
+        return { data: null, error: { code: profilesError.code, message: profilesError.message } };
     }
 
-    // Extract unique clients and sort them
-    const clientMap = new Map<string, ProfileRow>();
-    (data ?? []).forEach((row: any) => {
-        if (row.client) {
-            // Support both direct object or array if Supabase returns differently
-            const client = Array.isArray(row.client) ? row.client[0] : row.client;
-            if (client && client.id) {
-                clientMap.set(client.id, client as ProfileRow);
-            }
-        }
+    // 2. Fetch all unique client_ids from inquiries to ensure we don't miss anyone
+    const { data: inquiries } = await supabase
+        .from('client_inquiries')
+        .select('client_id')
+        .is('deleted_at', null);
+
+    const inquiryClientIds = new Set((inquiries || []).map(i => i.client_id));
+
+    // 3. Filter profiles
+    const clients = (profiles ?? []).filter(p => {
+        // Exclude explicit admins
+        if (p.is_admin || p.role === 'admin') return false;
+
+        // Include if they have the right role/type OR if they've submitted an inquiry
+        if (p.user_type === 'client' || p.role === 'user') return true;
+        if (inquiryClientIds.has(p.id)) return true;
+
+        return false;
     });
 
-    const uniqueClients = Array.from(clientMap.values()).sort((a, b) =>
-        (a.full_name || a.email).localeCompare(b.full_name || b.email)
-    );
+    // 4. Sort alphabetically
+    clients.sort((a, b) => (a.full_name || a.email).localeCompare(b.full_name || b.email));
 
-    return { data: uniqueClients, error: null };
+    return { data: clients, error: null };
 }
 
 export async function getRecentInvoices(limit: number = 10): Promise<ServiceResponse<InvoiceRow[]>> {
