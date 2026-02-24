@@ -281,7 +281,10 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
               </div>
 
               {/* Quick Action - Hidden on mobile */}
-              <button className="hidden md:flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-xl hover:shadow-lg hover:shadow-emerald-500/20 transition-all font-medium text-sm">
+              <button 
+                onClick={() => navigate('/dashboard/create-project')}
+                className="hidden md:flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-xl hover:shadow-lg hover:shadow-emerald-500/20 transition-all font-medium text-sm"
+              >
                 <Plus className="w-4 h-4" />
                 New Project
               </button>
