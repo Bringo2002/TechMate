@@ -143,6 +143,9 @@ const AdminOverview = () => {
 
   // Real database projects only!
   const projects = (recentProjects ?? []).map(p => ({
+    id: p.id, // <-- MAKE SURE THIS EXISTS IN YOUR DATA
+    client_id: p.user_id, // <-- for contact/profile route
+    client_email: null, // <-- provide if emailing
     name: p.name,
     client: p.client || 'Unknown Client',
     status: p.status,
@@ -543,10 +546,25 @@ const AdminOverview = () => {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button className="flex-1 py-2.5 px-4 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-lg text-sm font-medium transition-all">
+                  <button
+                    className="flex-1 py-2.5 px-4 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-lg text-sm font-medium transition-all"
+                    onClick={() => navigate(`/dashboard/projects/${project.id}`)}
+                  >
                     View Dashboard
                   </button>
-                  <button className="flex-1 py-2.5 px-4 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded-lg text-sm font-medium transition-all">
+                  <button
+                    className="flex-1 py-2.5 px-4 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded-lg text-sm font-medium transition-all"
+                    onClick={() => {
+                      // Option 1: email
+                      if (project.client_email) {
+                        window.open(`mailto:${project.client_email}`);
+                      }
+                      // Option 2: navigate to client profile (uncomment below if you have this page)
+                      // else if (project.client_id) {
+                      //   navigate(`/dashboard/clients/${project.client_id}`);
+                      // }
+                    }}
+                  >
                     Contact Client
                   </button>
                   <button title="More Options" className="py-2.5 px-4 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 rounded-lg text-sm font-medium transition-all">
