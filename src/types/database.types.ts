@@ -344,6 +344,13 @@ export type ProjectInsert = Omit<ProjectRow, 'id' | 'created_at' | 'updated_at'>
 
 export type ProjectUpdate = Partial<Omit<ProjectRow, 'id' | 'created_at'>>;
 
+export type ProjectRowWithClient = ProjectRow & {
+    profiles?: {
+        email: string;
+        full_name: string | null;
+    } | null;
+};
+
 // ============================================================================
 // ORDERS (NEWly restored)
 // ============================================================================

@@ -5,14 +5,14 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { AdminDashboardMetrics, GrowthDataPoint, RevenueDataPoint } from '../types/api.types';
-import type { ProjectRow, OrderRow, ProfileRow, RequestRow, ServiceCategoryRow, ActivityLogRow, ActivityLogRowWithProfile } from '../types/database.types';
+import type { ProjectRowWithClient, OrderRow, ProfileRow, RequestRow, ServiceCategoryRow, ActivityLogRowWithProfile } from '../types/database.types';
 import * as adminService from '../services/admin.service';
 
 interface AdminDashboardData {
     metrics: AdminDashboardMetrics | null;
     userGrowth: GrowthDataPoint[];
     revenueByMonth: RevenueDataPoint[];
-    recentProjects: ProjectRow[];
+    recentProjects: ProjectRowWithClient[];
     recentOrders: OrderRow[];
     recentUsers: ProfileRow[];
     openRequests: RequestRow[];
@@ -34,7 +34,7 @@ export function useAdmin(): AdminDashboardData {
     const [metrics, setMetrics] = useState<AdminDashboardMetrics | null>(null);
     const [userGrowth, setUserGrowth] = useState<GrowthDataPoint[]>([]);
     const [revenueByMonth, setRevenueByMonth] = useState<RevenueDataPoint[]>([]);
-    const [recentProjects, setRecentProjects] = useState<ProjectRow[]>([]);
+    const [recentProjects, setRecentProjects] = useState<ProjectRowWithClient[]>([]);
     const [recentOrders, setRecentOrders] = useState<OrderRow[]>([]);
     const [recentUsers, setRecentUsers] = useState<ProfileRow[]>([]);
     const [openRequests, setOpenRequests] = useState<RequestRow[]>([]);

@@ -145,7 +145,7 @@ const AdminOverview = () => {
   const projects = (recentProjects ?? []).map(p => ({
     id: p.id, // <-- MAKE SURE THIS EXISTS IN YOUR DATA
     client_id: p.user_id, // <-- for contact/profile route
-    client_email: null, // <-- provide if emailing
+    client_email: p.profiles?.email || null, // <-- provide if emailing
     name: p.name,
     client: p.client || 'Unknown Client',
     status: p.status,

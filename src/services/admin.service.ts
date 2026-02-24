@@ -4,7 +4,7 @@
 // ============================================================================
 
 import supabase from '../lib/supabaseClient';
-import type { ProfileRow, ProjectRow, OrderRow, InvoiceRow, RequestRow, SupportTicketRow, ActivityLogRowWithProfile } from '../types/database.types';
+import type { ProfileRow, ProjectRow, ProjectRowWithClient, OrderRow, InvoiceRow, RequestRow, SupportTicketRow, ActivityLogRowWithProfile } from '../types/database.types';
 import type {
     AdminDashboardMetrics,
     GrowthDataPoint,
@@ -74,10 +74,10 @@ export async function getRevenueStats() {
 // ============================================================================
 // Recent Activity
 // ============================================================================
-export async function getRecentProjects(limit: number = 10): Promise<ServiceResponse<ProjectRow[]>> {
+export async function getRecentProjects(limit: number = 10): Promise<ServiceResponse<ProjectRowWithClient[]>> {
     const { data, error } = await supabase
         .from('projects')
-        .select('*')
+        .select('*, profiles:user_id(email, full_name)')
         .is('deleted_at', null)
         .order('updated_at', { ascending: false })
         .limit(limit);
@@ -85,7 +85,7 @@ export async function getRecentProjects(limit: number = 10): Promise<ServiceResp
     if (error) {
         return { data: null, error: { code: error.code, message: error.message } };
     }
-    return { data: data ?? [], error: null };
+    return { data: (data as any) ?? [], error: null };
 }
 
 export async function getRecentOrders(limit: number = 10): Promise<ServiceResponse<OrderRow[]>> {
