@@ -140,14 +140,17 @@ export async function getAllClients(): Promise<ServiceResponse<ProfileRow[]>> {
 
     // 3. Filter profiles
     const clients = (profiles ?? []).filter(p => {
+        // If they have submitted an inquiry, they are definitively a client
+        if (inquiryClientIds.has(p.id)) return true;
+
         // Exclude explicit admins
         if (p.is_admin || p.role === 'admin') return false;
 
-        // Include if they have the right role/type OR if they've submitted an inquiry
-        if (p.user_type === 'client' || p.role === 'user') return true;
-        if (inquiryClientIds.has(p.id)) return true;
+        // Exclude explicit internal team members
+        if (p.user_type === 'developer' || p.user_type === 'designer' || p.user_type === 'technical_lead') return false;
 
-        return false;
+        // Include everyone else (they are implicitly clients)
+        return true;
     });
 
     // 4. Sort alphabetically
