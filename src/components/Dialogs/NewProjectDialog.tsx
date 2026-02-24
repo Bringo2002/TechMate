@@ -1,5 +1,5 @@
 // src/components/Dialogs/NewProjectDialog.tsx
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { X, Loader2, DollarSign, Calendar, AlertCircle, Briefcase, Sparkles, Zap } from 'lucide-react';
 import supabase from '../../lib/supabaseClient';
 
@@ -66,19 +66,17 @@ export default function NewProjectDialog({ onClose, onProjectCreated }: NewProje
 
       const { data, error } = await supabase
         .from('projects')
-        .insert([
-          {
+        .insert([{
             user_id: user.id,
             name: formData.name,
             client: formData.client,
             type: formData.type,
             budget: parseFloat(formData.budget),
             deadline: formData.deadline,
-            priority: formData.priority,
-            status: formData.status,
+            priority: formData.priority as any,
+            status: formData.status as any,
             description: formData.description || null,
-          },
-        ])
+          } as any])
         .select()
         .single();
 
@@ -250,8 +248,8 @@ export default function NewProjectDialog({ onClose, onProjectCreated }: NewProje
               >
                 <option value="planning">Planning</option>
                 <option value="active">Active</option>
-                <option value="blocked">Blocked</option>
-                <option value="ready">Ready</option>
+                <option value="on_hold">On Hold</option>
+                <option value="completed">Completed</option>
               </select>
             </div>
           </div>

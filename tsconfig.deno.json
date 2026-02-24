@@ -1,13 +1,21 @@
 {
   "compilerOptions": {
-    "lib": ["esnext"],
+    "lib": [
+      "esnext",
+      "dom",
+      "dom.iterable"
+    ],
     "module": "esnext",
     "moduleResolution": "node",
     "target": "esnext",
     "strict": true,
     "noEmit": true,
-    "types": ["deno.ns"],
+    "types": [
+      "deno"
+    ],
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["supabase/functions/**/*.ts"]
+  "include": [
+    "supabase/functions/**/*.ts"
+  ]
 }

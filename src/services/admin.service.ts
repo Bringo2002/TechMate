@@ -4,7 +4,7 @@
 // ============================================================================
 
 import supabase from '../lib/supabaseClient';
-import type { ProfileRow, ProjectRow, ProjectRowWithClient, OrderRow, InvoiceRow, RequestRow, SupportTicketRow, ActivityLogRowWithProfile } from '../types/database.types';
+import type { ProfileRow, ProjectRowWithClient, OrderRow, InvoiceRow, RequestRow, SupportTicketRow, ActivityLogRowWithProfile } from '../types/database.types';
 import type {
     AdminDashboardMetrics,
     GrowthDataPoint,
@@ -77,10 +77,23 @@ export async function getRevenueStats() {
 export async function getRecentProjects(limit: number = 10): Promise<ServiceResponse<ProjectRowWithClient[]>> {
     const { data, error } = await supabase
         .from('projects')
-        .select('*, profiles:user_id(email, full_name)')
+        .select('*, profiles!user_id(email, full_name)')
         .is('deleted_at', null)
         .order('updated_at', { ascending: false })
         .limit(limit);
+
+    if (error) {
+        return { data: null, error: { code: error.code, message: error.message } };
+    }
+    return { data: (data as any) ?? [], error: null };
+}
+
+export async function getAllProjects(): Promise<ServiceResponse<ProjectRowWithClient[]>> {
+    const { data, error } = await supabase
+        .from('projects')
+        .select('*, profiles!user_id(email, full_name)')
+        .is('deleted_at', null)
+        .order('updated_at', { ascending: false });
 
     if (error) {
         return { data: null, error: { code: error.code, message: error.message } };
