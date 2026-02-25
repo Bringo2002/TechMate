@@ -1,12 +1,42 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   TrendingUp, ArrowUp, ArrowDown, DollarSign, Users,
   Rocket, Activity, ChevronRight, CircleDot, Flame, Loader2,
-  Clock, AlertTriangle, AlertCircle, Sparkles
+  Clock, AlertTriangle, AlertCircle, Sparkles, UserPlus,
+  GitCommit, FileText, Zap, Bell, Shield
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import useAdmin from '../../hooks/useAdmin';
 import { useAuth } from '../../hooks/useAuth';
+
+// ─── Relative time helper ───────────────────────────────────────────────────
+const timeAgo = (dateStr: string) => {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  if (seconds < 60) return 'Just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+};
+
+// ─── Activity event type ────────────────────────────────────────────────────
+type ActivityEvent = {
+  id: string;
+  icon: typeof Activity;
+  message: string;
+  detail: string;
+  user: string;
+  project: string;
+  time: string;
+  rawTime: string;
+  status: 'success' | 'warning' | 'info' | 'opportunity' | 'danger';
+  metric: string;
+};
 
 // Utility: format currency
 const fmt = (n: number) =>
@@ -29,6 +59,8 @@ const AdminOverview = () => {
     userGrowth,
     revenueByMonth,
     recentProjects,
+    recentOrders,
+    recentUsers,
     recentActivity,
     revenueStats,
     loading
@@ -173,29 +205,124 @@ const AdminOverview = () => {
     predictedCompletion: p.predictedCompletion || 'N/A'
   }));
 
-  const activities = recentActivity && recentActivity.length > 0 ? recentActivity.map(a => ({
-    type: 'activity',
-    icon: Activity,
-    message: `${a.profiles?.full_name || 'User'} ${a.action} ${a.entity_type}`,
-    detail: JSON.stringify(a.changes).slice(0, 50) + '...',
-    user: a.profiles?.full_name || 'Unknown',
-    project: 'System',
-    time: a.created_at ? new Date(a.created_at).toLocaleTimeString() : '',
-    status: 'info',
-    metric: 'Log'
-  })) : [
-    {
-      type: 'deployment',
-      icon: Rocket,
-      message: 'No recent activity',
-      detail: 'System is quiet.',
-      user: 'System',
-      project: '-',
-      time: 'Just now',
-      status: 'info',
-      metric: '-'
+  // ─── Synthesize unified activity feed from all data sources ──────────────
+  const activities: ActivityEvent[] = useMemo(() => {
+    const events: ActivityEvent[] = [];
+
+    // 1. Real activity_logs from database
+    if (recentActivity && recentActivity.length > 0) {
+      recentActivity.forEach(a => {
+        const actionMap: Record<string, { icon: typeof Activity; status: ActivityEvent['status']; metric: string }> = {
+          'created': { icon: Sparkles, status: 'success', metric: 'Created' },
+          'updated': { icon: GitCommit, status: 'info', metric: 'Updated' },
+          'deleted': { icon: AlertCircle, status: 'danger', metric: 'Deleted' },
+          'login': { icon: Shield, status: 'info', metric: 'Auth' },
+        };
+        const config = actionMap[a.action] || { icon: Activity, status: 'info' as const, metric: 'Log' };
+        events.push({
+          id: `log-${a.id}`,
+          icon: config.icon,
+          message: `${a.profiles?.full_name || 'User'} ${a.action} ${a.entity_type}`,
+          detail: typeof a.changes === 'object' && a.changes
+            ? Object.keys(a.changes as Record<string, unknown>).slice(0, 3).join(', ') + ' changed'
+            : 'System event',
+          user: a.profiles?.full_name || 'System',
+          project: a.entity_type || 'System',
+          time: a.created_at ? timeAgo(a.created_at) : '',
+          rawTime: a.created_at || '',
+          status: config.status,
+          metric: config.metric,
+        });
+      });
     }
-  ];
+
+    // 2. Synthesize from recent projects
+    if (recentProjects && recentProjects.length > 0) {
+      recentProjects.slice(0, 5).forEach(p => {
+        const statusConfig: Record<string, { icon: typeof Activity; status: ActivityEvent['status']; msg: string }> = {
+          'active': { icon: Rocket, status: 'success', msg: 'is actively in development' },
+          'review': { icon: FileText, status: 'warning', msg: 'moved to review stage' },
+          'completed': { icon: Sparkles, status: 'success', msg: 'has been completed' },
+          'on_hold': { icon: Clock, status: 'warning', msg: 'was put on hold' },
+          'cancelled': { icon: AlertTriangle, status: 'danger', msg: 'was cancelled' },
+          'planning': { icon: Zap, status: 'info', msg: 'is in planning phase' },
+        };
+        const cfg = statusConfig[p.status] || { icon: Rocket, status: 'info' as const, msg: 'was updated' };
+        events.push({
+          id: `proj-${p.id}`,
+          icon: cfg.icon,
+          message: `${p.name} ${cfg.msg}`,
+          detail: `Client: ${p.client || p.profiles?.full_name || 'Unknown'} • Budget: $${(p.budget || 0).toLocaleString()}`,
+          user: p.profiles?.full_name || p.client || 'Unknown',
+          project: p.name,
+          time: p.updated_at ? timeAgo(p.updated_at) : '',
+          rawTime: p.updated_at || '',
+          status: cfg.status,
+          metric: p.status,
+        });
+      });
+    }
+
+    // 3. Synthesize from recent user signups
+    if (recentUsers && recentUsers.length > 0) {
+      recentUsers.slice(0, 3).forEach(u => {
+        events.push({
+          id: `user-${u.id}`,
+          icon: UserPlus,
+          message: `${u.full_name || u.email.split('@')[0]} joined the platform`,
+          detail: u.company ? `Company: ${u.company}` : `Email: ${u.email}`,
+          user: u.full_name || u.email.split('@')[0],
+          project: 'Platform',
+          time: u.created_at ? timeAgo(u.created_at) : '',
+          rawTime: u.created_at || '',
+          status: 'opportunity',
+          metric: 'New User',
+        });
+      });
+    }
+
+    // 4. Synthesize from recent orders
+    if (recentOrders && recentOrders.length > 0) {
+      recentOrders.slice(0, 3).forEach(o => {
+        events.push({
+          id: `order-${o.id}`,
+          icon: DollarSign,
+          message: `Order "${o.title}" is ${o.status.replace('_', ' ')}`,
+          detail: `Budget: $${(o.budget || 0).toLocaleString()} • Priority: ${o.priority}`,
+          user: 'Client',
+          project: o.title,
+          time: o.updated_at ? timeAgo(o.updated_at) : '',
+          rawTime: o.updated_at || '',
+          status: o.status === 'completed' ? 'success' : o.status === 'cancelled' ? 'danger' : 'info',
+          metric: o.status,
+        });
+      });
+    }
+
+    // Sort all events by timestamp (newest first) and deduplicate
+    events.sort((a, b) => new Date(b.rawTime).getTime() - new Date(a.rawTime).getTime());
+
+    // If still empty, show fallback
+    if (events.length === 0) {
+      events.push({
+        id: 'empty',
+        icon: Bell,
+        message: 'No recent activity yet',
+        detail: 'Activity will appear here as you use the platform',
+        user: 'System',
+        project: '-',
+        time: 'Now',
+        rawTime: new Date().toISOString(),
+        status: 'info',
+        metric: '-',
+      });
+    }
+
+    return events;
+  }, [recentActivity, recentProjects, recentUsers, recentOrders]);
+
+  const [showAllActivity, setShowAllActivity] = useState(false);
+  const visibleActivities = showAllActivity ? activities : activities.slice(0, 8);
 
   const HealthScore = ({ score }: { score: number }) => {
     const getColor = (s: number) => {
@@ -571,62 +698,73 @@ const AdminOverview = () => {
           </div>
         </div>
         <div className="bg-gradient-to-br from-gray-900/50 to-gray-900/30 backdrop-blur-sm border border-gray-800/50 rounded-2xl p-6">
-          <div className="mb-6">
-            <h3 className="text-xl font-bold text-white flex items-center gap-2">
-              <Activity className="w-5 h-5 text-blue-400" />
-              Live Activity Stream
-            </h3>
-            <p className="text-sm text-gray-400 mt-1">Real-time events & AI insights</p>
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <Activity className="w-5 h-5 text-blue-400" />
+                Live Activity Stream
+              </h3>
+              <p className="text-sm text-gray-400 mt-1">Real-time events & AI insights</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/30 rounded-full">
+                <CircleDot className="w-2.5 h-2.5 text-emerald-400 animate-pulse" />
+                <span className="text-emerald-400 text-xs font-semibold">Live</span>
+              </div>
+              {activities.length > 1 && (
+                <span className="px-2 py-0.5 bg-blue-500/10 border border-blue-500/30 rounded-full text-blue-400 text-xs font-semibold">
+                  {activities.length}
+                </span>
+              )}
+            </div>
           </div>
-          <div className="space-y-3">
-            {activities.map((activity, idx) => {
+          <div className="space-y-1">
+            {visibleActivities.map((activity, idx) => {
               const Icon = activity.icon;
+              const colorMap = {
+                success: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20' },
+                warning: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20' },
+                opportunity: { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/20' },
+                danger: { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/20' },
+                info: { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/20' },
+              };
+              const colors = colorMap[activity.status] || colorMap.info;
               return (
-                <div key={idx} className="flex items-start gap-3 pb-3 border-b border-gray-800/50 last:border-0 last:pb-0">
-                  <div className={`mt-1 p-2 rounded-lg flex-shrink-0 ${
-                    activity.status === 'success' ? 'bg-emerald-500/10' :
-                      activity.status === 'warning' ? 'bg-amber-500/10' :
-                        activity.status === 'opportunity' ? 'bg-purple-500/10' :
-                          'bg-blue-500/10'
-                  }`}>
-                    <Icon className={`w-4 h-4 ${
-                      activity.status === 'success' ? 'text-emerald-400' :
-                        activity.status === 'warning' ? 'text-amber-400' :
-                          activity.status === 'opportunity' ? 'text-purple-400' :
-                            'text-blue-400'
-                    }`} />
+                <div
+                  key={activity.id}
+                  className={`flex items-start gap-3 p-3 rounded-xl border border-transparent hover:${colors.border} hover:bg-gray-800/20 transition-all group`}
+                  style={{ animation: `fadeInSlide 0.3s ease-out ${idx * 0.05}s both` }}
+                >
+                  <div className={`mt-0.5 p-2 rounded-lg flex-shrink-0 ${colors.bg}`}>
+                    <Icon className={`w-4 h-4 ${colors.text}`} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white mb-1">{activity.message}</p>
-                    <p className="text-xs text-gray-400 mb-2">{activity.detail}</p>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-xs text-gray-500">
-                        <span>{activity.user}</span>
-                        {activity.project && (
-                          <>
-                            <span>•</span>
-                            <span>{activity.project}</span>
-                          </>
-                        )}
-                      </div>
-                      <span className={`text-xs font-semibold ${
-                        activity.status === 'success' ? 'text-emerald-400' :
-                          activity.status === 'warning' ? 'text-amber-400' :
-                            'text-blue-400'
-                      }`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-medium text-white leading-snug">{activity.message}</p>
+                      <span className="text-[10px] text-gray-500 whitespace-nowrap mt-0.5">{activity.time}</span>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-0.5 truncate">{activity.detail}</p>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className="text-[10px] text-gray-500">{activity.user}</span>
+                      <span className="text-[10px] text-gray-600">•</span>
+                      <span className={`text-[10px] font-semibold ${colors.text} px-1.5 py-0.5 ${colors.bg} rounded-full`}>
                         {activity.metric}
                       </span>
                     </div>
-                    <div className="text-xs text-gray-500 mt-1">{activity.time}</div>
                   </div>
                 </div>
               );
             })}
           </div>
-          <button className="w-full mt-6 py-3 px-4 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2">
-            View Full Timeline
-            <ChevronRight className="w-4 h-4" />
-          </button>
+          {activities.length > 8 && (
+            <button
+              onClick={() => setShowAllActivity(!showAllActivity)}
+              className="w-full mt-4 py-3 px-4 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2"
+            >
+              {showAllActivity ? 'Show Less' : `View All ${activities.length} Events`}
+              <ChevronRight className={`w-4 h-4 transition-transform ${showAllActivity ? 'rotate-90' : ''}`} />
+            </button>
+          )}
         </div>
       </div>
       <div className="relative overflow-hidden bg-gradient-to-br from-emerald-900/30 via-blue-900/30 to-purple-900/30 border border-emerald-500/30 rounded-3xl p-10">
