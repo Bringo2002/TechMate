@@ -801,7 +801,7 @@ export default function ProjectDashboard() {
             <FileText className="w-4 h-4" /> Edit Project
           </button>
           {clientEmail && (
-            <button onClick={() => window.open(`mailto:${clientEmail}`)}
+            <button onClick={() => window.open(`https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(clientEmail)}&su=${encodeURIComponent(`Re: ${project.name}`)}`, '_blank')}
               className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-xl text-sm font-semibold transition-all">
               <Mail className="w-4 h-4" /> Contact Client
             </button>
