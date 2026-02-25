@@ -287,21 +287,37 @@ export default function ProjectDashboard() {
     { label: 'Timeline', val: daysLeft != null ? `${daysLeft}d` : '—', ok: daysLeft === null || daysLeft > 0, Icon: daysLeft != null && daysLeft > 7 ? CheckCircle2 : Clock },
   ];
 
-  // ── Fix #10: Safe clipboard with fallback ──
-  const handleCopyLink = () => {
+  // ── Share Report: Web Share API with clipboard fallback ──
+  const handleCopyLink = async () => {
     const url = window.location.href;
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(url).catch(() => {
-        const el = document.createElement('textarea');
-        el.value = url;
-        document.body.appendChild(el);
-        el.select();
-        document.execCommand('copy');
-        document.body.removeChild(el);
-      });
-    } else {
+    const shareTitle = `${project.name} — Project Report`;
+    const shareText = `${project.name} | Status: ${project.status} | Progress: ${progress}% | Health: ${health}/100`;
+
+    // Use native Web Share API if available (mobile + modern desktop)
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: shareTitle,
+          text: shareText,
+          url,
+        });
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+        return;
+      } catch (err: unknown) {
+        // User cancelled the share — fall through to clipboard
+        if (err instanceof Error && err.name === 'AbortError') return;
+      }
+    }
+
+    // Fallback: copy URL to clipboard
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
       const el = document.createElement('textarea');
       el.value = url;
+      el.style.position = 'fixed';
+      el.style.opacity = '0';
       document.body.appendChild(el);
       el.select();
       document.execCommand('copy');
