@@ -190,7 +190,7 @@ const AdminCreateProject: React.FC = () => {
       } else {
         toast.success("Project created!");
         // Optionally: navigate to the project page or dashboard
-        navigate("/admin/projects");
+        navigate("/dashboard/projects");
       }
     } finally {
       setLoading(false);
