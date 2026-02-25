@@ -381,7 +381,7 @@ export default function ProjectDashboard() {
                   <span className="font-semibold text-white">{clientName}</span>
                 </span>
                 {clientEmail && (
-                  <button onClick={() => window.open(`mailto:${clientEmail}`)}
+                  <button onClick={() => window.open(`https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(clientEmail)}&su=${encodeURIComponent(`Re: ${project.name}`)}`, '_blank')}
                     className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-emerald-400 text-xs font-semibold transition-all">
                     <Mail className="w-3 h-3" /> Email Client
                   </button>
