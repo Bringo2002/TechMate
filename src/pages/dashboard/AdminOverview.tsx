@@ -437,7 +437,7 @@ const AdminOverview = () => {
                 </div>
                 <h3 className="text-sm font-medium text-gray-400 mb-2">{vital.label}</h3>
                 <div className="flex items-baseline gap-2 mb-1">
-                  <span className="font-bold text-white" style={{ fontSize: `${Math.max(1.25, 2.25 - vital.value.length * 0.1)}rem` }}>{vital.value}</span>
+                  <span className="font-bold text-white whitespace-nowrap" style={{ fontSize: `clamp(1rem, ${Math.max(1.5, 3 - vital.value.length * 0.15)}vw, ${Math.max(1.25, 2.25 - vital.value.length * 0.1)}rem)` }}>{vital.value}</span>
                   <span className={`text-sm font-semibold flex items-center gap-1 ${
                     vital.trend === 'up' ? 'text-emerald-400' :
                       vital.trend === 'down' ? 'text-red-400' :
@@ -492,7 +492,7 @@ const AdminOverview = () => {
                   )}
                 </div>
                 <h3 className="text-sm font-medium text-gray-400 mb-2">{fin.label}</h3>
-                <p className="font-bold text-white mb-1" style={{ fontSize: `${Math.max(1.25, 1.875 - fin.current.length * 0.06)}rem` }}>{fin.current}</p>
+                <p className="font-bold text-white mb-1 whitespace-nowrap" style={{ fontSize: `clamp(1rem, ${Math.max(1.5, 2.5 - fin.current.length * 0.1)}vw, ${Math.max(1.25, 1.875 - fin.current.length * 0.06)}rem)` }}>{fin.current}</p>
                 <p className="text-xs text-gray-400 mb-4">{
                   Object.entries(fin.breakdown).map(([k, v]) => `${k.toUpperCase()}: ${v}`).join(' | ')
                 }</p>
