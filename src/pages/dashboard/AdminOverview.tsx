@@ -47,6 +47,7 @@ const AdminOverview = () => {
   const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [selectedMetric, setSelectedMetric] = useState<number | null>(null);
+  const [showAllActivity, setShowAllActivity] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -66,19 +67,7 @@ const AdminOverview = () => {
     loading
   } = useAdmin();
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#0A0E1A] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="relative">
-            <div className="absolute inset-0 bg-emerald-500/20 blur-xl rounded-full"></div>
-            <Loader2 className="w-12 h-12 text-emerald-400 animate-spin relative z-10" />
-          </div>
-          <p className="text-emerald-400/80 font-medium animate-pulse">Loading Intelligence...</p>
-        </div>
-      </div>
-    );
-  }
+
 
   // All metrics from live backend
   const currentMonthRevenue = revenueStats?.monthlyRevenue ?? 0;
@@ -321,8 +310,21 @@ const AdminOverview = () => {
     return events;
   }, [recentActivity, recentProjects, recentUsers, recentOrders]);
 
-  const [showAllActivity, setShowAllActivity] = useState(false);
   const visibleActivities = showAllActivity ? activities : activities.slice(0, 8);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0A0E1A] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative">
+            <div className="absolute inset-0 bg-emerald-500/20 blur-xl rounded-full"></div>
+            <Loader2 className="w-12 h-12 text-emerald-400 animate-spin relative z-10" />
+          </div>
+          <p className="text-emerald-400/80 font-medium animate-pulse">Loading Intelligence...</p>
+        </div>
+      </div>
+    );
+  }
 
   const HealthScore = ({ score }: { score: number }) => {
     const getColor = (s: number) => {
