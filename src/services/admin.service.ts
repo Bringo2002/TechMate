@@ -101,6 +101,27 @@ export async function getAllProjects(): Promise<ServiceResponse<ProjectRowWithCl
     return { data: (data as any) ?? [], error: null };
 }
 
+// ============================================================================
+// Single Project — used by ProjectDashboard detail page
+// ============================================================================
+export async function getProjectById(projectId: string): Promise<ServiceResponse<ProjectRowWithClient>> {
+    if (!projectId) {
+        return { data: null, error: { code: 'MISSING_ID', message: 'Project ID is required' } };
+    }
+
+    const { data, error } = await supabase
+        .from('projects')
+        .select('*, profiles:user_id(email, full_name)')
+        .eq('id', projectId)
+        .is('deleted_at', null)
+        .single();
+
+    if (error) {
+        return { data: null, error: { code: error.code, message: error.message } };
+    }
+    return { data: data as unknown as ProjectRowWithClient, error: null };
+}
+
 export async function getRecentOrders(limit: number = 10): Promise<ServiceResponse<OrderRow[]>> {
     const { data, error } = await supabase
         .from('orders')

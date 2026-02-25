@@ -51,6 +51,7 @@ import NotificationSettings from './pages/dashboard/settings/notifications/Notif
 import ActivityLogs from './pages/dashboard/settings/activity/ActivityLogs';
 import NewProject from './pages/user/NewProject';
 import AdminCreateProject from './pages/admin/Projects/New';
+import ProjectsDashboard from './pages/dashboard/ProjectsDashboard';
 
 
 // Scroll to top and update title on route change
@@ -139,6 +140,7 @@ const App: React.FC = () => {
     <Route path="consulting" element={<Consulting />} />
     <Route path="deployments" element={<Deployments />} />
     <Route path="messages" element={<Messages />} />
+    <Route path="projects/:projectId" element={<ProjectsDashboard />} />
     {/* SETTINGS NESTED ROUTES */}
     <Route path="/dashboard/settings" element={<SettingsLayout />}>
   <Route index element={<TeamManagement />} />
