@@ -68,22 +68,13 @@ const daysRemaining = (deadline: string | null): number => {
 };
 
 // ─── Secure AI caller ─────────────────────────────────────────────────────────
-// IMPORTANT: All Claude API calls go through your Supabase Edge Function,
+// IMPORTANT: All Gemini API calls go through your Supabase Edge Function,
 // never directly from the browser. This keeps your API key server-side.
 // Deploy this edge function at: supabase/functions/ai-insights/index.ts
 //
-// Edge function template (deploy once):
-// ─────────────────────────────────────
-// import Anthropic from 'npm:@anthropic-ai/sdk';
-// const client = new Anthropic(); // reads ANTHROPIC_API_KEY from env
-// Deno.serve(async (req) => {
-//   const { messages, system } = await req.json();
-//   const response = await client.messages.create({
-//     model: 'claude-sonnet-4-20250514', max_tokens: 2000,
-//     system, messages,
-//   });
-//   return Response.json(response);
-// });
+// Deploy with:
+//   npx supabase functions deploy ai-insights
+//   npx supabase secrets set GEMINI_API_KEY=your-key-here
 // ─────────────────────────────────────
 
 import supabase from '../../lib/supabaseClient';

@@ -66,6 +66,12 @@ export async function fetchGitHubMetrics(
         return res;
     };
 
+    // Quick repo existence check to avoid spamming multiple 404s
+    const repoCheck = await fetch(`${GITHUB_API}/repos/${owner}/${repo}`, { headers });
+    if (!repoCheck.ok) {
+        throw new Error(`GitHub API ${repoCheck.status}: Repository not found or inaccessible`);
+    }
+
     // Run all requests in parallel for speed
     const [commitsRes, prsRes, bugsRes] = await Promise.all([
         // Commits: get total count from the last page link, or count the array
