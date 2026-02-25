@@ -10,6 +10,7 @@ import {
 import { getProjectById } from '../../services/admin.service';
 import { fetchGitHubMetrics, parseGitHubUrl, type GitHubMetrics } from '../../services/github.service';
 import type { ProjectRowWithClient, Json } from '../../types/database.types';
+import { VITE_GITHUB_TOKEN } from '../../APIdomains';
 
 // ─── Extended fields interface ────────────────────────────────────────────────
 // These fields are optional — the page renders gracefully whether they exist or not.
@@ -174,7 +175,7 @@ export default function ProjectDashboard() {
     setGhLoading(true);
     setGhError(null);
 
-    fetchGitHubMetrics(parsed.owner, parsed.repo)
+    fetchGitHubMetrics(parsed.owner, parsed.repo, VITE_GITHUB_TOKEN || undefined)
       .then((data) => { if (!cancelled) setGhMetrics(data); })
       .catch((err) => { if (!cancelled) setGhError(err.message); })
       .finally(() => { if (!cancelled) setGhLoading(false); });
