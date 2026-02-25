@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Loader2, ChevronLeft, Save, ArrowLeft } from "lucide-react";
+import { Loader2, ChevronLeft, Save, ArrowLeft, Github } from "lucide-react";
 import { getProjectById } from "../../../services/admin.service";
 import { updateProject } from "../../../services/projectService";
 import { getAllClients } from "../../../services/admin.service";
@@ -53,6 +53,7 @@ interface ProjectForm {
   progress: string;
   health_score: string;
   internal_notes: string;
+  github_repo: string;
 }
 
 const EditProject: React.FC = () => {
@@ -75,6 +76,7 @@ const EditProject: React.FC = () => {
     progress: "0",
     health_score: "100",
     internal_notes: "",
+    github_repo: "",
   });
 
   const [loading, setLoading] = useState(true);
@@ -120,6 +122,7 @@ const EditProject: React.FC = () => {
         progress: data.progress?.toString() ?? "0",
         health_score: data.health_score?.toString() ?? "100",
         internal_notes: data.internal_notes ?? "",
+        github_repo: (data.metadata as Record<string, unknown>)?.github_repo as string ?? "",
       });
 
       setLoading(false);
@@ -199,6 +202,7 @@ const EditProject: React.FC = () => {
         progress: Number(form.progress) || 0,
         health_score: Number(form.health_score) || 100,
         internal_notes: form.internal_notes || null,
+        metadata: { github_repo: form.github_repo || null },
       };
 
       const { error } = await updateProject(projectId, updates);
@@ -455,6 +459,27 @@ const EditProject: React.FC = () => {
               min={0}
               max={100}
             />
+          </div>
+
+          {/* GitHub Repo URL */}
+          <div>
+            <label className="block mb-1 text-gray-400 font-semibold">
+              <span className="flex items-center gap-1.5">
+                <Github className="w-4 h-4" />
+                GitHub Repository
+              </span>
+            </label>
+            <input
+              className="w-full px-3 py-2 rounded-lg border border-gray-700 bg-gray-900 text-white focus:outline-none focus:ring focus:ring-blue-300/30"
+              name="github_repo"
+              type="url"
+              value={form.github_repo}
+              onChange={handleChange}
+              placeholder="https://github.com/owner/repo"
+            />
+            <p className="text-xs text-gray-600 mt-1">
+              Link a GitHub repo to show live dev metrics on the dashboard
+            </p>
           </div>
 
           {/* Technologies */}

@@ -8,6 +8,7 @@ import {
   Package, XCircle,
 } from 'lucide-react';
 import { getProjectById } from '../../services/admin.service';
+import { fetchGitHubMetrics, parseGitHubUrl, type GitHubMetrics } from '../../services/github.service';
 import type { ProjectRowWithClient, Json } from '../../types/database.types';
 
 // ─── Extended fields interface ────────────────────────────────────────────────
@@ -231,7 +232,32 @@ export default function ProjectDashboard() {
   const risks: string[] = project.risks ?? [];
   const opps: string[] = project.opportunities ?? [];
   const blockers: string | null = project.blockers ?? null;
-  const devMetrics = project.metrics ?? { commits: 0, prs: 0, bugs: 0, tests: 0 };
+  const fallbackMetrics = project.metrics ?? { commits: 0, prs: 0, bugs: 0, tests: 0 };
+
+  // GitHub live metrics
+  const githubRepo = (project.metadata as Record<string, unknown>)?.github_repo as string | undefined;
+  const [ghMetrics, setGhMetrics] = useState<GitHubMetrics | null>(null);
+  const [ghLoading, setGhLoading] = useState(false);
+  const [ghError, setGhError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!githubRepo) return;
+    const parsed = parseGitHubUrl(githubRepo);
+    if (!parsed) return;
+
+    let cancelled = false;
+    setGhLoading(true);
+    setGhError(null);
+
+    fetchGitHubMetrics(parsed.owner, parsed.repo)
+      .then((data) => { if (!cancelled) setGhMetrics(data); })
+      .catch((err) => { if (!cancelled) setGhError(err.message); })
+      .finally(() => { if (!cancelled) setGhLoading(false); });
+
+    return () => { cancelled = true; };
+  }, [githubRepo]);
+
+  const devMetrics = ghMetrics ?? fallbackMetrics;
   const deliverables: Json[] = Array.isArray(project.deliverables) ? project.deliverables : [];
   const clientName = project.profiles?.full_name || project.client || 'Unknown Client';
   const clientEmail = project.profiles?.email ?? null;
@@ -571,20 +597,56 @@ export default function ProjectDashboard() {
           {/* Dev Metrics */}
           <SectionCard>
             <SectionTitle icon={GitBranch} color="blue">Development Metrics</SectionTitle>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { l: 'Commits',       v: devMetrics.commits, I: Code2,     c: 'emerald' },
-                { l: 'Pull Requests', v: devMetrics.prs,     I: GitBranch, c: 'blue' },
-                { l: 'Open Bugs',     v: devMetrics.bugs,    I: Bug,       c: devMetrics.bugs === 0 ? 'emerald' : 'amber' },
-                { l: 'Tests Passed',  v: devMetrics.tests,   I: TestTube2, c: 'purple' },
-              ].map((m, i) => (
-                <div key={i} className="text-center p-4 bg-gray-800/30 rounded-xl border border-gray-800/30 hover:border-gray-700/50 transition-all group cursor-default">
-                  <m.I className={`w-5 h-5 text-${m.c}-400 mx-auto mb-2 group-hover:scale-110 transition-transform`} />
-                  <div className="text-2xl font-black text-white mb-0.5">{m.v}</div>
-                  <div className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">{m.l}</div>
-                </div>
-              ))}
-            </div>
+            {ghLoading ? (
+              <div className="flex items-center justify-center py-8 gap-3">
+                <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
+                <span className="text-sm text-gray-400">Fetching GitHub data...</span>
+              </div>
+            ) : ghError ? (
+              <div className="text-center py-6">
+                <AlertCircle className="w-6 h-6 text-amber-400 mx-auto mb-2" />
+                <p className="text-sm text-amber-400/80">Could not fetch GitHub data</p>
+                <p className="text-xs text-gray-600 mt-1">{ghError}</p>
+              </div>
+            ) : !githubRepo && devMetrics.commits === 0 && devMetrics.prs === 0 ? (
+              <div className="text-center py-6">
+                <Code2 className="w-6 h-6 text-gray-600 mx-auto mb-2" />
+                <p className="text-sm text-gray-500">No GitHub repository linked</p>
+                <button
+                  onClick={() => navigate(`/dashboard/projects/${project.id}/edit`)}
+                  className="mt-2 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                >
+                  Connect a GitHub repo →
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                  { l: 'Commits',       v: devMetrics.commits, I: Code2,     c: 'emerald' },
+                  { l: 'Pull Requests', v: devMetrics.prs,     I: GitBranch, c: 'blue' },
+                  { l: 'Open Bugs',     v: devMetrics.bugs,    I: Bug,       c: devMetrics.bugs === 0 ? 'emerald' : 'amber' },
+                  { l: 'CI Runs',       v: devMetrics.tests,   I: TestTube2, c: 'purple' },
+                ].map((m, i) => (
+                  <div key={i} className="text-center p-4 bg-gray-800/30 rounded-xl border border-gray-800/30 hover:border-gray-700/50 transition-all group cursor-default">
+                    <m.I className={`w-5 h-5 text-${m.c}-400 mx-auto mb-2 group-hover:scale-110 transition-transform`} />
+                    <div className="text-2xl font-black text-white mb-0.5">{m.v}</div>
+                    <div className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">{m.l}</div>
+                  </div>
+                ))}
+                {githubRepo && (
+                  <div className="col-span-full text-right">
+                    <a
+                      href={githubRepo}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-gray-600 hover:text-blue-400 transition-colors"
+                    >
+                      View on GitHub →
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
           </SectionCard>
         </div>
 
