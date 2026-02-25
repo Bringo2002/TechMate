@@ -555,14 +555,9 @@ const AdminOverview = () => {
                   <button
                     className="flex-1 py-2.5 px-4 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded-lg text-sm font-medium transition-all"
                     onClick={() => {
-                      // Option 1: email
                       if (project.client_email) {
-                        window.open(`mailto:${project.client_email}`);
+                        window.open(`https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(project.client_email)}&su=${encodeURIComponent(`Re: ${project.name}`)}`, '_blank');
                       }
-                      // Option 2: navigate to client profile (uncomment below if you have this page)
-                      // else if (project.client_id) {
-                      //   navigate(`/dashboard/clients/${project.client_id}`);
-                      // }
                     }}
                   >
                     Contact Client

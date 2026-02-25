@@ -806,7 +806,7 @@ ${JSON.stringify(contextSummary, null, 2)}`;
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (project.profiles?.email) window.open(`mailto:${project.profiles.email}`);
+                          if (project.profiles?.email) window.open(`https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(project.profiles.email)}&su=${encodeURIComponent(`Re: ${project.name}`)}`, '_blank');
                         }}
                         title="Email client"
                         className="p-1.5 hover:bg-slate-800 rounded-lg transition-colors"
