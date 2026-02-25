@@ -5,6 +5,7 @@
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 Deno.serve(async (req: Request) => {
@@ -14,7 +15,8 @@ Deno.serve(async (req: Request) => {
     }
 
     try {
-        const { system, messages, max_tokens = 1500 } = await req.json();
+        const body = await req.json();
+        const { system, messages, max_tokens = 1500 } = body;
 
         if (!messages || !Array.isArray(messages)) {
             return new Response(
@@ -25,7 +27,10 @@ Deno.serve(async (req: Request) => {
 
         const apiKey = Deno.env.get('GEMINI_API_KEY');
         if (!apiKey) {
-            throw new Error('GEMINI_API_KEY is not configured');
+            return new Response(
+                JSON.stringify({ error: 'GEMINI_API_KEY is not configured' }),
+                { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
         }
 
         // Convert chat messages to Gemini format
@@ -34,7 +39,7 @@ Deno.serve(async (req: Request) => {
             parts: [{ text: msg.content }],
         }));
 
-        // Build the Gemini request
+        // Build the Gemini request payload
         const geminiPayload: Record<string, unknown> = {
             contents: geminiContents,
             generationConfig: {
@@ -50,7 +55,8 @@ Deno.serve(async (req: Request) => {
             };
         }
 
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+        const model = 'gemini-2.0-flash';
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
         const geminiRes = await fetch(geminiUrl, {
             method: 'POST',
@@ -58,12 +64,15 @@ Deno.serve(async (req: Request) => {
             body: JSON.stringify(geminiPayload),
         });
 
-        if (!geminiRes.ok) {
-            const errBody = await geminiRes.text();
-            throw new Error(`Gemini API ${geminiRes.status}: ${errBody}`);
-        }
-
         const geminiData = await geminiRes.json();
+
+        if (!geminiRes.ok) {
+            console.error('Gemini API error:', JSON.stringify(geminiData));
+            return new Response(
+                JSON.stringify({ error: geminiData?.error?.message || `Gemini API ${geminiRes.status}` }),
+                { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+        }
 
         // Extract the text from Gemini's response
         const text = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
@@ -74,6 +83,7 @@ Deno.serve(async (req: Request) => {
         });
 
     } catch (error) {
+        console.error('Edge function error:', error);
         const message = error instanceof Error ? error.message : 'Unknown error';
         return new Response(
             JSON.stringify({ error: message }),
