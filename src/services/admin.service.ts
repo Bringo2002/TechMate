@@ -37,39 +37,107 @@ export async function getUserGrowth(months: number = 12): Promise<ServiceRespons
 }
 
 export async function getRevenueByMonth(months: number = 12): Promise<ServiceResponse<RevenueDataPoint[]>> {
+    // Try RPC first
     const { data, error } = await supabase.rpc('get_revenue_by_month', { p_months: months });
 
-    if (error) {
-        return { data: null, error: { code: error.code, message: error.message } };
+    if (!error && data && (data as RevenueDataPoint[]).length > 0) {
+        return { data: data as RevenueDataPoint[], error: null };
     }
-    return { data: (data ?? []) as RevenueDataPoint[], error: null };
+
+    // Fallback: derive from projects table
+    const cutoff = new Date();
+    cutoff.setMonth(cutoff.getMonth() - months);
+
+    const { data: projects, error: projError } = await supabase
+        .from('projects')
+        .select('budget, created_at, status')
+        .is('deleted_at', null)
+        .neq('status', 'cancelled')
+        .gte('created_at', cutoff.toISOString());
+
+    if (projError || !projects) {
+        return { data: [], error: null };
+    }
+
+    // Group by month
+    const monthMap: Record<string, number> = {};
+    for (const p of projects) {
+        const d = new Date(p.created_at);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        monthMap[key] = (monthMap[key] || 0) + (p.budget || 0);
+    }
+
+    // Fill in missing months so the sparkline is continuous
+    const result: RevenueDataPoint[] = [];
+    const now = new Date();
+    for (let i = months - 1; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        result.push({ month: key, revenue: monthMap[key] || 0 });
+    }
+
+    return { data: result, error: null };
 }
+
 
 // ============================================================================
 // Revenue Analytics
 // ============================================================================
 export async function getRevenueStats() {
+    // 1. Try invoices first
     const { data: invoices, error } = await supabase
         .from('invoices')
         .select('amount, tax_amount, status, paid_date, created_at')
         .is('deleted_at', null)
         .returns<InvoiceRow[]>();
 
-    if (error) return { totalRevenue: 0, paidRevenue: 0, pendingRevenue: 0, overdueRevenue: 0, monthlyRevenue: 0 };
-
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    const all = (invoices as InvoiceRow[]) ?? [];
+
+    if (!error && invoices && invoices.length > 0) {
+        const all = invoices as InvoiceRow[];
+        return {
+            totalRevenue: all.reduce((s, i) => s + (i.amount ?? 0) + (i.tax_amount ?? 0), 0),
+            paidRevenue: all.filter(i => i.status === 'paid').reduce((s, i) => s + (i.amount ?? 0) + (i.tax_amount ?? 0), 0),
+            pendingRevenue: all.filter(i => i.status === 'sent').reduce((s, i) => s + (i.amount ?? 0) + (i.tax_amount ?? 0), 0),
+            overdueRevenue: all.filter(i => i.status === 'overdue').reduce((s, i) => s + (i.amount ?? 0) + (i.tax_amount ?? 0), 0),
+            monthlyRevenue: all.filter(i => i.status === 'paid' && i.paid_date && i.paid_date >= monthStart)
+                .reduce((s, i) => s + (i.amount ?? 0) + (i.tax_amount ?? 0), 0),
+        };
+    }
+
+    // 2. Fallback: derive revenue from projects table
+    const { data: projects, error: projError } = await supabase
+        .from('projects')
+        .select('budget, spent, status, payment_status, updated_at')
+        .is('deleted_at', null)
+        .neq('status', 'cancelled');
+
+    if (projError || !projects) {
+        return { totalRevenue: 0, paidRevenue: 0, pendingRevenue: 0, overdueRevenue: 0, monthlyRevenue: 0 };
+    }
+
+    const totalRevenue = projects.reduce((s, p) => s + (p.budget || 0), 0);
+    const paidRevenue = projects
+        .filter(p => p.payment_status === 'paid')
+        .reduce((s, p) => s + (p.budget || 0), 0);
+    const pendingRevenue = projects
+        .filter(p => p.payment_status === 'unpaid' || p.payment_status === 'partial')
+        .filter(p => ['active', 'review', 'planning', 'completed'].includes(p.status))
+        .reduce((s, p) => s + (p.budget || 0) - (p.spent || 0), 0);
+    const monthlyRevenue = projects
+        .filter(p => p.payment_status === 'paid' && p.updated_at && p.updated_at >= monthStart)
+        .reduce((s, p) => s + (p.budget || 0), 0);
 
     return {
-        totalRevenue: all.reduce((s, i) => s + (i.amount ?? 0) + (i.tax_amount ?? 0), 0),
-        paidRevenue: all.filter(i => i.status === 'paid').reduce((s, i) => s + (i.amount ?? 0) + (i.tax_amount ?? 0), 0),
-        pendingRevenue: all.filter(i => i.status === 'sent').reduce((s, i) => s + (i.amount ?? 0) + (i.tax_amount ?? 0), 0),
-        overdueRevenue: all.filter(i => i.status === 'overdue').reduce((s, i) => s + (i.amount ?? 0) + (i.tax_amount ?? 0), 0),
-        monthlyRevenue: all.filter(i => i.status === 'paid' && i.paid_date && i.paid_date >= monthStart)
-            .reduce((s, i) => s + (i.amount ?? 0) + (i.tax_amount ?? 0), 0),
+        totalRevenue,
+        paidRevenue,
+        pendingRevenue,
+        overdueRevenue: 0,
+        monthlyRevenue,
     };
 }
+
 
 // ============================================================================
 // Recent Activity
