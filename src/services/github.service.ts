@@ -66,9 +66,12 @@ export async function fetchGitHubMetrics(
         return res;
     };
 
-    // Quick repo existence check to avoid spamming multiple 404s
+    // Quick repo existence check to avoid spamming multiple 404s/403s
     const repoCheck = await fetch(`${GITHUB_API}/repos/${owner}/${repo}`, { headers });
     if (!repoCheck.ok) {
+        if (repoCheck.status === 403) {
+            throw new Error('GitHub API 403: Token lacks required permissions (needs Contents, Pull Requests, Issues read access)');
+        }
         throw new Error(`GitHub API ${repoCheck.status}: Repository not found or inaccessible`);
     }
 
