@@ -789,7 +789,7 @@ const AdminOverview = () => {
                 { label: "Avg Health", value: `${metrics?.avg_project_health?.toFixed(0) ?? 0}/100`, style: "text-amber-400" },
               ].map((card, idx) => (
                 <div key={idx} className="p-4 bg-white/5 rounded-xl border border-white/10">
-                  <div className={`text-2xl font-bold mb-1 ${card.style}`}>{card.value}</div>
+                  <div className={`font-bold mb-1 whitespace-nowrap ${card.style}`} style={{ fontSize: `clamp(0.875rem, ${Math.max(1.2, 2.5 - card.value.length * 0.15)}vw, ${Math.max(1, 1.5 - card.value.length * 0.04)}rem)` }}>{card.value}</div>
                   <div className="text-xs text-gray-400">{card.label}</div>
                 </div>
               ))}
