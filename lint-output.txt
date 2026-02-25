@@ -1,0 +1,73 @@
+
+> techmate@0.0.1 lint C:\Users\Administrator\Desktop\TechMate3\TechMate
+> eslint . --report-unused-disable-directives --max-warnings 0
+
+
+C:\Users\Administrator\Desktop\TechMate3\TechMate\src\components\AuthForm.tsx
+  29:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Administrator\Desktop\TechMate3\TechMate\src\components\Dialogs\NewProjectDialog.tsx
+  76:44  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  77:40  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  79:16  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Administrator\Desktop\TechMate3\TechMate\src\hooks\useAuth.ts
+  150:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Administrator\Desktop\TechMate3\TechMate\src\pages\AuthCallback.tsx
+  57:16  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Administrator\Desktop\TechMate3\TechMate\src\pages\admin\InquiryDetail.tsx
+  92:43  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  92:60  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  93:74  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Administrator\Desktop\TechMate3\TechMate\src\pages\admin\Projects\New.tsx
+  157:29  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Administrator\Desktop\TechMate3\TechMate\src\pages\dashboard\Projects.tsx
+  224:6  warning  React Hook useCallback has a missing dependency: 'generateFallbackInsights'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\Administrator\Desktop\TechMate3\TechMate\src\pages\dashboard\ProjectsDashboard.tsx
+  239:37  error  React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render. Did you accidentally call a React Hook after an early return?   react-hooks/rules-of-hooks
+  240:37  error  React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render. Did you accidentally call a React Hook after an early return?   react-hooks/rules-of-hooks
+  241:33  error  React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render. Did you accidentally call a React Hook after an early return?   react-hooks/rules-of-hooks
+  243:3   error  React Hook "useEffect" is called conditionally. React Hooks must be called in the exact same order in every component render. Did you accidentally call a React Hook after an early return?  react-hooks/rules-of-hooks
+
+C:\Users\Administrator\Desktop\TechMate3\TechMate\src\pages\user\UserOrders.tsx
+   41:14  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  130:74  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  147:80  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Administrator\Desktop\TechMate3\TechMate\src\pages\user\UserOverview.tsx
+   34:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  126:38  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  177:76  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  190:82  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Administrator\Desktop\TechMate3\TechMate\src\repro.ts
+  14:6  error  'ClientInquiryInsertType' is defined but never used                                                                  @typescript-eslint/no-unused-vars
+  37:9  error  Use "@ts-expect-error" instead of "@ts-ignore", as "@ts-ignore" will do nothing if the following line is error-free  @typescript-eslint/ban-ts-comment
+
+C:\Users\Administrator\Desktop\TechMate3\TechMate\src\services\admin.service.ts
+   88:29  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  101:29  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  221:29  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Administrator\Desktop\TechMate3\TechMate\src\services\inquiries.service.ts
+  169:36  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  195:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  217:24  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  259:24  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  303:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  329:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Administrator\Desktop\TechMate3\TechMate\supabase\functions\ai-insights\index.ts
+  5:1  error  Use "@ts-expect-error" instead of "@ts-ignore", as "@ts-ignore" will do nothing if the following line is error-free  @typescript-eslint/ban-ts-comment
+
+C:\Users\Administrator\Desktop\TechMate3\TechMate\test-admin-query.ts
+  9:19  error  'error' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+Γ£û 35 problems (34 errors, 1 warning)
+
+ΓÇëELIFECYCLEΓÇë Command failed with exit code 1.

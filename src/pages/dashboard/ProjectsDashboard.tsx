@@ -158,6 +158,30 @@ export default function ProjectDashboard() {
     });
   }, [projectId]);
 
+  // ── Fix #11: Move hooks ABOVE early returns to satisfy Rules of Hooks ──
+  // GitHub live metrics
+  const githubRepo = (project?.metadata as Record<string, unknown>)?.github_repo as string | undefined;
+  const [ghMetrics, setGhMetrics] = useState<GitHubMetrics | null>(null);
+  const [ghLoading, setGhLoading] = useState(false);
+  const [ghError, setGhError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!githubRepo) return;
+    const parsed = parseGitHubUrl(githubRepo);
+    if (!parsed) return;
+
+    let cancelled = false;
+    setGhLoading(true);
+    setGhError(null);
+
+    fetchGitHubMetrics(parsed.owner, parsed.repo)
+      .then((data) => { if (!cancelled) setGhMetrics(data); })
+      .catch((err) => { if (!cancelled) setGhError(err.message); })
+      .finally(() => { if (!cancelled) setGhLoading(false); });
+
+    return () => { cancelled = true; };
+  }, [githubRepo]);
+
   // ── Loading ──────────────────────────────────────────────────────────────────
   if (loading) {
     return (
@@ -233,31 +257,8 @@ export default function ProjectDashboard() {
   const opps: string[] = project.opportunities ?? [];
   const blockers: string | null = project.blockers ?? null;
   const fallbackMetrics = project.metrics ?? { commits: 0, prs: 0, bugs: 0, tests: 0 };
-
-  // GitHub live metrics
-  const githubRepo = (project.metadata as Record<string, unknown>)?.github_repo as string | undefined;
-  const [ghMetrics, setGhMetrics] = useState<GitHubMetrics | null>(null);
-  const [ghLoading, setGhLoading] = useState(false);
-  const [ghError, setGhError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!githubRepo) return;
-    const parsed = parseGitHubUrl(githubRepo);
-    if (!parsed) return;
-
-    let cancelled = false;
-    setGhLoading(true);
-    setGhError(null);
-
-    fetchGitHubMetrics(parsed.owner, parsed.repo)
-      .then((data) => { if (!cancelled) setGhMetrics(data); })
-      .catch((err) => { if (!cancelled) setGhError(err.message); })
-      .finally(() => { if (!cancelled) setGhLoading(false); });
-
-    return () => { cancelled = true; };
-  }, [githubRepo]);
-
   const devMetrics = ghMetrics ?? fallbackMetrics;
+
   const deliverables: Json[] = Array.isArray(project.deliverables) ? project.deliverables : [];
   const clientName = project.profiles?.full_name || project.client || 'Unknown Client';
   const clientEmail = project.profiles?.email ?? null;
