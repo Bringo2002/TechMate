@@ -783,10 +783,10 @@ const AdminOverview = () => {
             </p>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { label: "Hot Pipeline", value: "$340K", style: "text-emerald-400" },
-                { label: "Close Rate", value: "85%", style: "text-blue-400" },
-                { label: "Devs Available", value: "3", style: "text-purple-400" },
-                { label: "Client Score", value: "4.8/5", style: "text-amber-400" },
+                { label: "Hot Pipeline", value: fmt(revenueStats?.pendingRevenue ?? 0), style: "text-emerald-400" },
+                { label: "Active Projects", value: `${metrics?.active_projects ?? 0}`, style: "text-blue-400" },
+                { label: "Total Clients", value: `${metrics?.active_users ?? 0}`, style: "text-purple-400" },
+                { label: "Avg Health", value: `${metrics?.avg_project_health?.toFixed(0) ?? 0}/100`, style: "text-amber-400" },
               ].map((card, idx) => (
                 <div key={idx} className="p-4 bg-white/5 rounded-xl border border-white/10">
                   <div className={`text-2xl font-bold mb-1 ${card.style}`}>{card.value}</div>
@@ -803,7 +803,10 @@ const AdminOverview = () => {
               <Rocket className="w-6 h-6" />
               Launch New Project
             </button>
-            <button className="px-8 py-4 bg-white/5 hover:bg-white/10 border border-white/20 text-white rounded-xl font-semibold transition-all">
+            <button
+              className="px-8 py-4 bg-white/5 hover:bg-white/10 border border-white/20 text-white rounded-xl font-semibold transition-all"
+              onClick={() => navigate('/dashboard/projects')}
+            >
               Review Pipeline
             </button>
           </div>
