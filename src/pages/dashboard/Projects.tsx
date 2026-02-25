@@ -97,6 +97,7 @@ const Projects = () => {
   // ── Data State ──────────────────────────────────────────────────────────────
   const [projects, setProjects] = useState<ProjectRowWithClient[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // ── UI State ────────────────────────────────────────────────────────────────
@@ -154,6 +155,24 @@ const Projects = () => {
       setProjects([]);
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  // Refresh without full-page spinner
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    setError(null);
+    try {
+      const { data, error: fetchError } = await getAllProjects();
+      if (fetchError || !data) throw new Error(fetchError?.message || 'No data returned');
+      setProjects(data);
+      // Also reset AI insights so they regenerate with fresh data
+      setAiInsights([]);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      setError(`Failed to load projects: ${msg}`);
+    } finally {
+      setRefreshing(false);
     }
   }, []);
 
@@ -487,10 +506,12 @@ ${JSON.stringify(contextSummary, null, 2)}`;
           </div>
           <div className="flex gap-3">
             <button
-              onClick={fetchProjects}
-              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-medium transition-all flex items-center gap-2 border border-slate-700"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className={`px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-medium transition-all flex items-center gap-2 border border-slate-700 ${refreshing ? 'opacity-70 cursor-not-allowed' : ''}`}
             >
-              <RefreshCw size={16} /> Refresh
+              <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+              {refreshing ? 'Refreshing...' : 'Refresh'}
             </button>
             <button
               onClick={() => setShowAiPanel((v) => !v)}
