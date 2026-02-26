@@ -1,24 +1,30 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Code, Smartphone, Globe, Monitor, RefreshCcw, Database,
-  ShieldCheck, CloudCog, Rocket, Network, Layers, Bot
+  ShieldCheck, CloudCog, Rocket, Network, Layers, Bot,
+  Server, Briefcase, Sparkles, Terminal, Settings, Loader2
 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { getServiceCategories, type ServiceCategory } from '../../services/dashboardService';
 
-const services = [
-  { title: 'Website Development', description: 'Responsive websites that bring your brand to life on any device.', icon: Globe, color: 'text-blue-400' },
-  { title: 'Web App Development', description: 'Tailored web apps solving real problems.', icon: Code, color: 'text-emerald-400' },
-  { title: 'Mobile Apps (iOS & Android)', description: 'High-quality native or cross-platform apps.', icon: Smartphone, color: 'text-purple-400' },
-  { title: 'Desktop Software', description: 'Powerful apps for Windows, macOS, Linux.', icon: Monitor, color: 'text-orange-400' },
-  { title: 'MVPs & Prototypes', description: 'Turn ideas into MVPs fast.', icon: Rocket, color: 'text-orange-300' },
-  { title: 'Custom APIs & Backend', description: 'Scalable backend systems that perform.', icon: Database, color: 'text-red-400' },
-  { title: 'Ongoing Support & Maintenance', description: 'Stay future-ready with proactive updates.', icon: RefreshCcw, color: 'text-indigo-400' },
-  { title: 'SaaS Product Development', description: 'End-to-end SaaS solutions for scale.', icon: Layers, color: 'text-blue-400' },
-  { title: 'DevOps & Cloud', description: 'Automated CI/CD & cloud infrastructure.', icon: CloudCog, color: 'text-cyan-400' },
-  { title: 'Cybersecurity & Data Protection', description: 'Protect data, applications, and trust.', icon: ShieldCheck, color: 'text-violet-400' },
-  { title: 'Web3 / Blockchain', description: 'Smart contracts, wallets, NFT dashboards.', icon: Network, color: 'text-purple-300' },
-  { title: 'AI Integration & Automation', description: 'AI features to elevate apps & business value.', icon: Bot, color: 'text-cyan-500' },
-];
+const ICON_MAP: Record<string, any> = {
+  Globe, Smartphone, Cloud: CloudCog, Database, Brain: Bot,
+  Server, Briefcase, Sparkles, Terminal, Rocket,
+  Code, Monitor, RefreshCcw, ShieldCheck, CloudCog, Network, Layers, Bot
+};
+
+const COLOR_MAP: Record<string, string> = {
+  emerald: 'text-emerald-400',
+  blue: 'text-blue-400',
+  purple: 'text-purple-400',
+  amber: 'text-amber-400',
+  cyan: 'text-cyan-400',
+  indigo: 'text-indigo-400',
+  rose: 'text-rose-400',
+  orange: 'text-orange-400',
+};
+
+
 
 const fadeIn = (delay = 0) => ({
   initial: { opacity: 0, y: 40 },
@@ -26,6 +32,8 @@ const fadeIn = (delay = 0) => ({
 });
 
 const ServicesPage: React.FC = () => {
+  const [services, setServices] = useState<ServiceCategory[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', message: '' });
   const [cursor, setCursor] = useState({ x: 0, y: 0 });
@@ -35,6 +43,20 @@ const ServicesPage: React.FC = () => {
     const handleMouseMove = (e: MouseEvent) => setCursor({ x: e.clientX, y: e.clientY });
     window.addEventListener('mousemove', handleMouseMove);
     return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, []);
+
+  useEffect(() => {
+    const fetchServices = async () => {
+      try {
+        const { data } = await getServiceCategories();
+        setServices(data || []);
+      } catch (err) {
+        console.error('Failed to load services:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchServices();
   }, []);
 
   // Cyber Grid + Constellations
@@ -143,32 +165,46 @@ const ServicesPage: React.FC = () => {
 
       {/* Services Grid */}
       <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10 px-6">
-        {services.map((service, index) => {
-          const Icon = service.icon;
-          return (
-            <motion.div
-              key={index}
-              {...fadeIn(0.1 * index)}
-              whileHover={{ scale: 1.12, rotate: 2 }}
-              className="relative bg-black/30 border border-cyan-500/30 backdrop-blur-lg rounded-3xl p-6 shadow-2xl hover:shadow-[0_0_90px_rgba(0,255,255,0.6)] transition-all cursor-pointer"
-            >
+        {loading ? (
+          <div className="col-span-full flex flex-col items-center justify-center py-20 text-cyan-400">
+            <Loader2 className="w-12 h-12 animate-spin mb-4" />
+            <p className="animate-pulse">Loading Services...</p>
+          </div>
+        ) : services.length === 0 ? (
+          <div className="col-span-full text-center py-20 text-gray-400">
+            <Briefcase className="w-16 h-16 mx-auto mb-4 opacity-50" />
+            <h3 className="text-xl">No services available.</h3>
+          </div>
+        ) : (
+          services.map((service, index) => {
+            const Icon = ICON_MAP[service.icon] || Briefcase;
+            const textColor = COLOR_MAP[service.color] || 'text-cyan-400';
+            
+            return (
               <motion.div
-                animate={{
-                  x: [0, 6, -6, 0],
-                  y: [0, -6, 6, 0],
-                  rotate: [0, 90, 180, 270, 360],
-                }}
-                transition={{ repeat: Infinity, duration: 6 + index / 2, ease: 'linear' }}
-                className="absolute top-1/2 left-1/2 w-3 h-3 bg-cyan-400 rounded-full blur-sm -translate-x-1/2 -translate-y-1/2"
-              />
-              <div className={`w-14 h-14 flex items-center justify-center rounded-full bg-black/20 mb-4 ${service.color} shadow-lg`}>
-                <Icon className="w-7 h-7" />
-              </div>
-              <h2 className="text-xl font-semibold mb-2 text-white">{service.title}</h2>
-              <p className="text-slate-300 text-sm leading-relaxed">{service.description}</p>
-            </motion.div>
-          );
-        })}
+                key={service.id}
+                {...fadeIn(0.1 * index)}
+                whileHover={{ scale: 1.12, rotate: 2 }}
+                className="relative bg-black/30 border border-cyan-500/30 backdrop-blur-lg rounded-3xl p-6 shadow-2xl hover:shadow-[0_0_90px_rgba(0,255,255,0.6)] transition-all cursor-pointer"
+              >
+                <motion.div
+                  animate={{
+                    x: [0, 6, -6, 0],
+                    y: [0, -6, 6, 0],
+                    rotate: [0, 90, 180, 270, 360],
+                  }}
+                  transition={{ repeat: Infinity, duration: 6 + index / 2, ease: 'linear' }}
+                  className="absolute top-1/2 left-1/2 w-3 h-3 bg-cyan-400 rounded-full blur-sm -translate-x-1/2 -translate-y-1/2"
+                />
+                <div className={`w-14 h-14 flex items-center justify-center rounded-full bg-black/20 mb-4 ${textColor} shadow-lg`}>
+                  <Icon className="w-7 h-7" />
+                </div>
+                <h2 className="text-xl font-semibold mb-2 text-white">{service.name}</h2>
+                <p className="text-slate-300 text-sm leading-relaxed">{service.description}</p>
+              </motion.div>
+            );
+          })
+        )}
       </div>
 
       {/* Quote Button */}

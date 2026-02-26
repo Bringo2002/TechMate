@@ -76,6 +76,36 @@ export interface ServiceData {
     aiInsights: string[];
 }
 
+export interface ServiceCategory {
+    id: string;
+    name: string;
+    description: string | null;
+    icon: string;
+    color: string;
+    sort_order: number;
+    is_active: boolean;
+    created_at: string;
+}
+
+export async function getServiceCategories(): Promise<{ data: ServiceCategory[]; error: string | null }> {
+    try {
+        const { data, error } = await supabase
+            .from('service_categories')
+            .select('*')
+            .eq('is_active', true)
+            .order('sort_order', { ascending: true });
+
+        if (error) throw error;
+
+        return { data: data || [], error: null };
+    } catch (err) {
+        return {
+            data: [],
+            error: err instanceof Error ? err.message : 'Failed to fetch categories',
+        };
+    }
+}
+
 // ============================================================================
 // Project type normalization
 // Maps DB type values to a canonical service name
