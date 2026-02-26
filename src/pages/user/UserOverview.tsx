@@ -139,7 +139,7 @@ const UserOverview: React.FC = () => {
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, [handleMouseMove]);
 
-  // Fetch profile and order/inquiry data
+  // Fetch profile and project/order/inquiry data
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -156,24 +156,45 @@ const UserOverview: React.FC = () => {
           .single();
         setProfile(profileData);
 
-        // Orders
-        const { data: ordersData, error: oErr } = await supabase
+        // ── Projects (primary data source) ──
+        const { data: projectsData } = await supabase
+          .from('projects')
+          .select('*')
+          .eq('user_id', user.id)
+          .is('deleted_at', null)
+          .order('created_at', { ascending: false });
+
+        const projectsMapped: ProjectListItem[] = (projectsData ?? []).map((p: any) => {
+          // Map project status to display status
+          const statusMap: Record<string, string> = {
+            active: 'in_progress',
+            planning: 'pending',
+            completed: 'completed',
+            on_hold: 'pending',
+            review: 'reviewing',
+            cancelled: 'cancelled',
+          };
+          return {
+            id: p.id,
+            title: p.name,
+            type: p.type ?? 'other',
+            status: statusMap[p.status] ?? p.status,
+            progress: p.client_visible_progress ?? p.progress ?? 0,
+            budget: p.budget ?? 0,
+            spent: p.spent ?? 0,
+            due_date: p.deadline ?? null,
+            next_milestone: p.nextMilestone ?? null,
+            source: 'order' as const,
+          };
+        });
+
+        // ── Orders ──
+        const { data: ordersData } = await supabase
           .from('orders')
           .select('*')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false });
-        if (oErr) throw oErr;
 
-        // Inquiries
-        const { data: inquiriesData, error: iErr } = await supabase
-          .from('client_inquiries')
-          .select('*')
-          .eq('client_id', user.id)
-          .is('deleted_at', null)
-          .order('created_at', { ascending: false });
-        if (iErr) throw iErr;
-
-        // Map both to common format
         const ordersMapped: ProjectListItem[] = (ordersData ?? []).map((o: any) => ({
           id: o.id,
           title: o.title,
@@ -184,8 +205,16 @@ const UserOverview: React.FC = () => {
           spent: o.spent ?? 0,
           due_date: o.due_date ?? null,
           next_milestone: o.next_milestone ?? null,
-          source: 'order'
+          source: 'order' as const,
         }));
+
+        // ── Inquiries ──
+        const { data: inquiriesData } = await supabase
+          .from('client_inquiries')
+          .select('*')
+          .eq('client_id', user.id)
+          .is('deleted_at', null)
+          .order('created_at', { ascending: false });
 
         const inquiriesMapped: ProjectListItem[] = (inquiriesData ?? []).map((i: any) => ({
           id: i.id,
@@ -197,10 +226,11 @@ const UserOverview: React.FC = () => {
           spent: 0,
           due_date: i.deadline ?? null,
           next_milestone: null,
-          source: 'inquiry'
+          source: 'inquiry' as const,
         }));
 
-        setOrders([...ordersMapped, ...inquiriesMapped]);
+        // Merge all sources — projects first (primary), then orders, then inquiries
+        setOrders([...projectsMapped, ...ordersMapped, ...inquiriesMapped]);
       } catch (err) {
         setError(err);
       } finally {
