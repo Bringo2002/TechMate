@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Code, Smartphone, Globe, Monitor, RefreshCcw, Database,
   ShieldCheck, CloudCog, Rocket, Network, Layers, Bot,
-  Server, Briefcase, Sparkles, Terminal, Settings, Loader2
+  Server, Briefcase, Sparkles, Terminal, Loader2
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getServiceCategories, type ServiceCategory } from '../../services/dashboardService';

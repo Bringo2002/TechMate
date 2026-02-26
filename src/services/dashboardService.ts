@@ -97,7 +97,13 @@ export async function getServiceCategories(): Promise<{ data: ServiceCategory[];
 
         if (error) throw error;
 
-        return { data: data || [], error: null };
+        const categories: ServiceCategory[] = (data || []).map(item => ({
+            ...item,
+            icon: item.icon || 'Briefcase',
+            color: item.color || 'cyan'
+        }));
+
+        return { data: categories, error: null };
     } catch (err) {
         return {
             data: [],
