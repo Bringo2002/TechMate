@@ -3,8 +3,8 @@ import supabase from '../../lib/supabaseClient';
 import { getOrderStats } from '../../services/orders.service';
 import { 
   User, Mail, MapPin, Calendar, Globe, Camera,
-  Save, X, Lock, Bell, Shield, Eye, EyeOff, Check,
-  Package, CheckCircle, Settings, Star, LogOut
+  Save, X, Lock, Shield, Eye, EyeOff, Check,
+  Package, CheckCircle, Settings, LogOut
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -19,28 +19,25 @@ interface UserProfile {
   avatar_url: string | null;
   website: string | null;
   username: string | null;
-  // Extended fields (stored in metadata or potentially separate table in future)
-  phone?: string;
-  company?: string;
-  job_title?: string;
-  location?: string;
-  bio?: string;
+  phone: string | null;
+  company: string | null;
+  job_title: string | null;
+  location: string | null;
+  bio: string | null;
   join_date?: string;
-  is_premium?: boolean;
   is_verified?: boolean;
 }
 
 interface SecuritySettings {
-  currentPassword?: string;
-  newPassword?: string;
-  confirmPassword?: string;
-  twoFactorEnabled: boolean;
+  newPassword: string;
+  confirmPassword: string;
 }
 
 interface AccountStats {
   totalOrders: number;
   completedOrders: number;
   activeOrders: number;
+  totalProjects: number;
 }
 
 
@@ -59,10 +56,8 @@ const UserProfile: React.FC = () => {
   
   // Security State
   const [security, setSecurity] = useState<SecuritySettings>({
-    currentPassword: '',
     newPassword: '',
     confirmPassword: '',
-    twoFactorEnabled: false // Mocked default
   });
   const [showPassword, setShowPassword] = useState(false);
 
@@ -85,10 +80,19 @@ const UserProfile: React.FC = () => {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) return;
       const orderStats = await getOrderStats(authUser.id);
+
+      // Also count projects
+      const { count: projectCount } = await supabase
+        .from('projects')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', authUser.id)
+        .is('deleted_at', null);
+
       setStats({
         totalOrders: orderStats.total,
         completedOrders: orderStats.completed,
         activeOrders: orderStats.active,
+        totalProjects: projectCount ?? 0,
       });
     } catch {
       // Silently fail — stats are supplementary
@@ -118,21 +122,19 @@ const UserProfile: React.FC = () => {
       }
 
       // Combine auth user data with profile table data
-      // For demo purposes, we'll mock some extended fields if they don't exist in DB
       const mergedProfile: UserProfile = {
         id: user.id,
         email: user.email || '',
         full_name: profileData?.full_name || user.user_metadata?.full_name || '',
         avatar_url: profileData?.avatar_url || user.user_metadata?.avatar_url || null,
-        website: profileData?.website || '',
-        username: profileData?.username || '',
-        phone: user.phone || '',
-        company: user.user_metadata?.company || 'Company Name',
-        job_title: user.user_metadata?.job_title || 'Role',
-        location: user.user_metadata?.location || 'Location',
-        bio: user.user_metadata?.bio || 'Add a bio...',
+        website: profileData?.website || null,
+        username: profileData?.username || null,
+        phone: profileData?.phone || null,
+        company: profileData?.company || null,
+        job_title: profileData?.job_title || null,
+        location: profileData?.location || null,
+        bio: profileData?.bio || null,
         join_date: user.created_at,
-        is_premium: false,
         is_verified: !!user.email_confirmed_at
       };
 
@@ -210,33 +212,25 @@ const UserProfile: React.FC = () => {
       
       if (!profile?.id) return;
 
+      // Save ALL editable fields to profiles table (single source of truth)
       const updates = {
         id: profile.id,
-        full_name: formData.full_name,
-        website: formData.website,
-        username: formData.username,
+        full_name: formData.full_name || null,
+        website: formData.website || null,
+        username: formData.username || null,
+        phone: formData.phone || null,
+        company: formData.company || null,
+        job_title: formData.job_title || null,
+        location: formData.location || null,
+        bio: formData.bio || null,
         updated_at: new Date().toISOString(),
       };
 
-      // Update profiles table
       const { error } = await supabase
         .from('profiles')
         .upsert(updates);
 
       if (error) throw error;
-
-      // Update auth metadata for fields not in profiles table (as a fallback/extension)
-      const { error: authError } = await supabase.auth.updateUser({
-        data: {
-          full_name: formData.full_name,
-          company: formData.company,
-          job_title: formData.job_title,
-          location: formData.location,
-          bio: formData.bio
-        }
-      });
-
-      if (authError) throw authError;
 
       setProfile(prev => prev ? { ...prev, ...formData } : null);
       setIsEditing(false);
@@ -255,7 +249,10 @@ const UserProfile: React.FC = () => {
       return;
     }
     
-    if (!security.newPassword) return;
+    if (!security.newPassword || security.newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
 
     try {
       const { error } = await supabase.auth.updateUser({ 
@@ -265,7 +262,7 @@ const UserProfile: React.FC = () => {
       if (error) throw error;
 
       toast.success('Password updated successfully');
-      setSecurity({ ...security, newPassword: '', confirmPassword: '', currentPassword: '' });
+      setSecurity({ newPassword: '', confirmPassword: '' });
     } catch (error: unknown) {
       toast.error((error as Error).message);
     }
@@ -348,20 +345,15 @@ const UserProfile: React.FC = () => {
                   <input
                     type="text"
                     name="full_name"
-                    value={formData.full_name}
+                    value={formData.full_name || ''}
                     onChange={handleInputChange}
                     className="bg-slate-800/50 border border-slate-700 text-white text-3xl font-bold rounded-lg px-3 py-1 focus:outline-none focus:border-indigo-500 w-full md:w-auto text-center md:text-left"
                     placeholder="Your Name"
                   />
                 ) : (
                   <h1 className="text-4xl font-bold text-white tracking-tight">
-                    {profile.full_name || 'Anonymous User'}
+                    {profile.full_name || profile.username || 'Anonymous User'}
                   </h1>
-                )}
-                {profile.is_premium && (
-                  <span className="px-3 py-1 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 text-amber-400 text-xs font-bold rounded-full flex items-center gap-1 shadow-lg shadow-amber-500/10">
-                    <Star size={12} fill="currentColor" /> PREMIUM
-                  </span>
                 )}
               </div>
 
@@ -370,23 +362,35 @@ const UserProfile: React.FC = () => {
                   <input
                     type="text"
                     name="job_title"
-                    value={formData.job_title}
+                    value={formData.job_title || ''}
                     onChange={handleInputChange}
                     className="bg-slate-800/50 border border-slate-700 text-indigo-300 text-lg rounded-lg px-3 py-1 focus:outline-none focus:border-indigo-500 w-full"
-                    placeholder="Job Title"
+                    placeholder="Your Role (e.g. CEO, CTO)"
                   />
                   <input
                     type="text"
                     name="company"
-                    value={formData.company}
+                    value={formData.company || ''}
                     onChange={handleInputChange}
                     className="bg-slate-800/50 border border-slate-700 text-gray-400 rounded-lg px-3 py-1 focus:outline-none focus:border-indigo-500 w-full"
-                    placeholder="Company"
+                    placeholder="Company Name"
+                  />
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={formData.phone || ''}
+                    onChange={handleInputChange}
+                    className="bg-slate-800/50 border border-slate-700 text-gray-400 rounded-lg px-3 py-1 focus:outline-none focus:border-indigo-500 w-full"
+                    placeholder="Phone Number"
                   />
                 </div>
               ) : (
                 <>
-                  <p className="text-indigo-400 text-lg font-medium">{profile.job_title} @ {profile.company}</p>
+                  {(profile.job_title || profile.company) && (
+                    <p className="text-indigo-400 text-lg font-medium">
+                      {profile.job_title}{profile.job_title && profile.company ? ' @ ' : ''}{profile.company}
+                    </p>
+                  )}
                   
                   <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-gray-400 text-sm pt-2">
                     <div className="flex items-center gap-1.5 bg-slate-800/50 px-3 py-1.5 rounded-full border border-slate-700/50">
@@ -399,10 +403,12 @@ const UserProfile: React.FC = () => {
                         <span>{profile.location}</span>
                       </div>
                     )}
-                    <div className="flex items-center gap-1.5 bg-slate-800/50 px-3 py-1.5 rounded-full border border-slate-700/50">
-                      <Calendar size={14} className="text-gray-500" />
-                      <span>Joined {new Date(profile.join_date!).toLocaleDateString()}</span>
-                    </div>
+                    {profile.join_date && (
+                      <div className="flex items-center gap-1.5 bg-slate-800/50 px-3 py-1.5 rounded-full border border-slate-700/50">
+                        <Calendar size={14} className="text-gray-500" />
+                        <span>Joined {new Date(profile.join_date).toLocaleDateString()}</span>
+                      </div>
+                    )}
                   </div>
                 </>
               )}
@@ -478,7 +484,7 @@ const UserProfile: React.FC = () => {
                   <span className="text-sm font-medium">Completed</span>
                 </div>
                 <p className="text-2xl font-bold text-white">{stats.completedOrders}</p>
-                <p className="text-xs text-gray-500 mt-1">100% Satisfaction</p>
+                <p className="text-xs text-gray-500 mt-1">{stats.totalProjects} Project{stats.totalProjects !== 1 ? 's' : ''}</p>
               </div>
             </div>
 
@@ -499,7 +505,7 @@ const UserProfile: React.FC = () => {
                 />
               ) : (
                 <p className="text-gray-400 text-sm leading-relaxed">
-                  {profile.bio || "No bio added yet."}
+                  {profile.bio || 'No bio added yet. Click "Edit Profile" to add one.'}
                 </p>
               )}
 
@@ -544,15 +550,19 @@ const UserProfile: React.FC = () => {
                 Security Status
               </h3>
               <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 bg-green-500/10 border border-green-500/20 rounded-xl">
-                  <span className="text-green-400 text-sm font-medium">Email Verified</span>
-                  <Check size={16} className="text-green-400" />
+                <div className={`flex items-center justify-between p-3 rounded-xl border ${
+                  profile.is_verified
+                    ? 'bg-green-500/10 border-green-500/20'
+                    : 'bg-amber-500/10 border-amber-500/20'
+                }`}>
+                  <span className={`text-sm font-medium ${profile.is_verified ? 'text-green-400' : 'text-amber-400'}`}>
+                    Email {profile.is_verified ? 'Verified' : 'Not Verified'}
+                  </span>
+                  {profile.is_verified && <Check size={16} className="text-green-400" />}
                 </div>
-                 <div className="flex items-center justify-between p-3 bg-slate-800/50 border border-slate-700 rounded-xl">
-                  <span className="text-gray-400 text-sm">2FA Enabled</span>
-                   <div className="w-8 h-4 bg-slate-700 rounded-full relative cursor-not-allowed opacity-50">
-                    <div className="w-4 h-4 bg-slate-500 rounded-full absolute left-0" />
-                   </div>
+                <div className="flex items-center justify-between p-3 bg-slate-800/50 border border-slate-700 rounded-xl">
+                  <span className="text-gray-400 text-sm">Two-Factor Auth</span>
+                  <span className="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full">Coming Soon</span>
                 </div>
               </div>
             </div>
@@ -611,27 +621,6 @@ const UserProfile: React.FC = () => {
               </div>
             </div>
 
-            {/* Notification Preferences */}
-            <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 rounded-2xl p-8">
-              <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                <Bell size={20} className="text-indigo-400" />
-                Notifications
-              </h3>
-              
-              <div className="space-y-4">
-                {['Order Updates', 'Security Alerts', 'Marketing Emails', 'Weekly Digest'].map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-4 bg-slate-800/30 rounded-xl hover:bg-slate-800/50 transition-colors">
-                    <div>
-                      <p className="text-gray-200 font-medium">{item}</p>
-                      <p className="text-xs text-gray-500">Receive notifications about {item.toLowerCase()}</p>
-                    </div>
-                    <div className="relative inline-flex h-6 w-11 items-center rounded-full bg-indigo-600 cursor-pointer transition-colors hover:bg-indigo-500">
-                      <span className="translate-x-6 inline-block h-4 w-4 transform rounded-full bg-white transition" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
 
           </div>
         </div>
