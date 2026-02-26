@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import {
   AlertCircle, CheckCircle2, AlertTriangle, Clock, DollarSign,
   ChevronLeft, Sparkles, Target, TrendingUp, Activity,
@@ -19,6 +19,21 @@ const fadeUp = (delay = 0) => ({
   animate: { opacity: 1, y: 0 },
   transition: { duration: 0.5, delay, ease: [0.25, 0.46, 0.45, 0.94] as const },
 });
+
+// ── Tailwind-safe color map (prevents class purging in production) ──────────
+const colorClasses: Record<string, {
+  bg5: string; bg10: string; bg20: string;
+  border10: string; border30: string; border50: string;
+  text: string; shadow: string; dot: string;
+}> = {
+  cyan:    { bg5: 'bg-cyan-500/5',    bg10: 'bg-cyan-500/10',    bg20: 'bg-cyan-500/20',    border10: 'border-cyan-500/10',    border30: 'border-cyan-500/30',    border50: 'border-cyan-500/50',    text: 'text-cyan-400',    shadow: 'shadow-cyan-500/20',    dot: 'bg-cyan-400' },
+  blue:    { bg5: 'bg-blue-500/5',    bg10: 'bg-blue-500/10',    bg20: 'bg-blue-500/20',    border10: 'border-blue-500/10',    border30: 'border-blue-500/30',    border50: 'border-blue-500/50',    text: 'text-blue-400',    shadow: 'shadow-blue-500/20',    dot: 'bg-blue-400' },
+  purple:  { bg5: 'bg-purple-500/5',  bg10: 'bg-purple-500/10',  bg20: 'bg-purple-500/20',  border10: 'border-purple-500/10',  border30: 'border-purple-500/30',  border50: 'border-purple-500/50',  text: 'text-purple-400',  shadow: 'shadow-purple-500/20',  dot: 'bg-purple-400' },
+  amber:   { bg5: 'bg-amber-500/5',   bg10: 'bg-amber-500/10',   bg20: 'bg-amber-500/20',   border10: 'border-amber-500/10',   border30: 'border-amber-500/30',   border50: 'border-amber-500/50',   text: 'text-amber-400',   shadow: 'shadow-amber-500/20',   dot: 'bg-amber-400' },
+  emerald: { bg5: 'bg-emerald-500/5', bg10: 'bg-emerald-500/10', bg20: 'bg-emerald-500/20', border10: 'border-emerald-500/10', border30: 'border-emerald-500/30', border50: 'border-emerald-500/50', text: 'text-emerald-400', shadow: 'shadow-emerald-500/20', dot: 'bg-emerald-400' },
+  red:     { bg5: 'bg-red-500/5',     bg10: 'bg-red-500/10',     bg20: 'bg-red-500/20',     border10: 'border-red-500/10',     border30: 'border-red-500/30',     border50: 'border-red-500/50',     text: 'text-red-400',     shadow: 'shadow-red-500/20',     dot: 'bg-red-400' },
+};
+const cc = (color: string) => colorClasses[color] ?? colorClasses.cyan;
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type ActivityItem = {
@@ -98,30 +113,33 @@ const StatCard = ({
 }: {
   label: string; value: string; sub?: string;
   icon: React.ElementType; color: string; trend?: 'up' | 'down' | 'neutral'; delay?: number;
-}) => (
-  <motion.div {...fadeUp(delay)}
-    className="group relative bg-gradient-to-br from-[#0a0a16]/90 to-[#0a0a16]/40 backdrop-blur-xl border border-white/5 rounded-2xl p-5 hover:border-cyan-500/20 transition-all duration-300 overflow-hidden"
-  >
-    <div className={`absolute top-0 right-0 w-28 h-28 bg-${color}-500/5 rounded-full blur-3xl group-hover:bg-${color}-500/10 transition-all duration-500`} />
-    <div className="relative z-10">
-      <div className="flex items-center justify-between mb-3">
-        <div className={`p-2.5 bg-${color}-500/10 rounded-xl border border-${color}-500/10`}>
-          <Icon className={`w-5 h-5 text-${color}-400`} />
-        </div>
-        {trend && trend !== 'neutral' && (
-          <div className={`flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full ${
-            trend === 'up' ? 'text-emerald-400 bg-emerald-500/10' : 'text-red-400 bg-red-500/10'
-          }`}>
-            {trend === 'up' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
+}) => {
+  const c = cc(color);
+  return (
+    <motion.div {...fadeUp(delay)}
+      className="group relative bg-gradient-to-br from-[#0a0a16]/90 to-[#0a0a16]/40 backdrop-blur-xl border border-white/5 rounded-2xl p-5 hover:border-cyan-500/20 transition-all duration-300 overflow-hidden"
+    >
+      <div className={`absolute top-0 right-0 w-28 h-28 ${c.bg5} rounded-full blur-3xl group-hover:${c.bg10} transition-all duration-500`} />
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-3">
+          <div className={`p-2.5 ${c.bg10} rounded-xl border ${c.border10}`}>
+            <Icon className={`w-5 h-5 ${c.text}`} />
           </div>
-        )}
+          {trend && trend !== 'neutral' && (
+            <div className={`flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full ${
+              trend === 'up' ? 'text-emerald-400 bg-emerald-500/10' : 'text-red-400 bg-red-500/10'
+            }`}>
+              {trend === 'up' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
+            </div>
+          )}
+        </div>
+        <h4 className="text-xs font-medium text-slate-400 mb-1 tracking-wide uppercase">{label}</h4>
+        <p className="text-2xl font-bold text-white leading-tight">{value}</p>
+        {sub && <p className="text-xs text-slate-500 mt-1.5">{sub}</p>}
       </div>
-      <h4 className="text-xs font-medium text-slate-400 mb-1 tracking-wide uppercase">{label}</h4>
-      <p className="text-2xl font-bold text-white leading-tight">{value}</p>
-      {sub && <p className="text-xs text-slate-500 mt-1.5">{sub}</p>}
-    </div>
-  </motion.div>
-);
+    </motion.div>
+  );
+};
 
 const SectionCard = ({ children, className = '', delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) => (
   <motion.div {...fadeUp(delay)}
@@ -133,7 +151,7 @@ const SectionCard = ({ children, className = '', delay = 0 }: { children: React.
 
 const SectionTitle = ({ icon: Icon, color, children }: { icon: React.ElementType; color: string; children: React.ReactNode }) => (
   <h3 className="text-lg font-bold flex items-center gap-2 mb-4">
-    <Icon className={`w-5 h-5 text-${color}-400`} />
+    <Icon className={`w-5 h-5 ${cc(color).text}`} />
     {children}
   </h3>
 );
@@ -165,6 +183,35 @@ const timeAgo = (dateStr: string): string => {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
+// ── Deliverable helpers ──
+const getDeliverableName = (d: Json, i: number): string => {
+  if (typeof d === 'string') return d;
+  if (typeof d === 'object' && d !== null && !Array.isArray(d)) {
+    const obj = d as Record<string, Json | undefined>;
+    return (obj.name as string) ?? (obj.title as string) ?? `Deliverable ${i + 1}`;
+  }
+  return `Deliverable ${i + 1}`;
+};
+
+const isDeliverableDone = (d: Json): boolean => {
+  if (typeof d === 'string') return false;
+  if (typeof d === 'object' && d !== null && !Array.isArray(d)) {
+    const obj = d as Record<string, Json | undefined>;
+    return obj.status === 'completed' || obj.completed === true;
+  }
+  return false;
+};
+
+const getDeliverableProgress = (d: Json): number => {
+  if (typeof d === 'object' && d !== null && !Array.isArray(d)) {
+    const obj = d as Record<string, Json | undefined>;
+    if (obj.progress && typeof obj.progress === 'number') return obj.progress;
+    if (obj.status === 'completed' || obj.completed === true) return 100;
+    if (obj.status === 'in_progress') return 50;
+  }
+  return 0;
+};
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -178,24 +225,41 @@ export default function UserProjectDetail() {
   const [error, setError] = useState<string | null>(null);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
   const isMounted = useRef(true);
+  const parallaxRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     isMounted.current = true;
     return () => { isMounted.current = false; };
   }, []);
 
-  // Parallax mouse effect
+  // Parallax mouse effect (ref-based to avoid full re-renders)
   useEffect(() => {
+    let rafId: number;
     const handler = (e: MouseEvent) => {
-      setMousePosition({
-        x: (e.clientX / window.innerWidth) * 100,
-        y: (e.clientY / window.innerHeight) * 100,
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        const el = parallaxRef.current;
+        if (!el) return;
+        const x = (e.clientX / window.innerWidth) * 100;
+        const y = (e.clientY / window.innerHeight) * 100;
+        const orbs = el.children as HTMLCollectionOf<HTMLElement>;
+        if (orbs[0]) {
+          orbs[0].style.top = `${20 + y * 0.1}%`;
+          orbs[0].style.left = `${x * 0.3}%`;
+        }
+        if (orbs[1]) {
+          orbs[1].style.bottom = `${y * 0.15}%`;
+          orbs[1].style.right = `${x * 0.2}%`;
+        }
       });
     };
-    window.addEventListener('mousemove', handler);
-    return () => window.removeEventListener('mousemove', handler);
+    window.addEventListener('mousemove', handler, { passive: true });
+    return () => {
+      window.removeEventListener('mousemove', handler);
+      cancelAnimationFrame(rafId);
+    };
   }, []);
 
   useEffect(() => {
@@ -316,110 +380,95 @@ export default function UserProjectDetail() {
     );
   }
 
-  // ─── Derived Data ─────────────────────────────────────────────────────────
-  const progress = project.client_visible_progress || project.progress || 0;
-  const daysLeft = project.deadline
-    ? Math.ceil((new Date(project.deadline).getTime() - Date.now()) / 864e5)
-    : null;
-  const budget = project.budget ?? 0;
-  const spent = project.spent ?? 0;
-  const remaining = budget - spent;
-  const health = project.health_score ?? 100;
-  const burnPct = budget > 0 ? (spent / budget) * 100 : 0;
-  const isOnTrack = burnPct <= progress;
-  const isOverdue = daysLeft !== null && daysLeft < 0;
+  // ─── Derived Data (memoized to avoid recomputing on unrelated re-renders) ──
+  const {
+    progress, daysLeft, budget, spent, remaining, health,
+    burnPct, isOnTrack, isOverdue, tech, deliverables,
+    timeElapsed, sc, checkpoints, completedCount, phases,
+  } = useMemo(() => {
+    const progress = project.client_visible_progress || project.progress || 0;
+    const daysLeft = project.deadline
+      ? Math.ceil((new Date(project.deadline).getTime() - Date.now()) / 864e5)
+      : null;
+    const budget = project.budget ?? 0;
+    const spent = project.spent ?? 0;
+    const remaining = budget - spent;
+    const health = project.health_score ?? 100;
+    const burnPct = budget > 0 ? (spent / budget) * 100 : 0;
+    const isOnTrack = burnPct <= progress;
+    const isOverdue = daysLeft !== null && daysLeft < 0;
+    const tech: string[] = project.technologies ?? [];
+    const deliverables: Json[] = Array.isArray(project.deliverables) ? project.deliverables : [];
 
-  const tech: string[] = project.technologies ?? [];
-  const deliverables: Json[] = Array.isArray(project.deliverables) ? project.deliverables : [];
+    const timeElapsed = (() => {
+      if (!project.started_at || !project.deadline) return 0;
+      const s = new Date(project.started_at).getTime();
+      const e = new Date(project.deadline).getTime();
+      const n = Date.now();
+      if (n >= e) return 100;
+      if (n <= s) return 0;
+      return Math.round(((n - s) / (e - s)) * 100);
+    })();
 
-  const timeElapsed = (() => {
-    if (!project.started_at || !project.deadline) return 0;
-    const s = new Date(project.started_at).getTime();
-    const e = new Date(project.deadline).getTime();
-    const n = Date.now();
-    if (n >= e) return 100;
-    if (n <= s) return 0;
-    return Math.round(((n - s) / (e - s)) * 100);
-  })();
+    const statusMap: Record<string, { bg: string; bdr: string; txt: string; dot: string }> = {
+      active:    { bg: 'bg-cyan-500/10',    bdr: 'border-cyan-500/30',    txt: 'text-cyan-400',    dot: 'bg-cyan-400' },
+      planning:  { bg: 'bg-blue-500/10',    bdr: 'border-blue-500/30',    txt: 'text-blue-400',    dot: 'bg-blue-400' },
+      completed: { bg: 'bg-emerald-500/10', bdr: 'border-emerald-500/30', txt: 'text-emerald-400', dot: 'bg-emerald-400' },
+      review:    { bg: 'bg-purple-500/10',  bdr: 'border-purple-500/30',  txt: 'text-purple-400',  dot: 'bg-purple-400' },
+      on_hold:   { bg: 'bg-amber-500/10',   bdr: 'border-amber-500/30',   txt: 'text-amber-400',   dot: 'bg-amber-400' },
+      cancelled: { bg: 'bg-red-500/10',     bdr: 'border-red-500/30',     txt: 'text-red-400',     dot: 'bg-red-400' },
+    };
+    const sc = statusMap[project.status] ?? statusMap.active;
 
-  // Status config
-  const statusMap: Record<string, { bg: string; bdr: string; txt: string; dot: string }> = {
-    active:    { bg: 'bg-cyan-500/10',    bdr: 'border-cyan-500/30',    txt: 'text-cyan-400',    dot: 'bg-cyan-400' },
-    planning:  { bg: 'bg-blue-500/10',    bdr: 'border-blue-500/30',    txt: 'text-blue-400',    dot: 'bg-blue-400' },
-    completed: { bg: 'bg-emerald-500/10', bdr: 'border-emerald-500/30', txt: 'text-emerald-400', dot: 'bg-emerald-400' },
-    review:    { bg: 'bg-purple-500/10',  bdr: 'border-purple-500/30',  txt: 'text-purple-400',  dot: 'bg-purple-400' },
-    on_hold:   { bg: 'bg-amber-500/10',   bdr: 'border-amber-500/30',   txt: 'text-amber-400',   dot: 'bg-amber-400' },
-    cancelled: { bg: 'bg-red-500/10',     bdr: 'border-red-500/30',     txt: 'text-red-400',     dot: 'bg-red-400' },
-  };
-  const sc = statusMap[project.status] ?? statusMap.active;
+    const checkpoints = [
+      { label: 'Progress', val: `${progress}%`,          ok: progress >= 50,                           Icon: progress >= 100 ? CheckCircle2 : Target },
+      { label: 'Health',   val: `${health}/100`,          ok: health >= 75,                             Icon: health >= 90 ? CheckCircle2 : Sparkles },
+      { label: 'Budget',   val: `${burnPct.toFixed(0)}%`, ok: burnPct <= 85,                            Icon: isOnTrack ? TrendingUp : AlertTriangle },
+      { label: 'Timeline', val: daysLeft != null ? `${daysLeft}d` : '—', ok: daysLeft === null || daysLeft > 0, Icon: daysLeft != null && daysLeft > 7 ? CheckCircle2 : Clock },
+    ];
 
-  const checkpoints = [
-    { label: 'Progress', val: `${progress}%`,          ok: progress >= 50,                           Icon: progress >= 100 ? CheckCircle2 : Target },
-    { label: 'Health',   val: `${health}/100`,          ok: health >= 75,                             Icon: health >= 90 ? CheckCircle2 : Sparkles },
-    { label: 'Budget',   val: `${burnPct.toFixed(0)}%`, ok: burnPct <= 85,                            Icon: isOnTrack ? TrendingUp : AlertTriangle },
-    { label: 'Timeline', val: daysLeft != null ? `${daysLeft}d` : '—', ok: daysLeft === null || daysLeft > 0, Icon: daysLeft != null && daysLeft > 7 ? CheckCircle2 : Clock },
-  ];
+    const completedCount = deliverables.filter((d: Json) => {
+      if (typeof d === 'string') return false;
+      if (typeof d === 'object' && d !== null && !Array.isArray(d)) {
+        const obj = d as Record<string, Json | undefined>;
+        return obj.status === 'completed' || obj.completed === true;
+      }
+      return false;
+    }).length;
 
-  // Deliverable helpers
-  const getDeliverableName = (d: Json, i: number): string => {
-    if (typeof d === 'string') return d;
-    if (typeof d === 'object' && d !== null && !Array.isArray(d)) {
-      const obj = d as Record<string, Json | undefined>;
-      return (obj.name as string) ?? (obj.title as string) ?? `Deliverable ${i + 1}`;
-    }
-    return `Deliverable ${i + 1}`;
-  };
+    const phases = [
+      { name: 'Planning', pct: 0,  icon: FileText,  color: 'blue' },
+      { name: 'Development', pct: 25, icon: Code2,  color: 'cyan' },
+      { name: 'Review',  pct: 50, icon: Target,     color: 'purple' },
+      { name: 'Testing', pct: 75, icon: AlertCircle, color: 'amber' },
+      { name: 'Delivery', pct: 100, icon: Package,   color: 'emerald' },
+    ];
 
-  const isDeliverableDone = (d: Json): boolean => {
-    if (typeof d === 'string') return false;
-    if (typeof d === 'object' && d !== null && !Array.isArray(d)) {
-      const obj = d as Record<string, Json | undefined>;
-      return obj.status === 'completed' || obj.completed === true;
-    }
-    return false;
-  };
+    return {
+      progress, daysLeft, budget, spent, remaining, health,
+      burnPct, isOnTrack, isOverdue, tech, deliverables,
+      timeElapsed, sc, checkpoints, completedCount, phases,
+    };
+  }, [project]);
 
-  const getDeliverableProgress = (d: Json): number => {
-    if (typeof d === 'object' && d !== null && !Array.isArray(d)) {
-      const obj = d as Record<string, Json | undefined>;
-      if (obj.progress && typeof obj.progress === 'number') return obj.progress;
-      if (obj.status === 'completed' || obj.completed === true) return 100;
-      if (obj.status === 'in_progress') return 50;
-    }
-    return 0;
-  };
-
-  const completedCount = deliverables.filter(isDeliverableDone).length;
-
-  // Phase data for milestone timeline
-  const phases = [
-    { name: 'Planning', pct: 0,  icon: FileText,  color: 'blue' },
-    { name: 'Development', pct: 25, icon: Code2,  color: 'cyan' },
-    { name: 'Review',  pct: 50, icon: Target,     color: 'purple' },
-    { name: 'Testing', pct: 75, icon: AlertCircle, color: 'amber' },
-    { name: 'Delivery', pct: 100, icon: Package,   color: 'emerald' },
-  ];
+  // Document title
+  useEffect(() => {
+    document.title = `${project.name} — TechMate`;
+    return () => { document.title = 'TechMate'; };
+  }, [project.name]);
 
   // ─── RENDER ────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6 relative">
       {/* Parallax background orbs */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none opacity-20 z-0">
+      <div ref={parallaxRef} className="fixed inset-0 overflow-hidden pointer-events-none opacity-20 z-0">
         <div
           className="absolute w-[600px] h-[600px] bg-cyan-500/10 rounded-full blur-[120px]"
-          style={{
-            top: `${20 + mousePosition.y * 0.1}%`,
-            left: `${mousePosition.x * 0.3}%`,
-            transition: 'all 0.6s ease-out',
-          }}
+          style={{ top: '20%', left: '0%', transition: 'all 0.6s ease-out' }}
         />
         <div
           className="absolute w-[400px] h-[400px] bg-purple-500/8 rounded-full blur-[100px]"
-          style={{
-            bottom: `${mousePosition.y * 0.15}%`,
-            right: `${mousePosition.x * 0.2}%`,
-            transition: 'all 0.8s ease-out',
-          }}
+          style={{ bottom: '0%', right: '0%', transition: 'all 0.8s ease-out' }}
         />
       </div>
 
@@ -551,38 +600,39 @@ export default function UserProjectDetail() {
               const isComplete = progress >= phase.pct + 20;
               const isCurrent = progress >= phase.pct && progress < phase.pct + 20;
               const PhIcon = phase.icon;
+              const pc = cc(phase.color);
               return (
                 <motion.div
                   key={phase.name}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.4 + i * 0.08 }}
-                  className={`relative flex items-start gap-4 py-4 ${i < phases.length - 1 ? '' : ''}`}
+                  className="relative flex items-start gap-4 py-4"
                 >
                   {/* Node */}
                   <div className={`relative z-10 w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 border transition-all ${
-                    isComplete ? `bg-${phase.color}-500/10 border-${phase.color}-500/30` :
-                    isCurrent ? `bg-${phase.color}-500/20 border-${phase.color}-500/50 shadow-lg shadow-${phase.color}-500/20` :
+                    isComplete ? `${pc.bg10} ${pc.border30}` :
+                    isCurrent ? `${pc.bg20} ${pc.border50} shadow-lg ${pc.shadow}` :
                     'bg-slate-900 border-slate-700'
                   }`}>
                     {isComplete ? (
-                      <CheckCircle2 className={`w-5 h-5 text-${phase.color}-400`} />
+                      <CheckCircle2 className={`w-5 h-5 ${pc.text}`} />
                     ) : (
-                      <PhIcon className={`w-5 h-5 ${isCurrent ? `text-${phase.color}-400` : 'text-slate-600'}`} />
+                      <PhIcon className={`w-5 h-5 ${isCurrent ? pc.text : 'text-slate-600'}`} />
                     )}
                     {isCurrent && (
-                      <span className={`absolute -top-1 -right-1 w-3 h-3 bg-${phase.color}-400 rounded-full animate-pulse`} />
+                      <span className={`absolute -top-1 -right-1 w-3 h-3 ${pc.dot} rounded-full animate-pulse`} />
                     )}
                   </div>
 
                   {/* Content */}
                   <div className="flex-1 pt-1">
                     <div className="flex items-center gap-2">
-                      <span className={`font-bold ${isComplete ? 'text-white' : isCurrent ? 'text-white' : 'text-slate-500'}`}>
+                      <span className={`font-bold ${isComplete || isCurrent ? 'text-white' : 'text-slate-500'}`}>
                         {phase.name}
                       </span>
                       {isCurrent && (
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-${phase.color}-500/10 text-${phase.color}-400 border border-${phase.color}-500/30`}>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${pc.bg10} ${pc.text} border ${pc.border30}`}>
                           Current
                         </span>
                       )}
@@ -617,7 +667,10 @@ export default function UserProjectDetail() {
               </div>
             </div>
 
-            <div className="h-5 bg-slate-800 rounded-full overflow-hidden mb-2 relative">
+            <div className="h-5 bg-slate-800 rounded-full overflow-hidden mb-2 relative"
+              role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}
+              aria-label={`Project completion: ${progress}%`}
+            >
               <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${progress}%` }}
