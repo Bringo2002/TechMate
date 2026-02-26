@@ -181,15 +181,13 @@ const UserProfile: React.FC = () => {
         .getPublicUrl(filePath);
 
       // 3. Update Profile in DB
-      const updates = {
-        id: profile?.id,
-        avatar_url: publicUrl,
-        updated_at: new Date().toISOString(),
-      };
-
       const { error: updateError } = await supabase
         .from('profiles')
-        .upsert(updates);
+        .update({
+          avatar_url: publicUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', profile?.id);
 
       if (updateError) throw updateError;
 
@@ -214,7 +212,6 @@ const UserProfile: React.FC = () => {
 
       // Save ALL editable fields to profiles table (single source of truth)
       const updates = {
-        id: profile.id,
         full_name: formData.full_name || null,
         website: formData.website || null,
         username: formData.username || null,
@@ -228,7 +225,8 @@ const UserProfile: React.FC = () => {
 
       const { error } = await supabase
         .from('profiles')
-        .upsert(updates);
+        .update(updates)
+        .eq('id', profile.id);
 
       if (error) throw error;
 
