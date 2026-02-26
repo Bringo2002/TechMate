@@ -25,6 +25,7 @@ import UserDashboardLayout from './layouts/UserDashboardLayout';
 import AdminOverview from "./pages/dashboard/AdminOverview";
 import Projects from "./pages/dashboard/Projects";
 import Services from "./pages/dashboard/Services";
+import NewService from './pages/dashboard/NewService';
 import Analytics from "./pages/dashboard/Analytics";
 import Clients from "./pages/dashboard/Clients";
 import Revenue from "./pages/dashboard/Revenue";
@@ -135,6 +136,7 @@ const App: React.FC = () => {
     <Route path="projects" element={<Projects />} />
     <Route path="inquiries" element={<InquiryPipeline />} />
     <Route path="inquiries/:inquiryId" element={<InquiryDetail />} />
+    <Route path="services/new" element={<NewService />} />
     <Route path="services" element={<Services />} />
     <Route path="analytics" element={<Analytics />} />
     <Route path="clients" element={<Clients />} />

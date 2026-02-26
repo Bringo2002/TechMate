@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Globe, Smartphone, Cloud, Database, Brain, TrendingUp, ArrowUp, DollarSign, Users, Award, Target, BarChart3, Rocket, CheckCircle2, Sparkles, ChevronRight, Plus, PieChart, Star, Briefcase, Server, Terminal, Settings, Loader2 } from 'lucide-react';
 import { useServices } from '../../hooks/useServices';
 import type { ServiceData } from '../../services/dashboardService';
@@ -19,6 +20,7 @@ const ICON_MAP: Record<string, typeof Globe> = {
 };
 
 const Services = () => {
+  const navigate = useNavigate();
   const [selectedService, setSelectedService] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d' | '1y'>('30d');
   const { services, loading } = useServices();
@@ -171,7 +173,10 @@ const Services = () => {
                 <option value="90d">Last 90 days</option>
                 <option value="1y">Last year</option>
               </select>
-              <button className="flex items-center gap-2 px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl transition-all font-semibold shadow-lg shadow-emerald-500/20">
+              <button 
+                onClick={() => navigate('/dashboard/services/new')}
+                className="flex items-center gap-2 px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl transition-all font-semibold shadow-lg shadow-emerald-500/20"
+              >
                 <Plus className="w-5 h-5" />
                 Add Service
               </button>
