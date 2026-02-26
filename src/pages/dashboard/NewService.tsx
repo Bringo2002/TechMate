@@ -47,20 +47,34 @@ const NewService = () => {
       return;
     }
     setLoading(true);
+    
+    // Debugging: Log current session
+    const { data: { session } } = await supabase.auth.getSession();
+    console.log('Current User Session:', session?.user?.id || 'No active session');
+
     try {
-      const { error } = await supabase.from('service_categories').insert({
-        name: formData.name.trim(),
-        description: formData.description.trim() || null,
-        icon: formData.iconName,
-        color: formData.color,
-        is_active: formData.isActive,
-        sort_order: formData.sortOrder,
-      });
-      if (error) throw error;
+      const { data, error } = await supabase
+        .from('service_categories')
+        .insert({
+          name: formData.name.trim(),
+          description: formData.description.trim() || null,
+          icon: formData.iconName,
+          color: formData.color,
+          is_active: formData.isActive,
+          sort_order: formData.sortOrder,
+        })
+        .select(); // Ensure we get a response
+        
+      if (error) {
+        console.error('Supabase Insert Error:', error);
+        throw error;
+      }
+
+      console.log('Insert Successful:', data);
       toast.success('Service created successfully!');
       navigate('/dashboard/services');
     } catch (err: any) {
-      console.error('Error creating service:', err);
+      console.error('Final Catch Error creating service:', err);
       toast.error(err.message || 'Failed to create service');
     } finally {
       setLoading(false);
