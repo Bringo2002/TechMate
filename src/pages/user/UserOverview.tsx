@@ -45,7 +45,7 @@ interface ProjectListItem {
   spent: number;
   due_date: string | null;
   next_milestone: string | null;
-  source: 'order' | 'inquiry';
+  source: 'project' | 'order' | 'inquiry';
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
@@ -184,7 +184,7 @@ const UserOverview: React.FC = () => {
             spent: p.spent ?? 0,
             due_date: p.deadline ?? null,
             next_milestone: p.nextMilestone ?? null,
-            source: 'order' as const,
+            source: 'project' as const,
           };
         });
 
@@ -396,7 +396,9 @@ const UserOverview: React.FC = () => {
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: i * 0.1 + 0.4 }}
                 onClick={() => {
-                  if (order.source === 'order') {
+                  if (order.source === 'project') {
+                    navigate(`/user/projects/${order.id}`);
+                  } else if (order.source === 'order') {
                     navigate(`/user/orders/${order.id}`);
                   } else {
                     navigate(`/user/requests/${order.id}`);
