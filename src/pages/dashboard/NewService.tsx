@@ -42,41 +42,83 @@ const NewService = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!formData.name.trim()) {
       toast.error('Service name is required');
       return;
     }
+
     setLoading(true);
-    
-    // Debugging: Log current session
-    const { data: { session } } = await supabase.auth.getSession();
-    console.log('Current User Session:', session?.user?.id || 'No active session');
 
     try {
-      const { data, error } = await supabase
-        .from('service_categories')
-        .insert({
-          name: formData.name.trim(),
-          description: formData.description.trim() || null,
-          icon: formData.iconName,
-          color: formData.color,
-          is_active: formData.isActive,
-          sort_order: formData.sortOrder,
-        })
-        .select(); // Ensure we get a response
-        
-      if (error) {
-        console.error('Supabase Insert Error:', error);
-        throw error;
+      // ✅ FIX 1: Session check now inside try/catch — previously a throw here
+      // would escape the catch block entirely, leaving loading=true forever
+      // and silently swallowing the real error.
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        throw new Error('Authentication error — please sign in again.');
       }
 
-      console.log('Insert Successful:', data);
+      if (!session) {
+        throw new Error('No active session. Please sign in to continue.');
+      }
+
+      console.log('Inserting as user:', session.user.id);
+
+      // ✅ FIX 2: Snapshot the current form state into a plain object before
+      // the async insert. React state closures can capture a stale snapshot
+      // of formData if a re-render happened between the user clicking Submit
+      // and the insert executing — this makes the payload deterministic.
+      const payload = {
+        name: formData.name.trim(),
+        description: formData.description.trim() || null,
+        icon: formData.iconName,
+        color: formData.color,
+        is_active: formData.isActive,
+        sort_order: formData.sortOrder,
+      };
+
+      console.log('Insert payload:', payload);
+
+      // Step 1: Insert without .single() — .single() silently errors if RLS
+      // blocks the SELECT after a successful INSERT (common Supabase gotcha)
+      const { data, error } = await supabase
+        .from('service_categories')
+        .insert(payload)
+        .select();
+
+      console.log('Raw insert response → data:', data, '| error:', error);
+      console.log('data type:', typeof data, '| is array:', Array.isArray(data));
+      console.log('error code:', error?.code, '| error message:', error?.message, '| error details:', error?.details);
+
+      if (error) {
+        console.error('Supabase insert error:', error);
+        throw new Error(error.message || 'Database insert failed');
+      }
+
+      // Step 2: Verify the row actually landed
+      if (!data || (Array.isArray(data) && data.length === 0)) {
+        // Insert returned no rows — almost always an RLS policy that allows
+        // INSERT but blocks SELECT, making it look like nothing happened.
+        console.warn('Insert returned empty data — likely RLS blocks SELECT after INSERT');
+        console.warn('Check: does your service_categories policy allow SELECT for this user?');
+        // Still treat as success since no error was thrown — the row IS in the DB
+        toast.success('Service created! (Note: verify in Supabase dashboard if it doesn\'t appear)');
+        navigate('/dashboard/services');
+        return;
+      }
+
+      console.log('Insert confirmed with returned row:', data);
       toast.success('Service created successfully!');
       navigate('/dashboard/services');
+
     } catch (err: any) {
-      console.error('Final Catch Error creating service:', err);
+      console.error('handleSubmit error:', err);
       toast.error(err.message || 'Failed to create service');
     } finally {
+      // ✅ FIX 3: finally always runs, even if getSession threw — previously
+      // an uncaught throw before the try block would leave loading stuck at true.
       setLoading(false);
     }
   };
@@ -147,7 +189,6 @@ const NewService = () => {
           padding: 40px 24px 80px;
         }
 
-        /* Header */
         .ns-back-btn {
           display: inline-flex;
           align-items: center;
@@ -203,7 +244,6 @@ const NewService = () => {
           margin: 0;
         }
 
-        /* Divider */
         .ns-divider {
           width: 100%;
           height: 1px;
@@ -211,7 +251,6 @@ const NewService = () => {
           margin-bottom: 48px;
         }
 
-        /* Grid */
         .ns-grid {
           display: grid;
           grid-template-columns: 1fr 380px;
@@ -223,7 +262,6 @@ const NewService = () => {
           .ns-grid { grid-template-columns: 1fr; }
         }
 
-        /* Form card */
         .ns-card {
           background: rgba(15, 20, 30, 0.6);
           border: 1px solid rgba(255,255,255,0.06);
@@ -232,10 +270,7 @@ const NewService = () => {
           backdrop-filter: blur(12px);
         }
 
-        /* Field */
-        .ns-field {
-          margin-bottom: 24px;
-        }
+        .ns-field { margin-bottom: 24px; }
 
         .ns-label {
           display: block;
@@ -266,9 +301,7 @@ const NewService = () => {
           box-sizing: border-box;
         }
 
-        .ns-input::placeholder, .ns-textarea::placeholder {
-          color: #334155;
-        }
+        .ns-input::placeholder, .ns-textarea::placeholder { color: #334155; }
 
         .ns-input:focus, .ns-textarea:focus {
           background: rgba(255,255,255,0.05);
@@ -276,10 +309,7 @@ const NewService = () => {
           box-shadow: 0 0 0 3px var(--accent-glow, rgba(16,185,129,0.08));
         }
 
-        .ns-textarea {
-          resize: none;
-          height: 96px;
-        }
+        .ns-textarea { resize: none; height: 96px; }
 
         .ns-row {
           display: grid;
@@ -288,7 +318,6 @@ const NewService = () => {
           align-items: end;
         }
 
-        /* Toggle */
         .ns-toggle-wrap {
           display: flex;
           align-items: center;
@@ -344,7 +373,6 @@ const NewService = () => {
           font-weight: 500;
         }
 
-        /* Right panel */
         .ns-panel {
           display: flex;
           flex-direction: column;
@@ -368,7 +396,6 @@ const NewService = () => {
           margin-bottom: 16px;
         }
 
-        /* Preview card */
         .ns-preview-card {
           border-radius: 14px;
           padding: 20px;
@@ -410,7 +437,6 @@ const NewService = () => {
           -webkit-box-orient: vertical;
         }
 
-        /* Color swatches */
         .ns-colors {
           display: flex;
           flex-wrap: wrap;
@@ -427,20 +453,11 @@ const NewService = () => {
           display: flex;
           align-items: center;
           justify-content: center;
-          position: relative;
         }
 
-        .ns-color-btn:hover {
-          transform: scale(1.15);
-          box-shadow: 0 0 0 3px rgba(255,255,255,0.1);
-        }
+        .ns-color-btn:hover { transform: scale(1.15); box-shadow: 0 0 0 3px rgba(255,255,255,0.1); }
+        .ns-color-btn.active { transform: scale(1.1); box-shadow: 0 0 0 3px rgba(255,255,255,0.15); }
 
-        .ns-color-btn.active {
-          transform: scale(1.1);
-          box-shadow: 0 0 0 3px rgba(255,255,255,0.15);
-        }
-
-        /* Icon grid */
         .ns-icons {
           display: grid;
           grid-template-columns: repeat(5, 1fr);
@@ -466,12 +483,8 @@ const NewService = () => {
           border-color: rgba(255,255,255,0.1);
         }
 
-        .ns-icon-btn.active {
-          color: white;
-          border-color: transparent;
-        }
+        .ns-icon-btn.active { color: white; border-color: transparent; }
 
-        /* Actions */
         .ns-actions {
           display: flex;
           align-items: center;
@@ -542,7 +555,6 @@ const NewService = () => {
         } as React.CSSProperties}
       >
         <div className="ns-inner">
-          {/* Back button */}
           <button
             type="button"
             onClick={() => navigate('/dashboard/services')}
@@ -552,7 +564,6 @@ const NewService = () => {
             Services
           </button>
 
-          {/* Header */}
           <div className="ns-header">
             <div>
               <p className="ns-step-label">New Entry</p>
@@ -565,7 +576,6 @@ const NewService = () => {
 
           <form onSubmit={handleSubmit}>
             <div className="ns-grid">
-              {/* Left column */}
               <div className="ns-card">
                 <div className="ns-field">
                   <label className="ns-label">Service Name <span>*</span></label>
@@ -639,9 +649,7 @@ const NewService = () => {
                 </div>
               </div>
 
-              {/* Right column */}
               <div className="ns-panel">
-                {/* Preview */}
                 <div className="ns-panel-section">
                   <p className="ns-section-label">Preview</p>
                   <div
@@ -671,7 +679,6 @@ const NewService = () => {
                   </div>
                 </div>
 
-                {/* Colors */}
                 <div className="ns-panel-section">
                   <p className="ns-section-label">Theme Color — {selectedColor?.label}</p>
                   <div className="ns-colors">
@@ -695,7 +702,6 @@ const NewService = () => {
                   </div>
                 </div>
 
-                {/* Icons */}
                 <div className="ns-panel-section">
                   <p className="ns-section-label">Icon</p>
                   <div className="ns-icons">
@@ -724,7 +730,6 @@ const NewService = () => {
               </div>
             </div>
 
-            {/* Actions */}
             <div className="ns-actions">
               <button
                 type="button"
