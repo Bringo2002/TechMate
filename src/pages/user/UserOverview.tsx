@@ -179,7 +179,7 @@ const UserOverview: React.FC = () => {
             title: p.name,
             type: p.type ?? 'other',
             status: statusMap[p.status] ?? p.status,
-            progress: p.client_visible_progress ?? p.progress ?? 0,
+            progress: p.client_visible_progress || p.progress || 0,
             budget: p.budget ?? 0,
             spent: p.spent ?? 0,
             due_date: p.deadline ?? null,

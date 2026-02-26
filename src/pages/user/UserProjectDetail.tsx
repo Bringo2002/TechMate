@@ -197,7 +197,7 @@ export default function UserProjectDetail() {
   }
 
   // ─── Derived Data ─────────────────────────────────────────────────────────
-  const progress = project.client_visible_progress ?? project.progress ?? 0;
+  const progress = project.client_visible_progress || project.progress || 0;
   const daysLeft = project.deadline
     ? Math.ceil((new Date(project.deadline).getTime() - Date.now()) / 864e5)
     : null;
