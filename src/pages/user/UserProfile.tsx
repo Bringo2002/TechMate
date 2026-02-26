@@ -67,6 +67,7 @@ const UserProfile: React.FC = () => {
     totalOrders: 0,
     completedOrders: 0,
     activeOrders: 0,
+    totalProjects: 0,
   });
 
   // Fetch Profile Data
@@ -160,11 +161,12 @@ const UserProfile: React.FC = () => {
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
       if (!e.target.files || e.target.files.length === 0) return;
+      if (!profile) return;
       
       const file = e.target.files[0];
       const fileExt = file.name.split('.').pop();
       const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `${profile?.id}/${fileName}`;
+      const filePath = `${profile.id}/${fileName}`;
 
       toast.loading('Uploading avatar...');
 
@@ -187,7 +189,7 @@ const UserProfile: React.FC = () => {
           avatar_url: publicUrl,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', profile?.id);
+        .eq('id', profile.id);
 
       if (updateError) throw updateError;
 
@@ -495,7 +497,7 @@ const UserProfile: React.FC = () => {
               {isEditing ? (
                 <textarea
                   name="bio"
-                  value={formData.bio}
+                  value={formData.bio || ''}
                   onChange={handleInputChange}
                   rows={4}
                   className="w-full bg-slate-800/50 border border-slate-700 rounded-xl p-3 text-gray-300 focus:outline-none focus:border-indigo-500 resize-none text-sm"
