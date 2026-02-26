@@ -334,58 +334,25 @@ export default function UserProjectDetail() {
     })();
   }, [projectId]);
 
-  // ── Loading ──
-  if (loading) {
-    return (
-      <div className="flex h-full items-center justify-center p-20">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="flex flex-col items-center gap-4"
-        >
-          <div className="relative">
-            <div className="absolute inset-0 bg-cyan-500/20 blur-xl rounded-full animate-pulse" />
-            <Loader2 className="w-14 h-14 text-cyan-400 animate-spin relative z-10" />
-          </div>
-          <p className="text-cyan-400/80 font-medium animate-pulse tracking-wide">
-            Loading Project Intelligence...
-          </p>
-          <div className="flex gap-1 mt-1">
-            {[0, 1, 2, 3, 4].map(i => (
-              <div key={i} className="w-2 h-2 bg-cyan-500/40 rounded-full animate-pulse"
-                style={{ animationDelay: `${i * 150}ms` }} />
-            ))}
-          </div>
-        </motion.div>
-      </div>
-    );
-  }
-
-  // ── Error ──
-  if (error || !project) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-white gap-6 p-10">
-        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring' }} className="relative">
-          <div className="absolute inset-0 bg-red-500/10 blur-3xl rounded-full" />
-          <XCircle className="w-16 h-16 text-red-400 relative z-10" />
-        </motion.div>
-        <h1 className="text-2xl font-bold">{error ?? 'Project Not Found'}</h1>
-        <button
-          onClick={() => navigate('/user')}
-          className="px-6 py-3 bg-cyan-500 hover:bg-cyan-400 text-black rounded-xl font-bold transition-all flex items-center gap-2"
-        >
-          <ChevronLeft className="w-5 h-5" /> Back to Dashboard
-        </button>
-      </div>
-    );
-  }
-
-  // ─── Derived Data (memoized to avoid recomputing on unrelated re-renders) ──
+  // ─── Derived Data (memoized — MUST be before early returns per Rules of Hooks) ──
   const {
     progress, daysLeft, budget, spent, remaining, health,
     burnPct, isOnTrack, isOverdue, tech, deliverables,
     timeElapsed, sc, checkpoints, completedCount, phases,
   } = useMemo(() => {
+    if (!project) {
+      return {
+        progress: 0, daysLeft: null, budget: 0, spent: 0, remaining: 0,
+        health: 100, burnPct: 0, isOnTrack: true, isOverdue: false,
+        tech: [] as string[], deliverables: [] as Json[],
+        timeElapsed: 0,
+        sc: { bg: 'bg-cyan-500/10', bdr: 'border-cyan-500/30', txt: 'text-cyan-400', dot: 'bg-cyan-400' },
+        checkpoints: [] as { label: string; val: string; ok: boolean; Icon: React.ElementType }[],
+        completedCount: 0,
+        phases: [] as { name: string; pct: number; icon: React.ElementType; color: string }[],
+      };
+    }
+
     const progress = project.client_visible_progress || project.progress || 0;
     const daysLeft = project.deadline
       ? Math.ceil((new Date(project.deadline).getTime() - Date.now()) / 864e5)
@@ -453,9 +420,57 @@ export default function UserProjectDetail() {
 
   // Document title
   useEffect(() => {
-    document.title = `${project.name} — TechMate`;
+    if (project?.name) {
+      document.title = `${project.name} — TechMate`;
+    }
     return () => { document.title = 'TechMate'; };
-  }, [project.name]);
+  }, [project?.name]);
+
+  // ── Loading ──
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center p-20">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex flex-col items-center gap-4"
+        >
+          <div className="relative">
+            <div className="absolute inset-0 bg-cyan-500/20 blur-xl rounded-full animate-pulse" />
+            <Loader2 className="w-14 h-14 text-cyan-400 animate-spin relative z-10" />
+          </div>
+          <p className="text-cyan-400/80 font-medium animate-pulse tracking-wide">
+            Loading Project Intelligence...
+          </p>
+          <div className="flex gap-1 mt-1">
+            {[0, 1, 2, 3, 4].map(i => (
+              <div key={i} className="w-2 h-2 bg-cyan-500/40 rounded-full animate-pulse"
+                style={{ animationDelay: `${i * 150}ms` }} />
+            ))}
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // ── Error ──
+  if (error || !project) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-white gap-6 p-10">
+        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring' }} className="relative">
+          <div className="absolute inset-0 bg-red-500/10 blur-3xl rounded-full" />
+          <XCircle className="w-16 h-16 text-red-400 relative z-10" />
+        </motion.div>
+        <h1 className="text-2xl font-bold">{error ?? 'Project Not Found'}</h1>
+        <button
+          onClick={() => navigate('/user')}
+          className="px-6 py-3 bg-cyan-500 hover:bg-cyan-400 text-black rounded-xl font-bold transition-all flex items-center gap-2"
+        >
+          <ChevronLeft className="w-5 h-5" /> Back to Dashboard
+        </button>
+      </div>
+    );
+  }
 
   // ─── RENDER ────────────────────────────────────────────────────────────────
   return (
