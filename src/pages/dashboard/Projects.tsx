@@ -188,51 +188,6 @@ const Projects = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projects.length]);
 
-  // ── AI: Generate insights ───────────────────────────────────────────────────
-  const generateAiInsights = useCallback(async () => {
-    // Rate limiting: don't spam the API
-    const now = Date.now();
-    if (now - lastAiCall < AI_COOLDOWN_MS) return;
-
-    setIsAnalyzing(true);
-    setLastAiCall(now);
-
-    const summary = projects.map((p) => ({
-      name: p.name,
-      status: p.status,
-      priority: p.priority,
-      budget: p.budget,
-      deadline: p.deadline,
-      progress: p.progress ?? 0,
-      daysLeft: daysRemaining(p.deadline),
-    }));
-
-    const system = `You are a project portfolio analyst for TechMate, a software agency. 
-Analyze the given projects and return ONLY a valid JSON array of 4-5 insights.
-Each insight: { "type": "warning"|"success"|"info"|"critical", "message": string, "action": string }
-No markdown, no prose — raw JSON array only.`;
-
-    try {
-      const raw = await callAI(system, [
-        { role: 'user', content: `Projects:\n${JSON.stringify(summary, null, 2)}` },
-      ], 800);
-
-      // Safe JSON parse with type guard
-      const cleaned = raw.replace(/```json\n?|\n?```/g, '').trim();
-      const parsed = JSON.parse(cleaned);
-      if (Array.isArray(parsed)) {
-        setAiInsights(parsed);
-      } else {
-        throw new Error('Response is not an array');
-      }
-    } catch {
-      // Fall back to local calculations — never show an error to the user for insights
-      generateFallbackInsights();
-    } finally {
-      setIsAnalyzing(false);
-    }
-  }, [projects, lastAiCall, generateFallbackInsights]);
-
   // ── AI: Local fallback insights (no API needed) ─────────────────────────────
   const generateFallbackInsights = useCallback(() => {
     const insights: AIInsight[] = [];
@@ -277,6 +232,51 @@ No markdown, no prose — raw JSON array only.`;
 
     setAiInsights(insights);
   }, [projects]);
+
+  // ── AI: Generate insights ───────────────────────────────────────────────────
+  const generateAiInsights = useCallback(async () => {
+    // Rate limiting: don't spam the API
+    const now = Date.now();
+    if (now - lastAiCall < AI_COOLDOWN_MS) return;
+
+    setIsAnalyzing(true);
+    setLastAiCall(now);
+
+    const summary = projects.map((p) => ({
+      name: p.name,
+      status: p.status,
+      priority: p.priority,
+      budget: p.budget,
+      deadline: p.deadline,
+      progress: p.progress ?? 0,
+      daysLeft: daysRemaining(p.deadline),
+    }));
+
+    const system = `You are a project portfolio analyst for TechMate, a software agency. 
+Analyze the given projects and return ONLY a valid JSON array of 4-5 insights.
+Each insight: { "type": "warning"|"success"|"info"|"critical", "message": string, "action": string }
+No markdown, no prose — raw JSON array only.`;
+
+    try {
+      const raw = await callAI(system, [
+        { role: 'user', content: `Projects:\n${JSON.stringify(summary, null, 2)}` },
+      ], 800);
+
+      // Safe JSON parse with type guard
+      const cleaned = raw.replace(/```json\n?|\n?```/g, '').trim();
+      const parsed = JSON.parse(cleaned);
+      if (Array.isArray(parsed)) {
+        setAiInsights(parsed);
+      } else {
+        throw new Error('Response is not an array');
+      }
+    } catch {
+      // Fall back to local calculations — never show an error to the user for insights
+      generateFallbackInsights();
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [projects, lastAiCall, generateFallbackInsights]);
 
   // ── AI: Deep portfolio analysis ─────────────────────────────────────────────
   const handleDeepAnalysis = async () => {
