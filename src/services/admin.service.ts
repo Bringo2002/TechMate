@@ -4,7 +4,7 @@
 // ============================================================================
 
 import supabase from '../lib/supabaseClient';
-import type { ProfileRow, ProjectRowWithClient, OrderRow, InvoiceRow, RequestRow, SupportTicketRow, ActivityLogRowWithProfile } from '../types/database.types';
+import type { ProfileRow, ProjectRow, ProjectRowWithClient, OrderRow, InvoiceRow, RequestRow, SupportTicketRow, ActivityLogRowWithProfile } from '../types/database.types';
 import type {
     AdminDashboardMetrics,
     GrowthDataPoint,
@@ -153,7 +153,7 @@ export async function getRecentProjects(limit: number = 10): Promise<ServiceResp
     if (error) {
         return { data: null, error: { code: error.code, message: error.message } };
     }
-    return { data: (data as any) ?? [], error: null };
+    return { data: (data ?? []) as ProjectRowWithClient[], error: null };
 }
 
 export async function getAllProjects(): Promise<ServiceResponse<ProjectRowWithClient[]>> {
@@ -166,7 +166,7 @@ export async function getAllProjects(): Promise<ServiceResponse<ProjectRowWithCl
     if (error) {
         return { data: null, error: { code: error.code, message: error.message } };
     }
-    return { data: (data as any) ?? [], error: null };
+    return { data: (data ?? []) as ProjectRowWithClient[], error: null };
 }
 
 // ============================================================================
@@ -261,6 +261,154 @@ export async function getAllClients(): Promise<ServiceResponse<ProfileRow[]>> {
     return { data: clients, error: null };
 }
 
+// ============================================================================
+// Client Stats (aggregated view for the Client Relationship Hub)
+// ============================================================================
+export interface ClientStats {
+    id: string;
+    name: string;
+    email: string;
+    avatarUrl: string | null;
+    company: string | null;
+    joinedAt: string;
+    industry: string | null;
+    projects: { total: number; active: number; completed: number };
+    healthScore: number;
+    totalRevenue: number;
+    totalBudget: number;
+    totalSpent: number;
+    technologies: string[];
+    riskLevel: string;
+    risks: string[];
+    opportunities: string[];
+    lastProjectUpdate: string | null;
+    status: 'active' | 'at-risk' | 'champion' | 'inactive';
+}
+
+export async function getClientsWithStats(): Promise<ServiceResponse<ClientStats[]>> {
+    // Parallel fetch: profiles, projects, invoices (paid), businesses
+    const [profilesRes, projectsRes, invoicesRes, businessesRes] = await Promise.all([
+        supabase.from('profiles').select('*').is('deleted_at', null),
+        supabase.from('projects').select('*').is('deleted_at', null),
+        supabase.from('invoices').select('*').eq('status', 'paid').is('deleted_at', null),
+        supabase.from('businesses').select('*').eq('is_active', true).is('deleted_at', null),
+    ]);
+
+    if (profilesRes.error) {
+        return { data: null, error: { code: profilesRes.error.code, message: profilesRes.error.message } };
+    }
+
+    const profiles = profilesRes.data ?? [];
+    const projects = (projectsRes.data ?? []) as ProjectRow[];
+    const invoices = (invoicesRes.data ?? []) as InvoiceRow[];
+    const businesses = (businessesRes.data ?? []) as { id: string; owner_id: string; name: string; industry: string | null }[];
+
+    // Index projects by user_id
+    const projectsByUser = new Map<string, ProjectRow[]>();
+    for (const p of projects) {
+        const uid = p.user_id;
+        if (!uid) continue;
+        if (!projectsByUser.has(uid)) projectsByUser.set(uid, []);
+        projectsByUser.get(uid)!.push(p);
+    }
+
+    // Index revenue by user_id
+    const revenueByUser = new Map<string, number>();
+    for (const inv of invoices) {
+        const uid = inv.user_id;
+        if (!uid) continue;
+        revenueByUser.set(uid, (revenueByUser.get(uid) ?? 0) + Number(inv.amount ?? 0));
+    }
+
+    // Index industry by owner_id
+    const industryByOwner = new Map<string, string>();
+    for (const b of businesses) {
+        if (b.owner_id && b.industry) industryByOwner.set(b.owner_id, b.industry);
+    }
+
+    // Build client list — exclude admins and internal roles
+    const clientProfiles = profiles.filter(p =>
+        !p.is_admin &&
+        p.role !== 'admin' &&
+        p.user_type !== 'developer' &&
+        p.user_type !== 'designer' &&
+        p.user_type !== 'technical_lead'
+    );
+
+    const clientStats: ClientStats[] = clientProfiles.map(p => {
+        const userProjects = projectsByUser.get(p.id) ?? [];
+        const activeProjects = userProjects.filter(pr => pr.status === 'active' || pr.status === 'in_progress');
+        const completedProjects = userProjects.filter(pr => pr.status === 'completed');
+
+        // Health score: average of active projects, or 0
+        const healthScores = activeProjects.map(pr => Number(pr.health_score ?? 0)).filter(s => s > 0);
+        const healthScore = healthScores.length > 0
+            ? Math.round(healthScores.reduce((a, b) => a + b, 0) / healthScores.length)
+            : (userProjects.length > 0 ? 50 : 0);
+
+        // Revenue
+        const totalRevenue = revenueByUser.get(p.id) ?? 0;
+        const totalBudget = userProjects.reduce((s, pr) => s + Number(pr.budget ?? 0), 0);
+        const totalSpent = userProjects.reduce((s, pr) => s + Number(pr.spent ?? 0), 0);
+
+        // Technologies (flatten & dedupe)
+        const techs = new Set<string>();
+        for (const pr of userProjects) {
+            const t = pr.technologies;
+            if (Array.isArray(t)) t.forEach(x => techs.add(String(x)));
+        }
+
+        // Risks & opportunities from project metadata
+        const risks: string[] = [];
+        const opportunities: string[] = [];
+        let worstRisk = 'low';
+        for (const pr of userProjects) {
+            const rl = pr.risk_level;
+            if (rl === 'high') worstRisk = 'high';
+            else if (rl === 'medium' && worstRisk !== 'high') worstRisk = 'medium';
+
+            const prRisks = pr.risks;
+            if (Array.isArray(prRisks)) prRisks.forEach((r: string) => risks.push(r));
+
+            const prOpps = pr.opportunities;
+            if (Array.isArray(prOpps)) prOpps.forEach((o: string) => opportunities.push(o));
+        }
+
+        // Last activity
+        const dates = userProjects.map(pr => pr.updated_at).filter(Boolean).sort().reverse();
+        const lastProjectUpdate = dates[0] ?? null;
+
+        // Status derivation
+        let status: ClientStats['status'] = 'inactive';
+        if (healthScore >= 90 && activeProjects.length > 0) status = 'champion';
+        else if (healthScore < 70 || worstRisk === 'high') status = 'at-risk';
+        else if (activeProjects.length > 0) status = 'active';
+
+        return {
+            id: p.id,
+            name: p.full_name || p.email,
+            email: p.email,
+            avatarUrl: p.avatar_url ?? null,
+            company: p.company ?? null,
+            joinedAt: p.created_at,
+            industry: industryByOwner.get(p.id) ?? null,
+            projects: { total: userProjects.length, active: activeProjects.length, completed: completedProjects.length },
+            healthScore,
+            totalRevenue,
+            totalBudget,
+            totalSpent,
+            technologies: [...techs],
+            riskLevel: worstRisk,
+            risks,
+            opportunities,
+            lastProjectUpdate,
+            status,
+        };
+    });
+
+    return { data: clientStats, error: null };
+}
+
 export async function getRecentInvoices(limit: number = 10): Promise<ServiceResponse<InvoiceRow[]>> {
     const { data, error } = await supabase
         .from('invoices')
@@ -286,7 +434,7 @@ export async function getRecentActivity(limit: number = 10): Promise<ServiceResp
     if (error) {
         return { data: null, error: { code: error.code, message: error.message } };
     }
-    return { data: (data as any) ?? [], error: null };
+    return { data: (data ?? []) as ActivityLogRowWithProfile[], error: null };
 }
 
 // ============================================================================
