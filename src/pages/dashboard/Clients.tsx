@@ -4,6 +4,7 @@
 // ============================================================================
 
 import React, { useState, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     Users, TrendingUp, DollarSign, Star, Award, AlertTriangle,
     CheckCircle2, MessageSquare, Sparkles, Search, Download,
@@ -112,13 +113,18 @@ interface ClientCardProps { client: ClientStats; isExpanded: boolean; onToggle: 
 
 const ClientCard = React.memo(({ client, isExpanded, onToggle }: ClientCardProps) => {
     const healthHex = COLOR_MAP[getHealthColor(client.healthScore)] ?? COLOR_MAP.gray;
+    const navigate = useNavigate();
+
+    const handleCardClick = useCallback(() => {
+        navigate(`/dashboard/clients/${client.id}`);
+    }, [navigate, client.id]);
 
     return (
         <div
             role="button" tabIndex={0}
             className="group relative overflow-hidden bg-gradient-to-br from-gray-900/50 to-gray-900/30 backdrop-blur-sm border border-gray-800/50 hover:border-emerald-500/30 rounded-2xl p-6 transition-all cursor-pointer"
-            onClick={onToggle}
-            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') onToggle(); }}
+            onClick={handleCardClick}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') handleCardClick(); }}
         >
             {/* Glow */}
             <div className="absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl transition-all"
@@ -144,8 +150,8 @@ const ClientCard = React.memo(({ client, isExpanded, onToggle }: ClientCardProps
                             </p>
                         </div>
                     </div>
-                    <button title="More options" className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
-                        onClick={e => e.stopPropagation()}>
+                    <button title="Expand details" className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+                        onClick={e => { e.stopPropagation(); onToggle(); }}>
                         <MoreVertical className="w-5 h-5 text-gray-400" />
                     </button>
                 </div>
@@ -237,12 +243,12 @@ const ClientCard = React.memo(({ client, isExpanded, onToggle }: ClientCardProps
                 {/* CTA */}
                 <div className="flex gap-2 mt-4">
                     <button className="flex-1 py-2.5 px-4 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-lg text-sm font-medium transition-all"
-                        onClick={e => e.stopPropagation()}>
+                        onClick={e => { e.stopPropagation(); navigate(`/dashboard/clients/${client.id}`); }}>
                         View Profile
                     </button>
                     <button title="Send Message"
                         className="py-2.5 px-4 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 rounded-lg transition-all"
-                        onClick={e => e.stopPropagation()}>
+                        onClick={e => { e.stopPropagation(); navigate(`/dashboard/messages?client=${client.id}`); }}>
                         <MessageSquare className="w-4 h-4 text-gray-400" />
                     </button>
                 </div>

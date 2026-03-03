@@ -231,7 +231,7 @@ No markdown, no prose — raw JSON array only.`;
     } finally {
       setIsAnalyzing(false);
     }
-  }, [projects, lastAiCall]);
+  }, [projects, lastAiCall, generateFallbackInsights]);
 
   // ── AI: Local fallback insights (no API needed) ─────────────────────────────
   const generateFallbackInsights = useCallback(() => {
@@ -488,7 +488,7 @@ ${JSON.stringify(contextSummary, null, 2)}`;
       {/* Ambient background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl animate-pulse-delay" />
       </div>
 
       <div className="relative z-10 p-6 max-w-[1800px] mx-auto">
@@ -645,7 +645,8 @@ ${JSON.stringify(contextSummary, null, 2)}`;
                     {statusData.filter((s) => s.value > 0).map((item, idx) => (
                       <div key={idx} className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}>
+                          </div>
                           <span className="text-xs text-slate-400">{item.name}</span>
                         </div>
                         <span className="text-xs font-semibold text-white">{item.value}</span>
@@ -699,10 +700,10 @@ ${JSON.stringify(contextSummary, null, 2)}`;
               </div>
             ))}
             <div className="flex border border-slate-800/50 rounded-lg overflow-hidden">
-              <button onClick={() => setView('grid')} className={`px-3 py-3 ${view === 'grid' ? 'bg-emerald-500 text-white' : 'bg-slate-900/50 text-slate-400 hover:text-white'} transition-colors`}>
+              <button title="Grid view" onClick={() => setView('grid')} className={`px-3 py-3 ${view === 'grid' ? 'bg-emerald-500 text-white' : 'bg-slate-900/50 text-slate-400 hover:text-white'} transition-colors`}>
                 <LayoutGrid size={16} />
               </button>
-              <button onClick={() => setView('list')} className={`px-3 py-3 ${view === 'list' ? 'bg-emerald-500 text-white' : 'bg-slate-900/50 text-slate-400 hover:text-white'} transition-colors`}>
+              <button title="List view" onClick={() => setView('list')} className={`px-3 py-3 ${view === 'list' ? 'bg-emerald-500 text-white' : 'bg-slate-900/50 text-slate-400 hover:text-white'} transition-colors`}>
                 <List size={16} />
               </button>
             </div>
@@ -854,7 +855,7 @@ ${JSON.stringify(contextSummary, null, 2)}`;
                   <p className="text-xs text-slate-500">Powered by Claude · Secure via Edge Function</p>
                 </div>
               </div>
-              <button onClick={() => setShowAiPanel(false)} className="p-2 hover:bg-slate-800 rounded-lg transition-colors">
+              <button title="Close AI panel" onClick={() => setShowAiPanel(false)} className="p-2 hover:bg-slate-800 rounded-lg transition-colors">
                 <X className="text-slate-400" size={20} />
               </button>
             </div>
@@ -936,7 +937,7 @@ ${JSON.stringify(contextSummary, null, 2)}`;
                           ? 'bg-emerald-500 text-white'
                           : 'bg-slate-800/60 border border-slate-700/40 text-slate-200'
                       }`}>
-                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                        <p className="whitespace-pre-wrap break-words">{msg.content}</p>
                       </div>
                     </div>
                   ))}
@@ -947,7 +948,7 @@ ${JSON.stringify(contextSummary, null, 2)}`;
                       <div className="bg-slate-800/60 border border-slate-700/40 px-4 py-3 rounded-xl">
                         <div className="flex items-center gap-1.5">
                           {[0, 0.2, 0.4].map((delay, i) => (
-                            <div key={i} className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: `${delay}s` }} />
+                            <div key={i} className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce" style={{ '--animation-delay': `${delay}s` } as React.CSSProperties} />
                           ))}
                         </div>
                       </div>
@@ -968,6 +969,7 @@ ${JSON.stringify(contextSummary, null, 2)}`;
                       className="flex-1 px-4 py-2.5 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white text-sm placeholder-slate-600 focus:outline-none focus:border-emerald-500/50 transition-colors"
                     />
                     <button
+                      title="Send message"
                       onClick={handleSendMessage}
                       disabled={!userMessage.trim() || isSendingMessage}
                       className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-lg transition-all"

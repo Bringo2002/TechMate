@@ -151,6 +151,24 @@ export default function AdminSettings() {
     showNotif(`${member.name} ${newStatus === 'suspended' ? 'suspended' : 'reactivated'}`, 'success');
   };
 
+  const handleRemoveMember = () => {
+    if (!selectedMember) return;
+    const memberToRemove = selectedMember;
+    setTeamMembers(prev => prev.filter(m => m.id !== memberToRemove.id));
+    setAuditLogs([{
+      id: Date.now().toString(),
+      action: 'Team Member Removed',
+      user: 'brian@nyxdev.com',
+      timestamp: new Date().toLocaleString(),
+      details: `Removed ${memberToRemove.name} (${memberToRemove.email})`,
+      ip: '102.68.79.12',
+      type: 'warning'
+    }, ...auditLogs]);
+    showNotif(`${memberToRemove.name} has been removed from the team`, 'success');
+    setShowDeleteConfirm(false);
+    setSelectedMember(null);
+  };
+
   const handleResend = (memberId: string) => {
     const member = teamMembers.find(m => m.id === memberId);
     if (!member) return;
@@ -357,24 +375,24 @@ export default function AdminSettings() {
         <div className="space-y-6">
           <div className="flex items-start justify-between gap-8">
             <div className="flex-1 space-y-1">
-              <label className="block text-sm font-medium text-zinc-100">Full Name</label>
+              <label htmlFor="settings-fullname" className="block text-sm font-medium text-zinc-100">Full Name</label>
               <p className="text-sm text-zinc-500">Your display name</p>
             </div>
-            <input type="text" defaultValue="Brian Mwangi" onChange={() => setHasChanges(true)} className="w-80 px-3 py-2 bg-black border border-zinc-800 hover:border-zinc-700 focus:border-violet-500 rounded-md text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-all" />
+            <input id="settings-fullname" type="text" defaultValue="Brian Mwangi" placeholder="Your full name" title="Full Name" onChange={() => setHasChanges(true)} className="w-80 px-3 py-2 bg-black border border-zinc-800 hover:border-zinc-700 focus:border-violet-500 rounded-md text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-all" />
           </div>
           <div className="flex items-start justify-between gap-8">
             <div className="flex-1 space-y-1">
-              <label className="block text-sm font-medium text-zinc-100">Email</label>
+              <label htmlFor="settings-email" className="block text-sm font-medium text-zinc-100">Email</label>
               <p className="text-sm text-zinc-500">Your primary email</p>
             </div>
-            <input type="email" defaultValue="brian@nyxdev.com" onChange={() => setHasChanges(true)} className="w-80 px-3 py-2 bg-black border border-zinc-800 hover:border-zinc-700 focus:border-violet-500 rounded-md text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-all" />
+            <input id="settings-email" type="email" defaultValue="brian@nyxdev.com" placeholder="Your email address" title="Email" onChange={() => setHasChanges(true)} className="w-80 px-3 py-2 bg-black border border-zinc-800 hover:border-zinc-700 focus:border-violet-500 rounded-md text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-all" />
           </div>
           <div className="flex items-start justify-between gap-8">
             <div className="flex-1 space-y-1">
-              <label className="block text-sm font-medium text-zinc-100">Company</label>
+              <label htmlFor="settings-company" className="block text-sm font-medium text-zinc-100">Company</label>
               <p className="text-sm text-zinc-500">Your organization</p>
             </div>
-            <input type="text" defaultValue="NyxDev Technologies" onChange={() => setHasChanges(true)} className="w-80 px-3 py-2 bg-black border border-zinc-800 hover:border-zinc-700 focus:border-violet-500 rounded-md text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-all" />
+            <input id="settings-company" type="text" defaultValue="NyxDev Technologies" placeholder="Your organization" title="Company" onChange={() => setHasChanges(true)} className="w-80 px-3 py-2 bg-black border border-zinc-800 hover:border-zinc-700 focus:border-violet-500 rounded-md text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-all" />
           </div>
         </div>
       </div>
@@ -507,7 +525,7 @@ export default function AdminSettings() {
                 <label className="block text-sm font-medium text-zinc-100">{n.label}</label>
                 <p className="text-sm text-zinc-500">{n.desc}</p>
               </div>
-              <button onClick={() => setHasChanges(true)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${n.enabled ? 'bg-violet-600' : 'bg-zinc-800'}`}>
+              <button title={`Toggle ${n.label}`} onClick={() => setHasChanges(true)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${n.enabled ? 'bg-violet-600' : 'bg-zinc-800'}`}>
                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${n.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
               </button>
             </div>
@@ -824,7 +842,7 @@ export default function AdminSettings() {
               <button onClick={() => { setShowDeleteConfirm(false); setSelectedMember(null); }} className="flex-1 px-4 py-2 border border-zinc-800 hover:bg-zinc-900 rounded-md text-sm font-medium text-zinc-300 transition-all">
                 Cancel
               </button>
-              <button onClick={handleDelete} className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium transition-colors">
+              <button onClick={handleRemoveMember} className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium transition-colors">
                 Remove
               </button>
             </div>

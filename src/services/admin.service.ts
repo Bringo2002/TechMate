@@ -409,6 +409,98 @@ export async function getClientsWithStats(): Promise<ServiceResponse<ClientStats
     return { data: clientStats, error: null };
 }
 
+// ============================================================================
+// Single Client Detail — full stats + project list for detail page
+// ============================================================================
+export interface ClientDetail extends ClientStats {
+    projectList: ProjectRow[];
+    invoices: InvoiceRow[];
+}
+
+export async function getClientById(clientId: string): Promise<ServiceResponse<ClientDetail>> {
+    if (!clientId) {
+        return { data: null, error: { code: 'MISSING_ID', message: 'Client ID is required' } };
+    }
+
+    // Parallel fetch
+    const [profileRes, projectsRes, invoicesRes, businessRes] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', clientId).is('deleted_at', null).single(),
+        supabase.from('projects').select('*').eq('user_id', clientId).is('deleted_at', null).order('updated_at', { ascending: false }),
+        supabase.from('invoices').select('*').eq('user_id', clientId).is('deleted_at', null).order('created_at', { ascending: false }),
+        supabase.from('businesses').select('*').eq('owner_id', clientId).eq('is_active', true).is('deleted_at', null).limit(1),
+    ]);
+
+    if (profileRes.error) {
+        return { data: null, error: { code: profileRes.error.code, message: profileRes.error.message } };
+    }
+
+    const p = profileRes.data as ProfileRow;
+    const userProjects = (projectsRes.data ?? []) as ProjectRow[];
+    const userInvoices = (invoicesRes.data ?? []) as InvoiceRow[];
+    const business = ((businessRes.data ?? []) as { id: string; owner_id: string; name: string; industry: string | null }[])[0];
+
+    const activeProjects = userProjects.filter(pr => pr.status === 'active' || pr.status === 'in_progress');
+    const completedProjects = userProjects.filter(pr => pr.status === 'completed');
+
+    const healthScores = activeProjects.map(pr => Number(pr.health_score ?? 0)).filter(s => s > 0);
+    const healthScore = healthScores.length > 0
+        ? Math.round(healthScores.reduce((a, b) => a + b, 0) / healthScores.length)
+        : (userProjects.length > 0 ? 50 : 0);
+
+    const paidInvoices = userInvoices.filter(i => i.status === 'paid');
+    const totalRevenue = paidInvoices.reduce((s, i) => s + Number(i.amount ?? 0), 0);
+    const totalBudget = userProjects.reduce((s, pr) => s + Number(pr.budget ?? 0), 0);
+    const totalSpent = userProjects.reduce((s, pr) => s + Number(pr.spent ?? 0), 0);
+
+    const techs = new Set<string>();
+    const risks: string[] = [];
+    const opportunities: string[] = [];
+    let worstRisk = 'low';
+
+    for (const pr of userProjects) {
+        if (Array.isArray(pr.technologies)) pr.technologies.forEach(x => techs.add(String(x)));
+        const rl = pr.risk_level;
+        if (rl === 'high') worstRisk = 'high';
+        else if (rl === 'medium' && worstRisk !== 'high') worstRisk = 'medium';
+        if (Array.isArray(pr.risks)) pr.risks.forEach((r: string) => risks.push(r));
+        if (Array.isArray(pr.opportunities)) pr.opportunities.forEach((o: string) => opportunities.push(o));
+    }
+
+    const dates = userProjects.map(pr => pr.updated_at).filter(Boolean).sort().reverse();
+    const lastProjectUpdate = dates[0] ?? null;
+
+    let status: ClientStats['status'] = 'inactive';
+    if (healthScore >= 90 && activeProjects.length > 0) status = 'champion';
+    else if (healthScore < 70 || worstRisk === 'high') status = 'at-risk';
+    else if (activeProjects.length > 0) status = 'active';
+
+    return {
+        data: {
+            id: p.id,
+            name: p.full_name || p.email,
+            email: p.email,
+            avatarUrl: p.avatar_url ?? null,
+            company: p.company ?? null,
+            joinedAt: p.created_at,
+            industry: business?.industry ?? null,
+            projects: { total: userProjects.length, active: activeProjects.length, completed: completedProjects.length },
+            healthScore,
+            totalRevenue,
+            totalBudget,
+            totalSpent,
+            technologies: [...techs],
+            riskLevel: worstRisk,
+            risks,
+            opportunities,
+            lastProjectUpdate,
+            status,
+            projectList: userProjects,
+            invoices: userInvoices,
+        },
+        error: null,
+    };
+}
+
 export async function getRecentInvoices(limit: number = 10): Promise<ServiceResponse<InvoiceRow[]>> {
     const { data, error } = await supabase
         .from('invoices')

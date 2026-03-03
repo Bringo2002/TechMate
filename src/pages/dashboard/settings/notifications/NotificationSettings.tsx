@@ -83,6 +83,7 @@ export default function NotificationSettings() {
               </div>
               <button 
                 onClick={() => toggleNotification(n.id)}
+                title={`Toggle ${n.label}`}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                   n.enabled ? 'bg-violet-600' : 'bg-zinc-800'
                 }`}

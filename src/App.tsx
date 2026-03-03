@@ -28,6 +28,7 @@ import Services from "./pages/dashboard/Services";
 import NewService from './pages/dashboard/NewService';
 import Analytics from "./pages/dashboard/Analytics";
 import Clients from "./pages/dashboard/Clients";
+import ClientDetail from "./pages/dashboard/ClientDetail";
 import Revenue from "./pages/dashboard/Revenue";
 import Consulting from "./pages/dashboard/Consulting";
 import Deployments from "./pages/dashboard/Deployments";
@@ -140,6 +141,7 @@ const App: React.FC = () => {
     <Route path="services" element={<Services />} />
     <Route path="analytics" element={<Analytics />} />
     <Route path="clients" element={<Clients />} />
+    <Route path="clients/:clientId" element={<ClientDetail />} />
     <Route path="revenue" element={<Revenue />} />
     <Route path="consulting" element={<Consulting />} />
     <Route path="deployments" element={<Deployments />} />
