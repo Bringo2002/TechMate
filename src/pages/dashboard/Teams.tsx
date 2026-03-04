@@ -61,7 +61,6 @@ const Teams: React.FC = () => {
   const [deptFilter, setDeptFilter] = useState<TeamDepartment | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<TeamMemberStatus | 'all'>('all');
   const [view, setView] = useState<'roster' | 'allocation'>('roster');
-  const [selectedMember, setSelectedMember] = useState<string | null>(null);
 
   // Alias for conciseness — stable refs when data is null
   const members: MemberWithWorkload[] = useMemo(() => data?.members ?? [], [data]);
@@ -144,8 +143,6 @@ const Teams: React.FC = () => {
     { label: 'Active Projects', value: activeProjectsCount, icon: Briefcase, color: 'cyan' },
   ];
 
-  // ─── selected member detail ─────────────────────────────────────────────────
-  const detail = selectedMember ? membersWithWorkload.find(m => m.id === selectedMember) : null;
 
   /* ═══════════════════════════════════════════════ JSX ═══════════════════════════════════════════════ */
   if (loading) {
@@ -266,8 +263,8 @@ const Teams: React.FC = () => {
               return (
                 <div
                   key={member.id}
-                  onClick={() => setSelectedMember(member.id === selectedMember ? null : member.id)}
-                  className={`group relative bg-gradient-to-br from-gray-900/50 to-gray-900/30 backdrop-blur-sm border rounded-2xl p-5 transition-all cursor-pointer ${selectedMember === member.id ? 'border-emerald-500/50 shadow-lg shadow-emerald-500/10' : 'border-gray-800/50 hover:border-gray-700/50'}`}
+                  onClick={() => navigate(`/dashboard/teams/${member.id}`)}
+                  className={`group relative bg-gradient-to-br from-gray-900/50 to-gray-900/30 backdrop-blur-sm border rounded-2xl p-5 transition-all cursor-pointer border-gray-800/50 hover:border-gray-700/50 hover:shadow-lg hover:shadow-emerald-500/5`}
                 >
                   {/* Status dot */}
                   <div className={`absolute top-4 right-4 w-2.5 h-2.5 rounded-full bg-${statusColor[member.status]}-400`} />
@@ -319,9 +316,9 @@ const Teams: React.FC = () => {
                   {/* Quick actions */}
                   <div className="flex items-center justify-end gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
-                      onClick={e => { e.stopPropagation(); setSelectedMember(member.id === selectedMember ? null : member.id); }}
+                      onClick={e => { e.stopPropagation(); navigate(`/dashboard/teams/${member.id}`); }}
                       className="p-1.5 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg transition-colors"
-                      title="View member details"
+                      title="View developer profile"
                     >
                       <Eye className="w-3.5 h-3.5 text-gray-400" />
                     </button>
@@ -337,41 +334,6 @@ const Teams: React.FC = () => {
               );
             })}
           </div>
-
-          {/* MEMBER DETAIL SLIDE */}
-          {detail && (
-            <div className="bg-gradient-to-br from-gray-900/60 to-gray-900/40 backdrop-blur-sm border border-emerald-500/30 rounded-2xl p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Eye className="w-5 h-5 text-emerald-400" />
-                  {detail.full_name} — Project Assignments
-                </h3>
-                <button onClick={() => setSelectedMember(null)} className="text-sm text-gray-400 hover:text-white" title="Close detail">Close</button>
-              </div>
-              {detail.allocations.length === 0 ? (
-                <p className="text-gray-500 text-sm">No active allocations.</p>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {detail.allocations.map(a => (
-                    <div key={a.id} className="p-4 bg-gray-800/30 border border-gray-700/40 rounded-xl">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-semibold text-white">{a.project?.name ?? a.project_id}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full bg-${a.allocation_pct > 70 ? 'amber' : 'emerald'}-500/10 text-${a.allocation_pct > 70 ? 'amber' : 'emerald'}-400 font-semibold`}>{a.allocation_pct}%</span>
-                      </div>
-                      <div className="text-xs text-gray-400 mb-3">{a.role_on_project} · {a.start_date?.slice(0, 10)} → {a.end_date?.slice(0, 10) ?? '—'}</div>
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="text-gray-400">Hours logged</span>
-                        <span className="text-white font-semibold">{a.hours_logged}/{a.hours_estimated}h</span>
-                      </div>
-                      <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">
-                        <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.min((a.hours_logged / a.hours_estimated) * 100, 100)}%` }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
         </>
       ) : (
         /* ═══════════ ALLOCATION VIEW ═══════════ */

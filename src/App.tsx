@@ -58,6 +58,8 @@ import NewProject from './pages/user/NewProject';
 import AdminCreateProject from './pages/admin/Projects/New';
 import ProjectsDashboard from './pages/dashboard/ProjectsDashboard';
 import EditProject from './pages/admin/Projects/EditProject';
+import DeveloperProfile from './pages/dashboard/DeveloperProfile';
+import ProjectTeam from './pages/dashboard/ProjectTeam';
 
 
 // Scroll to top and update title on route change
@@ -149,9 +151,11 @@ const App: React.FC = () => {
     <Route path="deployments" element={<Deployments />} />
     <Route path="teams" element={<Teams />} />
     <Route path="teams/add-member" element={<AddTeamMember />} />
+    <Route path="teams/:memberId" element={<DeveloperProfile />} />
     <Route path="messages" element={<Messages />} />
     <Route path="projects/:projectId" element={<ProjectsDashboard />} />
     <Route path="projects/:projectId/edit" element={<EditProject />} />
+    <Route path="projects/:projectId/team" element={<ProjectTeam />} />
     {/* SETTINGS NESTED ROUTES */}
     <Route path="/dashboard/settings" element={<SettingsLayout />}>
   <Route index element={<TeamManagement />} />

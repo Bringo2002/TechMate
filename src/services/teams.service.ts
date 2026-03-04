@@ -291,3 +291,357 @@ export async function addTeamMember(payload: AddTeamMemberPayload): Promise<Team
         deleted_at: raw.deleted_at ? String(raw.deleted_at) : null,
     };
 }
+
+// ============================================================================
+// Fetch a single team member by ID (full row)
+// ============================================================================
+
+export async function getTeamMemberById(memberId: string): Promise<MemberWithWorkload> {
+    // Fetch member
+    const { data: memberData, error: memberError } = await supabase
+        .from('team_members')
+        .select('*')
+        .eq('id', memberId)
+        .is('deleted_at', null)
+        .single();
+
+    if (memberError || !memberData) throw new Error(`Failed to fetch team member: ${memberError?.message ?? 'Not found'}`);
+
+    const raw = memberData as Record<string, unknown>;
+    const member: TeamMemberRow = {
+        id: String(raw.id ?? ''),
+        profile_id: raw.profile_id ? String(raw.profile_id) : null,
+        full_name: String(raw.full_name ?? ''),
+        email: String(raw.email ?? ''),
+        avatar_url: raw.avatar_url ? String(raw.avatar_url) : null,
+        role: asRole(raw.role as string),
+        department: asDept(raw.department as string),
+        seniority: asSeniority(raw.seniority as string),
+        skills: Array.isArray(raw.skills) ? (raw.skills as string[]) : [],
+        hourly_rate: Number(raw.hourly_rate ?? 0),
+        availability: Number(raw.availability ?? 40),
+        status: asStatus(raw.status as string),
+        joined_at: String(raw.joined_at ?? ''),
+        created_at: String(raw.created_at ?? ''),
+        updated_at: String(raw.updated_at ?? ''),
+        deleted_at: raw.deleted_at ? String(raw.deleted_at) : null,
+    };
+
+    // Fetch allocations for this member with project info
+    const { data: allocData } = await supabase
+        .from('developer_allocations')
+        .select('*')
+        .eq('team_member_id', memberId)
+        .order('created_at', { ascending: false });
+
+    // Fetch projects for joining
+    const { data: projectsData } = await supabase
+        .from('projects')
+        .select('id, name, status')
+        .is('deleted_at', null);
+
+    const projectMap = new Map(
+        (projectsData ?? []).map((p: Record<string, unknown>) => [
+            String(p.id),
+            { id: String(p.id), name: String(p.name ?? ''), status: String(p.status ?? 'active') },
+        ]),
+    );
+
+    const allocations: AllocationWithProject[] = (allocData ?? []).map((r: Record<string, unknown>) => {
+        const pid = String(r.project_id ?? '');
+        return {
+            id: String(r.id ?? ''),
+            team_member_id: String(r.team_member_id ?? ''),
+            project_id: pid,
+            role_on_project: asProjectRole(r.role_on_project as string),
+            allocation_pct: Number(r.allocation_pct ?? 0),
+            hours_estimated: Number(r.hours_estimated ?? 0),
+            hours_logged: Number(r.hours_logged ?? 0),
+            start_date: r.start_date ? String(r.start_date) : null,
+            end_date: r.end_date ? String(r.end_date) : null,
+            status: asAllocStatus(r.status as string),
+            notes: r.notes ? String(r.notes) : null,
+            created_at: String(r.created_at ?? ''),
+            updated_at: String(r.updated_at ?? ''),
+            project: projectMap.get(pid) ?? null,
+        };
+    });
+
+    const activeAllocs = allocations.filter(a => a.status === 'active');
+    return {
+        ...member,
+        allocations,
+        total_allocation_pct: activeAllocs.reduce((s, a) => s + a.allocation_pct, 0),
+        active_projects: activeAllocs.length,
+        totalEstimated: activeAllocs.reduce((s, a) => s + a.hours_estimated, 0),
+        totalLogged: activeAllocs.reduce((s, a) => s + a.hours_logged, 0),
+    };
+}
+
+// ============================================================================
+// Update a team member
+// ============================================================================
+
+export async function updateTeamMember(
+    memberId: string,
+    updates: Partial<Pick<TeamMemberRow, 'full_name' | 'email' | 'role' | 'department' | 'seniority' | 'skills' | 'hourly_rate' | 'availability' | 'status' | 'avatar_url'>>,
+): Promise<void> {
+    const { error } = await supabase
+        .from('team_members')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', memberId);
+
+    if (error) throw new Error(`Failed to update team member: ${error.message}`);
+}
+
+// ============================================================================
+// Soft-delete a team member
+// ============================================================================
+
+export async function deleteTeamMember(memberId: string): Promise<void> {
+    const { error } = await supabase
+        .from('team_members')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', memberId);
+
+    if (error) throw new Error(`Failed to delete team member: ${error.message}`);
+}
+
+// ============================================================================
+// Create a new allocation (assign developer to project)
+// ============================================================================
+
+export interface CreateAllocationPayload {
+    team_member_id: string;
+    project_id: string;
+    role_on_project: ProjectRoleOnProject;
+    allocation_pct: number;
+    hours_estimated: number;
+    start_date?: string | null;
+    end_date?: string | null;
+    notes?: string | null;
+}
+
+export async function createAllocation(payload: CreateAllocationPayload): Promise<DeveloperAllocationRow> {
+    const { data, error } = await supabase
+        .from('developer_allocations')
+        .insert({
+            team_member_id: payload.team_member_id,
+            project_id: payload.project_id,
+            role_on_project: payload.role_on_project,
+            allocation_pct: payload.allocation_pct,
+            hours_estimated: payload.hours_estimated,
+            hours_logged: 0,
+            start_date: payload.start_date ?? null,
+            end_date: payload.end_date ?? null,
+            status: 'active',
+            notes: payload.notes ?? null,
+        })
+        .select('*')
+        .single();
+
+    if (error) throw new Error(`Failed to create allocation: ${error.message}`);
+    const r = data as Record<string, unknown>;
+    return {
+        id: String(r.id ?? ''),
+        team_member_id: String(r.team_member_id ?? ''),
+        project_id: String(r.project_id ?? ''),
+        role_on_project: asProjectRole(r.role_on_project as string),
+        allocation_pct: Number(r.allocation_pct ?? 0),
+        hours_estimated: Number(r.hours_estimated ?? 0),
+        hours_logged: Number(r.hours_logged ?? 0),
+        start_date: r.start_date ? String(r.start_date) : null,
+        end_date: r.end_date ? String(r.end_date) : null,
+        status: asAllocStatus(r.status as string),
+        notes: r.notes ? String(r.notes) : null,
+        created_at: String(r.created_at ?? ''),
+        updated_at: String(r.updated_at ?? ''),
+    };
+}
+
+// ============================================================================
+// Update an existing allocation
+// ============================================================================
+
+export async function updateAllocation(
+    allocationId: string,
+    updates: Partial<Pick<DeveloperAllocationRow, 'role_on_project' | 'allocation_pct' | 'hours_estimated' | 'hours_logged' | 'start_date' | 'end_date' | 'status' | 'notes'>>,
+): Promise<void> {
+    const { error } = await supabase
+        .from('developer_allocations')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', allocationId);
+
+    if (error) throw new Error(`Failed to update allocation: ${error.message}`);
+}
+
+// ============================================================================
+// Remove developer from project (set allocation status to 'removed')
+// ============================================================================
+
+export async function removeAllocation(allocationId: string): Promise<void> {
+    const { error } = await supabase
+        .from('developer_allocations')
+        .update({ status: 'removed', updated_at: new Date().toISOString() })
+        .eq('id', allocationId);
+
+    if (error) throw new Error(`Failed to remove allocation: ${error.message}`);
+}
+
+// ============================================================================
+// Fetch all available projects (not deleted, for assignment dropdowns)
+// ============================================================================
+
+export async function getAvailableProjects(): Promise<ProjectRef[]> {
+    const { data, error } = await supabase
+        .from('projects')
+        .select('id, name, status')
+        .is('deleted_at', null)
+        .in('status', ['planning', 'active', 'review'])
+        .order('name');
+
+    if (error) throw new Error(`Failed to fetch projects: ${error.message}`);
+
+    return (data ?? []).map((p: Record<string, unknown>) => ({
+        id: String(p.id ?? ''),
+        name: String(p.name ?? ''),
+        status: String(p.status ?? 'active'),
+    }));
+}
+
+// ============================================================================
+// Fetch project team (members assigned + available members)
+// ============================================================================
+
+export interface ProjectTeamMember {
+    allocation_id: string;
+    team_member_id: string;
+    full_name: string;
+    email: string;
+    avatar_url: string | null;
+    role: TeamMemberRole;
+    seniority: Seniority;
+    department: TeamDepartment;
+    skills: string[];
+    hourly_rate: number;
+    member_status: TeamMemberStatus;
+    role_on_project: ProjectRoleOnProject;
+    allocation_pct: number;
+    hours_estimated: number;
+    hours_logged: number;
+    start_date: string | null;
+    end_date: string | null;
+    alloc_status: AllocationStatus;
+    notes: string | null;
+}
+
+export interface AvailableMember {
+    team_member_id: string;
+    full_name: string;
+    email: string;
+    avatar_url: string | null;
+    role: TeamMemberRole;
+    seniority: Seniority;
+    department: TeamDepartment;
+    skills: string[];
+    hourly_rate: number;
+    member_status: TeamMemberStatus;
+    total_allocation_pct: number;
+    active_projects: number;
+}
+
+export async function fetchProjectTeam(projectId: string): Promise<{
+    team: ProjectTeamMember[];
+    available: AvailableMember[];
+}> {
+    // Fetch team members assigned to this project
+    const { data: allocData, error: allocError } = await supabase
+        .from('developer_allocations')
+        .select('*')
+        .eq('project_id', projectId)
+        .eq('status', 'active');
+
+    if (allocError) throw new Error(`Failed to fetch project allocations: ${allocError.message}`);
+
+    const memberIds = (allocData ?? []).map((a: Record<string, unknown>) => String(a.team_member_id));
+
+    // Fetch all team members
+    const { data: allMembers, error: membersError } = await supabase
+        .from('team_members')
+        .select('*')
+        .is('deleted_at', null)
+        .order('full_name');
+
+    if (membersError) throw new Error(`Failed to fetch team members: ${membersError.message}`);
+
+    // Fetch all allocations for workload computation
+    const { data: allAllocData } = await supabase
+        .from('developer_allocations')
+        .select('*')
+        .eq('status', 'active');
+
+    const memberMap = new Map(
+        (allMembers ?? []).map((m: Record<string, unknown>) => [String(m.id), m]),
+    );
+
+    // Compute total allocation per member
+    const allocByMember = new Map<string, number>();
+    const projectsByMember = new Map<string, number>();
+    for (const a of (allAllocData ?? []) as Record<string, unknown>[]) {
+        const mid = String(a.team_member_id);
+        allocByMember.set(mid, (allocByMember.get(mid) ?? 0) + Number(a.allocation_pct ?? 0));
+        projectsByMember.set(mid, (projectsByMember.get(mid) ?? 0) + 1);
+    }
+
+    const team: ProjectTeamMember[] = (allocData ?? []).map((a: Record<string, unknown>) => {
+        const mid = String(a.team_member_id);
+        const m = memberMap.get(mid) as Record<string, unknown> | undefined;
+        return {
+            allocation_id: String(a.id ?? ''),
+            team_member_id: mid,
+            full_name: String(m?.full_name ?? ''),
+            email: String(m?.email ?? ''),
+            avatar_url: m?.avatar_url ? String(m.avatar_url) : null,
+            role: asRole(m?.role as string),
+            seniority: asSeniority(m?.seniority as string),
+            department: asDept(m?.department as string),
+            skills: Array.isArray(m?.skills) ? (m.skills as string[]) : [],
+            hourly_rate: Number(m?.hourly_rate ?? 0),
+            member_status: asStatus(m?.status as string),
+            role_on_project: asProjectRole(a.role_on_project as string),
+            allocation_pct: Number(a.allocation_pct ?? 0),
+            hours_estimated: Number(a.hours_estimated ?? 0),
+            hours_logged: Number(a.hours_logged ?? 0),
+            start_date: a.start_date ? String(a.start_date) : null,
+            end_date: a.end_date ? String(a.end_date) : null,
+            alloc_status: asAllocStatus(a.status as string),
+            notes: a.notes ? String(a.notes) : null,
+        };
+    });
+
+    const assignedIds = new Set(memberIds);
+    const available: AvailableMember[] = (allMembers ?? [])
+        .filter((m: Record<string, unknown>) => {
+            const mid = String(m.id);
+            return !assignedIds.has(mid) && String(m.status) === 'active';
+        })
+        .map((m: Record<string, unknown>) => {
+            const mid = String(m.id);
+            return {
+                team_member_id: mid,
+                full_name: String(m.full_name ?? ''),
+                email: String(m.email ?? ''),
+                avatar_url: m.avatar_url ? String(m.avatar_url) : null,
+                role: asRole(m.role as string),
+                seniority: asSeniority(m.seniority as string),
+                department: asDept(m.department as string),
+                skills: Array.isArray(m.skills) ? (m.skills as string[]) : [],
+                hourly_rate: Number(m.hourly_rate ?? 0),
+                member_status: asStatus(m.status as string),
+                total_allocation_pct: allocByMember.get(mid) ?? 0,
+                active_projects: projectsByMember.get(mid) ?? 0,
+            };
+        });
+
+    return { team, available };
+}
