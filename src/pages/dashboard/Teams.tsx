@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import {
   Users, Search, Filter, UserPlus, Clock, Briefcase, Star,
   BarChart3, AlertCircle, CheckCircle2, Code2, Palette, Shield, Terminal,
-  TrendingUp, Eye, MoreHorizontal, Zap, Target, Brain,
+  TrendingUp, Eye, MoreHorizontal, Zap, Target, Brain, RefreshCw, Loader2,
 } from 'lucide-react';
 import {
   ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, RadarChart,
@@ -10,9 +10,11 @@ import {
   CartesianGrid, Tooltip, Legend,
 } from 'recharts';
 import type {
-  TeamMemberRow, DeveloperAllocationRow, TeamMemberRole, TeamDepartment,
+  TeamMemberRole, TeamDepartment,
   Seniority, TeamMemberStatus,
 } from '../../types/database.types';
+import { useTeams } from '../../hooks/useTeams';
+import type { MemberWithWorkload, AllocationWithProject, ProjectRef } from '../../services/teams.service';
 
 /* ────────────── palette ────────────── */
 const COLORS = {
@@ -47,49 +49,11 @@ const seniorityLabel: Record<Seniority, string> = { junior: 'Junior', mid: 'Mid'
 const statusColor: Record<TeamMemberStatus, string> = { active: 'emerald', on_leave: 'amber', inactive: 'red' };
 const roleIcon: Record<TeamMemberRole, React.ElementType> = { developer: Code2, designer: Palette, tech_lead: Star, devops: Terminal, qa: Shield, pm: Briefcase };
 
-/* ────────────── mock: team members ────────────── */
-const MOCK_MEMBERS: TeamMemberRow[] = [
-  { id: '1', profile_id: null, full_name: 'Sarah Chen', email: 'sarah@nyxdev.com', avatar_url: null, role: 'tech_lead', department: 'engineering', seniority: 'lead', skills: ['React', 'TypeScript', 'Node.js', 'System Design'], hourly_rate: 150, availability: 40, status: 'active', joined_at: '2023-01-15T00:00:00Z', created_at: '', updated_at: '', deleted_at: null },
-  { id: '2', profile_id: null, full_name: 'Mike Rodriguez', email: 'mike@nyxdev.com', avatar_url: null, role: 'developer', department: 'engineering', seniority: 'senior', skills: ['React', 'Go', 'PostgreSQL', 'Docker'], hourly_rate: 130, availability: 40, status: 'active', joined_at: '2023-03-10T00:00:00Z', created_at: '', updated_at: '', deleted_at: null },
-  { id: '3', profile_id: null, full_name: 'Emily Park', email: 'emily@nyxdev.com', avatar_url: null, role: 'designer', department: 'design', seniority: 'senior', skills: ['Figma', 'UI/UX', 'Motion Design', 'Branding'], hourly_rate: 120, availability: 40, status: 'active', joined_at: '2023-04-22T00:00:00Z', created_at: '', updated_at: '', deleted_at: null },
-  { id: '4', profile_id: null, full_name: 'James Wilson', email: 'james@nyxdev.com', avatar_url: null, role: 'devops', department: 'devops', seniority: 'senior', skills: ['AWS', 'Terraform', 'Kubernetes', 'CI/CD'], hourly_rate: 140, availability: 40, status: 'active', joined_at: '2023-02-05T00:00:00Z', created_at: '', updated_at: '', deleted_at: null },
-  { id: '5', profile_id: null, full_name: 'Aisha Khan', email: 'aisha@nyxdev.com', avatar_url: null, role: 'developer', department: 'engineering', seniority: 'mid', skills: ['React', 'Python', 'FastAPI', 'Redis'], hourly_rate: 100, availability: 32, status: 'active', joined_at: '2023-06-14T00:00:00Z', created_at: '', updated_at: '', deleted_at: null },
-  { id: '6', profile_id: null, full_name: 'Lucas Nguyen', email: 'lucas@nyxdev.com', avatar_url: null, role: 'qa', department: 'qa', seniority: 'mid', skills: ['Playwright', 'Cypress', 'Jest', 'Load Testing'], hourly_rate: 95, availability: 40, status: 'active', joined_at: '2023-07-20T00:00:00Z', created_at: '', updated_at: '', deleted_at: null },
-  { id: '7', profile_id: null, full_name: 'Maria Santos', email: 'maria@nyxdev.com', avatar_url: null, role: 'pm', department: 'management', seniority: 'senior', skills: ['Agile', 'Scrum', 'Stakeholder Mgmt', 'JIRA'], hourly_rate: 110, availability: 40, status: 'active', joined_at: '2023-03-01T00:00:00Z', created_at: '', updated_at: '', deleted_at: null },
-  { id: '8', profile_id: null, full_name: 'David Kim', email: 'david@nyxdev.com', avatar_url: null, role: 'developer', department: 'engineering', seniority: 'junior', skills: ['JavaScript', 'React', 'CSS', 'HTML'], hourly_rate: 70, availability: 40, status: 'active', joined_at: '2024-01-08T00:00:00Z', created_at: '', updated_at: '', deleted_at: null },
-  { id: '9', profile_id: null, full_name: 'Priya Patel', email: 'priya@nyxdev.com', avatar_url: null, role: 'developer', department: 'engineering', seniority: 'senior', skills: ['React Native', 'Swift', 'Kotlin', 'Firebase'], hourly_rate: 135, availability: 40, status: 'on_leave', joined_at: '2023-05-12T00:00:00Z', created_at: '', updated_at: '', deleted_at: null },
-  { id: '10', profile_id: null, full_name: 'Tom Bradley', email: 'tom@nyxdev.com', avatar_url: null, role: 'designer', department: 'design', seniority: 'mid', skills: ['Figma', 'Illustration', 'Design Systems'], hourly_rate: 100, availability: 40, status: 'active', joined_at: '2023-09-18T00:00:00Z', created_at: '', updated_at: '', deleted_at: null },
-];
-
-/* ────────────── mock: projects ────────────── */
-const MOCK_PROJECTS = [
-  { id: 'p1', name: 'FinTrack Pro', status: 'active' },
-  { id: 'p2', name: 'ShopEase', status: 'active' },
-  { id: 'p3', name: 'HealthHub', status: 'active' },
-  { id: 'p4', name: 'EduLearn LMS', status: 'planning' },
-  { id: 'p5', name: 'LogiFlow CRM', status: 'active' },
-];
-
-/* ────────────── mock: allocations ────────────── */
-const MOCK_ALLOCATIONS: (DeveloperAllocationRow & { project?: { id: string; name: string; status: string } })[] = [
-  { id: 'a1', team_member_id: '1', project_id: 'p1', role_on_project: 'lead', allocation_pct: 60, hours_estimated: 320, hours_logged: 210, start_date: '2024-01-10', end_date: '2024-06-30', status: 'active', notes: null, created_at: '', updated_at: '', project: MOCK_PROJECTS[0] },
-  { id: 'a2', team_member_id: '1', project_id: 'p3', role_on_project: 'reviewer', allocation_pct: 20, hours_estimated: 80, hours_logged: 45, start_date: '2024-02-01', end_date: '2024-07-15', status: 'active', notes: null, created_at: '', updated_at: '', project: MOCK_PROJECTS[2] },
-  { id: 'a3', team_member_id: '2', project_id: 'p1', role_on_project: 'developer', allocation_pct: 80, hours_estimated: 400, hours_logged: 310, start_date: '2024-01-10', end_date: '2024-06-30', status: 'active', notes: null, created_at: '', updated_at: '', project: MOCK_PROJECTS[0] },
-  { id: 'a4', team_member_id: '3', project_id: 'p2', role_on_project: 'designer', allocation_pct: 50, hours_estimated: 200, hours_logged: 120, start_date: '2024-02-15', end_date: '2024-05-30', status: 'active', notes: null, created_at: '', updated_at: '', project: MOCK_PROJECTS[1] },
-  { id: 'a5', team_member_id: '3', project_id: 'p4', role_on_project: 'designer', allocation_pct: 30, hours_estimated: 100, hours_logged: 25, start_date: '2024-03-01', end_date: '2024-08-15', status: 'active', notes: null, created_at: '', updated_at: '', project: MOCK_PROJECTS[3] },
-  { id: 'a6', team_member_id: '4', project_id: 'p1', role_on_project: 'developer', allocation_pct: 40, hours_estimated: 160, hours_logged: 130, start_date: '2024-01-10', end_date: '2024-06-30', status: 'active', notes: null, created_at: '', updated_at: '', project: MOCK_PROJECTS[0] },
-  { id: 'a7', team_member_id: '4', project_id: 'p5', role_on_project: 'developer', allocation_pct: 40, hours_estimated: 180, hours_logged: 88, start_date: '2024-02-20', end_date: '2024-07-31', status: 'active', notes: null, created_at: '', updated_at: '', project: MOCK_PROJECTS[4] },
-  { id: 'a8', team_member_id: '5', project_id: 'p2', role_on_project: 'developer', allocation_pct: 70, hours_estimated: 280, hours_logged: 195, start_date: '2024-02-15', end_date: '2024-05-30', status: 'active', notes: null, created_at: '', updated_at: '', project: MOCK_PROJECTS[1] },
-  { id: 'a9', team_member_id: '6', project_id: 'p1', role_on_project: 'qa', allocation_pct: 30, hours_estimated: 120, hours_logged: 78, start_date: '2024-01-10', end_date: '2024-06-30', status: 'active', notes: null, created_at: '', updated_at: '', project: MOCK_PROJECTS[0] },
-  { id: 'a10', team_member_id: '6', project_id: 'p2', role_on_project: 'qa', allocation_pct: 30, hours_estimated: 100, hours_logged: 52, start_date: '2024-02-15', end_date: '2024-05-30', status: 'active', notes: null, created_at: '', updated_at: '', project: MOCK_PROJECTS[1] },
-  { id: 'a11', team_member_id: '7', project_id: 'p1', role_on_project: 'reviewer', allocation_pct: 20, hours_estimated: 60, hours_logged: 42, start_date: '2024-01-10', end_date: '2024-06-30', status: 'active', notes: null, created_at: '', updated_at: '', project: MOCK_PROJECTS[0] },
-  { id: 'a12', team_member_id: '7', project_id: 'p3', role_on_project: 'reviewer', allocation_pct: 30, hours_estimated: 80, hours_logged: 55, start_date: '2024-02-01', end_date: '2024-07-15', status: 'active', notes: null, created_at: '', updated_at: '', project: MOCK_PROJECTS[2] },
-  { id: 'a13', team_member_id: '8', project_id: 'p5', role_on_project: 'developer', allocation_pct: 90, hours_estimated: 360, hours_logged: 120, start_date: '2024-02-20', end_date: '2024-07-31', status: 'active', notes: null, created_at: '', updated_at: '', project: MOCK_PROJECTS[4] },
-  { id: 'a14', team_member_id: '10', project_id: 'p3', role_on_project: 'designer', allocation_pct: 60, hours_estimated: 240, hours_logged: 98, start_date: '2024-02-01', end_date: '2024-07-15', status: 'active', notes: null, created_at: '', updated_at: '', project: MOCK_PROJECTS[2] },
-];
+/* ────────────── mock data removed — real data from useTeams hook ────────────── */
 
 /* ─────────────────────────────── component ─────────────────────────────── */
 const Teams: React.FC = () => {
+  const { data, loading, error, refetch } = useTeams();
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<TeamMemberRole | 'all'>('all');
   const [deptFilter, setDeptFilter] = useState<TeamDepartment | 'all'>('all');
@@ -97,16 +61,13 @@ const Teams: React.FC = () => {
   const [view, setView] = useState<'roster' | 'allocation'>('roster');
   const [selectedMember, setSelectedMember] = useState<string | null>(null);
 
+  // Alias for conciseness — stable refs when data is null
+  const members: MemberWithWorkload[] = useMemo(() => data?.members ?? [], [data]);
+  const projects: ProjectRef[] = useMemo(() => data?.projects ?? [], [data]);
+  const allocations: AllocationWithProject[] = useMemo(() => data?.allocations ?? [], [data]);
+
   // ─── derived ────────────────────────────────────────────────────────────────
-  const membersWithWorkload = useMemo(() =>
-    MOCK_MEMBERS.map(m => {
-      const allocs = MOCK_ALLOCATIONS.filter(a => a.team_member_id === m.id && a.status === 'active');
-      const totalPct = allocs.reduce((s, a) => s + a.allocation_pct, 0);
-      const totalEstimated = allocs.reduce((s, a) => s + a.hours_estimated, 0);
-      const totalLogged = allocs.reduce((s, a) => s + a.hours_logged, 0);
-      return { ...m, allocations: allocs, total_allocation_pct: totalPct, active_projects: allocs.length, totalEstimated, totalLogged };
-    }),
-  []);
+  const membersWithWorkload = members;
 
   const filtered = useMemo(() =>
     membersWithWorkload.filter(m => {
@@ -131,54 +92,82 @@ const Teams: React.FC = () => {
 
   const rolePieData = useMemo(() => {
     const counts: Record<string, number> = {};
-    MOCK_MEMBERS.forEach(m => { counts[roleLabel[m.role]] = (counts[roleLabel[m.role]] || 0) + 1; });
+    members.forEach(m => { counts[roleLabel[m.role]] = (counts[roleLabel[m.role]] || 0) + 1; });
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  }, []);
+  }, [members]);
 
   const deptPieData = useMemo(() => {
     const counts: Record<string, number> = {};
-    MOCK_MEMBERS.forEach(m => { counts[deptLabel[m.department]] = (counts[deptLabel[m.department]] || 0) + 1; });
+    members.forEach(m => { counts[deptLabel[m.department]] = (counts[deptLabel[m.department]] || 0) + 1; });
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  }, []);
+  }, [members]);
 
   const skillRadarData = useMemo(() => {
     const skillMap: Record<string, number> = {};
-    MOCK_MEMBERS.forEach(m => m.skills.forEach(s => { skillMap[s] = (skillMap[s] || 0) + 1; }));
+    members.forEach(m => m.skills.forEach(s => { skillMap[s] = (skillMap[s] || 0) + 1; }));
     return Object.entries(skillMap)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 8)
       .map(([skill, count]) => ({ skill, count }));
-  }, []);
+  }, [members]);
 
-  const projectAllocationData = useMemo(() =>
-    MOCK_PROJECTS.map(p => {
-      const allocs = MOCK_ALLOCATIONS.filter(a => a.project_id === p.id && a.status === 'active');
-      const totalHoursEst = allocs.reduce((s, a) => s + a.hours_estimated, 0);
-      const totalHoursLog = allocs.reduce((s, a) => s + a.hours_logged, 0);
-      return { name: p.name.length > 12 ? p.name.slice(0, 12) + '…' : p.name, members: allocs.length, hoursEstimated: totalHoursEst, hoursLogged: totalHoursLog };
-    }),
-  []);
+  const projectAllocationData = useMemo(() => {
+    // Use only projects that have at least one active allocation
+    const activeAllocs = allocations.filter(a => a.status === 'active');
+    const projectIds = [...new Set(activeAllocs.map(a => a.project_id))];
+    return projectIds.map(pid => {
+      const proj = projects.find(p => p.id === pid);
+      const pAllocs = activeAllocs.filter(a => a.project_id === pid);
+      const totalHoursEst = pAllocs.reduce((s, a) => s + a.hours_estimated, 0);
+      const totalHoursLog = pAllocs.reduce((s, a) => s + a.hours_logged, 0);
+      const pName = proj?.name ?? pid.slice(0, 8);
+      return { name: pName.length > 12 ? pName.slice(0, 12) + '…' : pName, members: pAllocs.length, hoursEstimated: totalHoursEst, hoursLogged: totalHoursLog };
+    });
+  }, [allocations, projects]);
 
   // ─── summary KPIs ──────────────────────────────────────────────────────────
-  const activeCount = MOCK_MEMBERS.filter(m => m.status === 'active').length;
-  const onLeaveCount = MOCK_MEMBERS.filter(m => m.status === 'on_leave').length;
-  const avgAllocation = Math.round(membersWithWorkload.filter(m => m.status === 'active').reduce((s, m) => s + m.total_allocation_pct, 0) / activeCount);
-  const overallocated = membersWithWorkload.filter(m => m.total_allocation_pct > 100).length;
-  const underutilised = membersWithWorkload.filter(m => m.status === 'active' && m.total_allocation_pct < 50).length;
+  const activeCount = data?.kpis.activeCount ?? 0;
+  const onLeaveCount = data?.kpis.onLeaveCount ?? 0;
+  const avgAllocation = data?.kpis.avgAllocation ?? 0;
+  const overallocated = data?.kpis.overallocated ?? 0;
+  const underutilised = data?.kpis.underutilised ?? 0;
+  const activeProjectsCount = data?.kpis.activeProjectsCount ?? 0;
 
   const kpis = [
-    { label: 'Active Members', value: activeCount, icon: Users, color: 'emerald', change: '+2', trend: 'up' as const },
-    { label: 'On Leave', value: onLeaveCount, icon: Clock, color: 'amber', change: '0', trend: 'up' as const },
-    { label: 'Avg Allocation', value: `${avgAllocation}%`, icon: BarChart3, color: 'blue', change: '+5%', trend: 'up' as const },
-    { label: 'Over-allocated', value: overallocated, icon: AlertCircle, color: 'red', change: '0', trend: 'up' as const },
-    { label: 'Under-utilised', value: underutilised, icon: Target, color: 'purple', change: '-1', trend: 'up' as const },
-    { label: 'Active Projects', value: MOCK_PROJECTS.filter(p => p.status === 'active').length, icon: Briefcase, color: 'cyan', change: '+1', trend: 'up' as const },
+    { label: 'Active Members', value: activeCount, icon: Users, color: 'emerald' },
+    { label: 'On Leave', value: onLeaveCount, icon: Clock, color: 'amber' },
+    { label: 'Avg Allocation', value: `${avgAllocation}%`, icon: BarChart3, color: 'blue' },
+    { label: 'Over-allocated', value: overallocated, icon: AlertCircle, color: 'red' },
+    { label: 'Under-utilised', value: underutilised, icon: Target, color: 'purple' },
+    { label: 'Active Projects', value: activeProjectsCount, icon: Briefcase, color: 'cyan' },
   ];
 
   // ─── selected member detail ─────────────────────────────────────────────────
   const detail = selectedMember ? membersWithWorkload.find(m => m.id === selectedMember) : null;
 
   /* ═══════════════════════════════════════════════ JSX ═══════════════════════════════════════════════ */
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-32">
+        <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
+        <span className="ml-3 text-gray-400 text-lg">Loading team data…</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-32 gap-4">
+        <AlertCircle className="w-10 h-10 text-red-400" />
+        <p className="text-gray-300 text-lg">{error}</p>
+        <button onClick={refetch} className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl transition-all">
+          <RefreshCw className="w-4 h-4" />
+          Retry
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -191,6 +180,9 @@ const Teams: React.FC = () => {
           <p className="text-gray-400">Monitor workload, skills, and project assignments across your team</p>
         </div>
         <div className="flex items-center gap-3">
+          <button onClick={refetch} className="p-2 bg-gray-800/50 border border-gray-700 rounded-xl hover:border-gray-600 transition-colors" title="Refresh data">
+            <RefreshCw className="w-4 h-4 text-gray-400" />
+          </button>
           <div className="flex items-center gap-2 bg-gray-800/50 border border-gray-700 rounded-xl p-1">
             {(['roster', 'allocation'] as const).map(v => (
               <button
@@ -219,9 +211,6 @@ const Teams: React.FC = () => {
                 <div className={`p-2 bg-${kpi.color}-500/10 rounded-lg`}>
                   <Icon className={`w-4 h-4 text-${kpi.color}-400`} />
                 </div>
-                <span className={`text-xs font-semibold ${kpi.change.startsWith('+') ? 'text-emerald-400' : kpi.change.startsWith('-') ? 'text-red-400' : 'text-gray-500'}`}>
-                  {kpi.change}
-                </span>
               </div>
               <div className="text-2xl font-bold text-white">{kpi.value}</div>
               <div className="text-xs text-gray-400 mt-1">{kpi.label}</div>
@@ -257,7 +246,7 @@ const Teams: React.FC = () => {
         </select>
         <div className="flex items-center gap-1 text-xs text-gray-500">
           <Filter className="w-3.5 h-3.5" />
-          {filtered.length}/{MOCK_MEMBERS.length}
+          {filtered.length}/{members.length}
         </div>
       </div>
 
@@ -379,7 +368,7 @@ const Teams: React.FC = () => {
               <thead>
                 <tr className="text-left text-gray-400 border-b border-gray-800">
                   <th className="pb-3 pr-4 font-medium">Member</th>
-                  {MOCK_PROJECTS.map(p => (
+                  {projects.map(p => (
                     <th key={p.id} className="pb-3 px-2 text-center font-medium whitespace-nowrap">{p.name.length > 10 ? p.name.slice(0, 10) + '…' : p.name}</th>
                   ))}
                   <th className="pb-3 pl-4 text-center font-medium">Total</th>
@@ -398,8 +387,8 @@ const Teams: React.FC = () => {
                           <div className="text-white font-medium">{member.full_name}</div>
                         </div>
                       </td>
-                      {MOCK_PROJECTS.map(p => {
-                        const alloc = MOCK_ALLOCATIONS.find(a => a.team_member_id === member.id && a.project_id === p.id && a.status === 'active');
+                      {projects.map(p => {
+                        const alloc = allocations.find(a => a.team_member_id === member.id && a.project_id === p.id && a.status === 'active');
                         return (
                           <td key={p.id} className="py-3 px-2 text-center">
                             {alloc ? (
@@ -548,21 +537,40 @@ const Teams: React.FC = () => {
                   <TrendingUp className="w-4 h-4 text-emerald-400" />
                   <span className="text-sm font-semibold text-emerald-400">Capacity Forecast</span>
                 </div>
-                <p className="text-xs text-gray-300">Team capacity is at {avgAllocation}% utilisation. You can take on approximately {Math.round((100 - avgAllocation) * activeCount / 100)} more full-time project slots this quarter.</p>
+                <p className="text-xs text-gray-300">
+                  {activeCount > 0
+                    ? `Team capacity is at ${avgAllocation}% utilisation. You can take on approximately ${Math.max(0, Math.round((100 - avgAllocation) * activeCount / 100))} more full-time project slots this quarter.`
+                    : 'No active team members yet. Add members to see capacity insights.'}
+                </p>
               </div>
               <div className="p-4 bg-white/5 rounded-xl border border-white/10">
                 <div className="flex items-center gap-2 mb-2">
                   <AlertCircle className="w-4 h-4 text-amber-400" />
-                  <span className="text-sm font-semibold text-amber-400">Skill Gaps</span>
+                  <span className="text-sm font-semibold text-amber-400">Risk Alerts</span>
                 </div>
-                <p className="text-xs text-gray-300">Mobile (React Native / Swift / Kotlin) expertise is concentrated in 1 member currently on leave. Consider cross-training or hiring.</p>
+                <p className="text-xs text-gray-300">
+                  {overallocated > 0
+                    ? `${overallocated} team member${overallocated > 1 ? 's are' : ' is'} over-allocated (>100%). Consider redistributing workload to avoid burnout.`
+                    : onLeaveCount > 0
+                      ? `${onLeaveCount} member${onLeaveCount > 1 ? 's are' : ' is'} currently on leave. Ensure project coverage is maintained.`
+                      : 'No risk alerts. All team members are within healthy allocation ranges.'}
+                </p>
               </div>
               <div className="p-4 bg-white/5 rounded-xl border border-white/10">
                 <div className="flex items-center gap-2 mb-2">
                   <CheckCircle2 className="w-4 h-4 text-blue-400" />
                   <span className="text-sm font-semibold text-blue-400">Delivery Health</span>
                 </div>
-                <p className="text-xs text-gray-300">Aggregate hours logged are at 67% of estimates with 48% timeline elapsed — delivery is on track across all active projects.</p>
+                <p className="text-xs text-gray-300">
+                  {(() => {
+                    const totalEst = membersWithWorkload.reduce((s, m) => s + m.totalEstimated, 0);
+                    const totalLog = membersWithWorkload.reduce((s, m) => s + m.totalLogged, 0);
+                    const pct = totalEst > 0 ? Math.round((totalLog / totalEst) * 100) : 0;
+                    return totalEst > 0
+                      ? `Aggregate hours logged are at ${pct}% of estimates across ${activeProjectsCount} active project${activeProjectsCount !== 1 ? 's' : ''}. ${pct >= 80 ? 'Nearing completion targets.' : pct >= 40 ? 'Delivery is progressing on track.' : 'Still in early stages of execution.'}`
+                      : 'No hours data available yet. Allocations will populate as projects progress.';
+                  })()}
+                </p>
               </div>
             </div>
           </div>

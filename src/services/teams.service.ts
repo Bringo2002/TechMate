@@ -1,0 +1,232 @@
+// ============================================================================
+// TechMate Teams Service
+// Aggregates real Supabase data for the Teams & Developer Allocation page
+// ============================================================================
+
+import supabase from '../lib/supabaseClient';
+import type {
+    TeamMemberRow,
+    DeveloperAllocationRow,
+    TeamMemberRole,
+    TeamDepartment,
+    Seniority,
+    TeamMemberStatus,
+    AllocationStatus,
+    ProjectRoleOnProject,
+} from '../types/database.types';
+
+// ============================================================================
+// Types
+// ============================================================================
+
+/** A lightweight project reference used in UI grids/tables */
+export interface ProjectRef {
+    id: string;
+    name: string;
+    status: string;
+}
+
+/** An allocation row with its parent project resolved */
+export type AllocationWithProject = DeveloperAllocationRow & {
+    project?: ProjectRef | null;
+};
+
+/** Extended member with allocation data and computed roll-ups */
+export interface MemberWithWorkload extends TeamMemberRow {
+    allocations: AllocationWithProject[];
+    total_allocation_pct: number;
+    active_projects: number;
+    totalEstimated: number;
+    totalLogged: number;
+}
+
+/** KPI snapshot for the header cards */
+export interface TeamsKPIs {
+    activeCount: number;
+    onLeaveCount: number;
+    inactiveCount: number;
+    avgAllocation: number;
+    overallocated: number;
+    underutilised: number;
+    activeProjectsCount: number;
+    totalMembers: number;
+}
+
+/** Everything the Teams page needs */
+export interface TeamsData {
+    members: MemberWithWorkload[];
+    projects: ProjectRef[];
+    allocations: AllocationWithProject[];
+    kpis: TeamsKPIs;
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+/** Safely cast string → typed enum, falling back to a default   */
+function asRole(v: string | null | undefined): TeamMemberRole {
+    const valid: TeamMemberRole[] = ['developer', 'designer', 'tech_lead', 'devops', 'qa', 'pm'];
+    return valid.includes(v as TeamMemberRole) ? (v as TeamMemberRole) : 'developer';
+}
+
+function asDept(v: string | null | undefined): TeamDepartment {
+    const valid: TeamDepartment[] = ['engineering', 'design', 'qa', 'devops', 'management'];
+    return valid.includes(v as TeamDepartment) ? (v as TeamDepartment) : 'engineering';
+}
+
+function asSeniority(v: string | null | undefined): Seniority {
+    const valid: Seniority[] = ['junior', 'mid', 'senior', 'lead', 'principal'];
+    return valid.includes(v as Seniority) ? (v as Seniority) : 'mid';
+}
+
+function asStatus(v: string | null | undefined): TeamMemberStatus {
+    const valid: TeamMemberStatus[] = ['active', 'on_leave', 'inactive'];
+    return valid.includes(v as TeamMemberStatus) ? (v as TeamMemberStatus) : 'active';
+}
+
+function asAllocStatus(v: string | null | undefined): AllocationStatus {
+    const valid: AllocationStatus[] = ['active', 'completed', 'paused', 'removed'];
+    return valid.includes(v as AllocationStatus) ? (v as AllocationStatus) : 'active';
+}
+
+function asProjectRole(v: string | null | undefined): ProjectRoleOnProject {
+    const valid: ProjectRoleOnProject[] = ['developer', 'lead', 'reviewer', 'designer', 'qa'];
+    return valid.includes(v as ProjectRoleOnProject) ? (v as ProjectRoleOnProject) : 'developer';
+}
+
+// ============================================================================
+// Main fetch
+// ============================================================================
+
+/**
+ * Fetch all teams + allocation data from Supabase in parallel.
+ * Joins are done in-memory so we don't depend on PostgREST relation
+ * config – only raw table reads are needed.
+ */
+export async function fetchTeamsData(): Promise<TeamsData> {
+    // Parallel queries ──────────────────────────────────────────────────────
+    const [membersRes, allocsRes, projectsRes] = await Promise.all([
+        supabase
+            .from('team_members')
+            .select('*')
+            .is('deleted_at', null)
+            .order('full_name'),
+        supabase
+            .from('developer_allocations')
+            .select('*')
+            .order('created_at', { ascending: false }),
+        supabase
+            .from('projects')
+            .select('id, name, status')
+            .is('deleted_at', null)
+            .order('name'),
+    ]);
+
+    if (membersRes.error) throw new Error(`Failed to fetch team members: ${membersRes.error.message}`);
+    if (allocsRes.error) throw new Error(`Failed to fetch allocations: ${allocsRes.error.message}`);
+    if (projectsRes.error) throw new Error(`Failed to fetch projects: ${projectsRes.error.message}`);
+
+    // ── Normalise rows ─────────────────────────────────────────────────────
+    const rawMembers = (membersRes.data ?? []) as Record<string, unknown>[];
+    const rawAllocs = (allocsRes.data ?? []) as Record<string, unknown>[];
+    const rawProjects = (projectsRes.data ?? []) as Record<string, unknown>[];
+
+    const projects: ProjectRef[] = rawProjects.map(p => ({
+        id: String(p.id ?? ''),
+        name: String(p.name ?? ''),
+        status: String(p.status ?? 'active'),
+    }));
+
+    const projectMap = new Map(projects.map(p => [p.id, p]));
+
+    const members: TeamMemberRow[] = rawMembers.map(r => ({
+        id: String(r.id ?? ''),
+        profile_id: r.profile_id ? String(r.profile_id) : null,
+        full_name: String(r.full_name ?? ''),
+        email: String(r.email ?? ''),
+        avatar_url: r.avatar_url ? String(r.avatar_url) : null,
+        role: asRole(r.role as string),
+        department: asDept(r.department as string),
+        seniority: asSeniority(r.seniority as string),
+        skills: Array.isArray(r.skills) ? (r.skills as string[]) : [],
+        hourly_rate: Number(r.hourly_rate ?? 0),
+        availability: Number(r.availability ?? 40),
+        status: asStatus(r.status as string),
+        joined_at: String(r.joined_at ?? ''),
+        created_at: String(r.created_at ?? ''),
+        updated_at: String(r.updated_at ?? ''),
+        deleted_at: r.deleted_at ? String(r.deleted_at) : null,
+    }));
+
+    const allocations: AllocationWithProject[] = rawAllocs.map(r => {
+        const pid = String(r.project_id ?? '');
+        return {
+            id: String(r.id ?? ''),
+            team_member_id: String(r.team_member_id ?? ''),
+            project_id: pid,
+            role_on_project: asProjectRole(r.role_on_project as string),
+            allocation_pct: Number(r.allocation_pct ?? 0),
+            hours_estimated: Number(r.hours_estimated ?? 0),
+            hours_logged: Number(r.hours_logged ?? 0),
+            start_date: r.start_date ? String(r.start_date) : null,
+            end_date: r.end_date ? String(r.end_date) : null,
+            status: asAllocStatus(r.status as string),
+            notes: r.notes ? String(r.notes) : null,
+            created_at: String(r.created_at ?? ''),
+            updated_at: String(r.updated_at ?? ''),
+            project: projectMap.get(pid) ?? null,
+        };
+    });
+
+    // ── Build MemberWithWorkload ───────────────────────────────────────────
+    const membersWithWorkload: MemberWithWorkload[] = members.map(m => {
+        const myAllocs = allocations.filter(a => a.team_member_id === m.id && a.status === 'active');
+        const totalPct = myAllocs.reduce((s, a) => s + a.allocation_pct, 0);
+        const totalEstimated = myAllocs.reduce((s, a) => s + a.hours_estimated, 0);
+        const totalLogged = myAllocs.reduce((s, a) => s + a.hours_logged, 0);
+        return {
+            ...m,
+            allocations: myAllocs,
+            total_allocation_pct: totalPct,
+            active_projects: myAllocs.length,
+            totalEstimated,
+            totalLogged,
+        };
+    });
+
+    // ── KPIs ───────────────────────────────────────────────────────────────
+    const activeCount = members.filter(m => m.status === 'active').length;
+    const onLeaveCount = members.filter(m => m.status === 'on_leave').length;
+    const inactiveCount = members.filter(m => m.status === 'inactive').length;
+    const activeMembers = membersWithWorkload.filter(m => m.status === 'active');
+    const avgAllocation = activeCount > 0
+        ? Math.round(activeMembers.reduce((s, m) => s + m.total_allocation_pct, 0) / activeCount)
+        : 0;
+    const overallocated = membersWithWorkload.filter(m => m.total_allocation_pct > 100).length;
+    const underutilised = activeMembers.filter(m => m.total_allocation_pct < 50).length;
+
+    // Distinct active projects (from allocations only)
+    const activeProjectIds = new Set(
+        allocations.filter(a => a.status === 'active').map(a => a.project_id),
+    );
+    const activeProjectsCount = activeProjectIds.size;
+
+    const kpis: TeamsKPIs = {
+        activeCount,
+        onLeaveCount,
+        inactiveCount,
+        avgAllocation,
+        overallocated,
+        underutilised,
+        activeProjectsCount,
+        totalMembers: members.length,
+    };
+
+    return {
+        members: membersWithWorkload,
+        projects,
+        allocations,
+        kpis,
+    };
+}

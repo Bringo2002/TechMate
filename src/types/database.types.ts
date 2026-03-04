@@ -132,6 +132,18 @@ export interface Database {
                 Update: SupportTicketUpdate;
                 Relationships: [];
             };
+            team_members: {
+                Row: TeamMemberRow;
+                Insert: TeamMemberInsert;
+                Update: TeamMemberUpdate;
+                Relationships: [];
+            };
+            developer_allocations: {
+                Row: DeveloperAllocationRow;
+                Insert: DeveloperAllocationInsert;
+                Update: DeveloperAllocationUpdate;
+                Relationships: [];
+            };
         };
         Views: {
             [_ in never]: never;
