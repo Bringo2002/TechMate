@@ -4,7 +4,7 @@ import {
   Download, ChevronRight, Target, Award, CheckCircle2, AlertCircle,
   BarChart3, PieChart as PieChartIcon, LineChart as LineChartIcon,
   Globe, Smartphone, Database, Cloud, Layers, Sparkles, Brain,
-  Gauge, Calendar, Zap, ArrowRightLeft,
+  Gauge, Calendar, Zap, ArrowRightLeft, Loader2,
 } from 'lucide-react';
 import {
   ResponsiveContainer, LineChart, Line, AreaChart, Area, BarChart, Bar,
@@ -12,6 +12,17 @@ import {
   PolarRadiusAxis, ComposedChart, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend,
 } from 'recharts';
+import { useAnalytics } from '../../hooks/useAnalytics';
+import type { RevenueByServiceItem } from '../../services/analytics.service';
+
+// ─── Icon resolver (maps iconName strings from service to Lucide components) ─
+const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  DollarSign, Rocket, Users, Target, Award, CheckCircle2,
+  Globe, Smartphone, Database, Cloud, Layers, Brain, Sparkles,
+};
+function resolveIcon(name: string) {
+  return ICON_MAP[name] || Activity;
+}
 
 // ─── Theme palette (matches dark dashboard) ──────────────────────────────────
 const COLORS = {
@@ -48,120 +59,45 @@ const DarkTooltip = ({ active, payload, label }: any) => {
   );
 };
 
+// ─── Loading skeleton ────────────────────────────────────────────────────────
+const SkeletonCard = () => (
+  <div className="bg-gradient-to-br from-gray-900/50 to-gray-900/30 border border-gray-800/50 rounded-2xl p-6 animate-pulse">
+    <div className="h-4 bg-gray-700/50 rounded w-1/3 mb-4" />
+    <div className="h-8 bg-gray-700/50 rounded w-1/2 mb-2" />
+    <div className="h-3 bg-gray-700/50 rounded w-2/3" />
+  </div>
+);
+
 // ─── Component ───────────────────────────────────────────────────────────────
 const Analytics = () => {
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d' | '1y'>('30d');
+  const { data, loading, error, refetch } = useAnalytics(timeRange);
 
-  // ─── Mock data (preserved) ──────────────────────────────────────────────────
-  const kpis = [
-    { label: 'Total Revenue', value: '$847,290', change: '+23.5%', trend: 'up', compareValue: '$687,450', icon: DollarSign, color: 'emerald', sparkline: [650, 680, 670, 720, 750, 780, 847] },
-    { label: 'Active Projects', value: '24', change: '+12.3%', trend: 'up', compareValue: '21', icon: Rocket, color: 'blue', sparkline: [18, 19, 20, 21, 22, 23, 24] },
-    { label: 'Client Acquisition', value: '156', change: '+8.2%', trend: 'up', compareValue: '144', icon: Users, color: 'purple', sparkline: [130, 135, 140, 144, 148, 152, 156] },
-    { label: 'Avg Project Value', value: '$35,304', change: '+18.7%', trend: 'up', compareValue: '$29,750', icon: Target, color: 'amber', sparkline: [28, 29, 30, 31, 33, 34, 35] },
-    { label: 'Client Satisfaction', value: '4.8/5', change: '+0.3', trend: 'up', compareValue: '4.5/5', icon: Award, color: 'pink', sparkline: [4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8] },
-    { label: 'Deployment Success', value: '96.2%', change: '+2.1%', trend: 'up', compareValue: '94.1%', icon: CheckCircle2, color: 'cyan', sparkline: [92, 93, 93.5, 94.1, 95, 95.8, 96.2] },
-  ];
-
-  const revenueByService = [
-    { name: 'Web Development', value: 342000, percentage: 40, growth: 18, color: 'emerald', icon: Globe },
-    { name: 'Mobile Apps', value: 289000, percentage: 34, growth: 22, color: 'blue', icon: Smartphone },
-    { name: 'Cloud Services', value: 156000, percentage: 18, growth: 12, color: 'purple', icon: Cloud },
-    { name: 'API Development', value: 134000, percentage: 16, growth: 15, color: 'cyan', icon: Database },
-    { name: 'DevOps', value: 98000, percentage: 12, growth: 9, color: 'amber', icon: Layers },
-  ];
-
-  const monthlyRevenue = [
-    { month: 'Jan', revenue: 62000, projects: 18, clients: 12 },
-    { month: 'Feb', revenue: 71000, projects: 19, clients: 13 },
-    { month: 'Mar', revenue: 68000, projects: 20, clients: 14 },
-    { month: 'Apr', revenue: 79000, projects: 21, clients: 15 },
-    { month: 'May', revenue: 85000, projects: 22, clients: 16 },
-    { month: 'Jun', revenue: 92000, projects: 23, clients: 17 },
-    { month: 'Jul', revenue: 98000, projects: 24, clients: 18 },
-  ];
-
-  const projectStatus = [
-    { status: 'Completed', count: 47, percentage: 52, color: 'emerald' },
-    { status: 'In Progress', count: 24, percentage: 27, color: 'blue' },
-    { status: 'Planning', count: 12, percentage: 13, color: 'purple' },
-    { status: 'On Hold', count: 7, percentage: 8, color: 'amber' },
-  ];
-
-  const clientMetrics = [
-    { tier: 'Enterprise', count: 12, revenue: 456000, avgValue: 38000, color: 'emerald' },
-    { tier: 'Growth', count: 28, revenue: 287000, avgValue: 10250, color: 'blue' },
-    { tier: 'Mid-Market', count: 45, revenue: 189000, avgValue: 4200, color: 'purple' },
-    { tier: 'Startup', count: 71, revenue: 98000, avgValue: 1380, color: 'cyan' },
-  ];
-
-  const topPerformers = [
-    { name: 'Sarah Chen', role: 'Account Manager', revenue: 245000, clients: 8, satisfaction: 4.9, color: 'emerald' },
-    { name: 'Mike Rodriguez', role: 'Tech Lead', projects: 12, onTime: 100, quality: 4.8, color: 'blue' },
-    { name: 'Maria Santos', role: 'Account Manager', revenue: 201000, clients: 6, satisfaction: 4.9, color: 'purple' },
-    { name: 'David Park', role: 'Tech Lead', projects: 10, onTime: 95, quality: 4.7, color: 'amber' },
-  ];
-
-  const conversionFunnel = [
-    { stage: 'Leads', count: 245, percentage: 100, color: 'blue' },
-    { stage: 'Qualified', count: 167, percentage: 68, color: 'cyan' },
-    { stage: 'Proposals', count: 98, percentage: 40, color: 'purple' },
-    { stage: 'Negotiation', count: 62, percentage: 25, color: 'amber' },
-    { stage: 'Closed Won', count: 42, percentage: 17, color: 'emerald' },
-  ];
-
-  // ─── NEW: Extended analytics data for Recharts charts ───────────────────────
-  const budgetVsSpent = useMemo(() => [
-    { month: 'Jan', budget: 72000, spent: 62000 },
-    { month: 'Feb', budget: 75000, spent: 71000 },
-    { month: 'Mar', budget: 78000, spent: 68000 },
-    { month: 'Apr', budget: 80000, spent: 79000 },
-    { month: 'May', budget: 88000, spent: 85000 },
-    { month: 'Jun', budget: 95000, spent: 92000 },
-    { month: 'Jul', budget: 100000, spent: 98000 },
-  ], []);
-
-  const weeklyActivity = useMemo(() => [
-    { day: 'Mon', commits: 42, prs: 8, deploys: 3 },
-    { day: 'Tue', commits: 56, prs: 12, deploys: 5 },
-    { day: 'Wed', commits: 61, prs: 10, deploys: 4 },
-    { day: 'Thu', commits: 48, prs: 14, deploys: 6 },
-    { day: 'Fri', commits: 38, prs: 9, deploys: 7 },
-    { day: 'Sat', commits: 15, prs: 3, deploys: 1 },
-    { day: 'Sun', commits: 8, prs: 1, deploys: 0 },
-  ], []);
-
-  const teamSkillsRadar = useMemo(() => [
-    { skill: 'React', level: 95 },
-    { skill: 'Node.js', level: 88 },
-    { skill: 'TypeScript', level: 92 },
-    { skill: 'DevOps', level: 76 },
-    { skill: 'UI/UX', level: 84 },
-    { skill: 'Testing', level: 70 },
-    { skill: 'Cloud', level: 80 },
-    { skill: 'Mobile', level: 72 },
-  ], []);
-
-  const clientGrowthOverTime = useMemo(() => [
-    { month: 'Jan', new: 8, churned: 2, net: 6 },
-    { month: 'Feb', new: 10, churned: 1, net: 9 },
-    { month: 'Mar', new: 12, churned: 3, net: 9 },
-    { month: 'Apr', new: 9, churned: 2, net: 7 },
-    { month: 'May', new: 14, churned: 1, net: 13 },
-    { month: 'Jun', new: 11, churned: 2, net: 9 },
-    { month: 'Jul', new: 16, churned: 1, net: 15 },
-  ], []);
+  // ─── Derived data from hook ─────────────────────────────────────────────────
+  const kpis = data?.kpis ?? [];
+  const revenueByService: RevenueByServiceItem[] = data?.revenueByService ?? [];
+  const monthlyRevenue = data?.monthlyRevenue ?? [];
+  const projectStatus = data?.projectStatus ?? [];
+  const clientMetrics = data?.clientMetrics ?? [];
+  const topPerformers = data?.topPerformers ?? [];
+  const conversionFunnel = data?.conversionFunnel ?? [];
+  const budgetVsSpent = data?.budgetVsSpent ?? [];
+  const weeklyActivity = data?.weeklyActivity ?? [];
+  const teamSkillsRadar = data?.teamSkillsRadar ?? [];
+  const clientGrowthOverTime = data?.clientGrowthOverTime ?? [];
+  const conversionRate = data?.conversionRate ?? 0;
 
   const servicePieData = useMemo(() => revenueByService.map(s => ({
     name: s.name,
     value: s.value,
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  })), []);
+  })), [revenueByService]);
 
   const projectPieData = useMemo(() => projectStatus.map(s => ({
     name: s.status,
     value: s.count,
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  })), []);
+  })), [projectStatus]);
+
+  const totalProjects = useMemo(() => projectStatus.reduce((s, p) => s + p.count, 0), [projectStatus]);
 
   // ─── Sparkline renderer (CSS – original design preserved) ───────────────────
   const renderSparkline = (data: number[], color: string) => {
@@ -187,10 +123,11 @@ const Analytics = () => {
   // ─── Service breakdown (CSS progress bars – preserved) ──────────────────────
   const renderServiceBreakdown = () => {
     const total = revenueByService.reduce((sum, s) => sum + s.value, 0);
+    if (total === 0) return <p className="text-sm text-gray-500">No service data available</p>;
     return (
       <div className="space-y-4">
         {revenueByService.map((service, idx) => {
-          const Icon = service.icon;
+          const Icon = resolveIcon(service.iconName);
           const pct = (service.value / total) * 100;
           return (
             <div key={idx} className="group">
@@ -285,10 +222,38 @@ const Analytics = () => {
         </div>
       </div>
 
+      {/* Error state */}
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-6 flex items-center gap-4">
+          <AlertCircle className="w-6 h-6 text-red-400 shrink-0" />
+          <div className="flex-1">
+            <p className="text-red-300 font-medium">Failed to load analytics data</p>
+            <p className="text-red-400/70 text-sm mt-1">{error}</p>
+          </div>
+          <button onClick={refetch} className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-lg text-sm font-medium transition-all">Retry</button>
+        </div>
+      )}
+
+      {/* Loading state */}
+      {loading && !data && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
+          </div>
+          <div className="flex items-center justify-center gap-3 py-12">
+            <Loader2 className="w-6 h-6 text-emerald-400 animate-spin" />
+            <span className="text-gray-400">Loading analytics data...</span>
+          </div>
+        </div>
+      )}
+
+      {/* Data loaded */}
+      {data && (
+      <>
       {/* KPIs Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {kpis.map((kpi, idx) => {
-          const Icon = kpi.icon;
+          const Icon = resolveIcon(kpi.iconName);
           const isPositive = kpi.trend === 'up';
           return (
             <div
@@ -391,7 +356,7 @@ const Analytics = () => {
           </div>
           <div className="mt-4 p-3 bg-gray-800/30 rounded-xl">
             <div className="text-sm text-gray-400 mb-1">Total Projects</div>
-            <div className="text-2xl font-bold text-white">90</div>
+            <div className="text-2xl font-bold text-white">{totalProjects}</div>
           </div>
         </div>
       </div>
@@ -548,9 +513,15 @@ const Analytics = () => {
           <div className="mt-6 p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-xl">
             <div className="flex items-center gap-2 mb-2">
               <Sparkles className="w-4 h-4 text-emerald-400" />
-              <span className="text-sm font-semibold text-emerald-400">17% Conversion Rate</span>
+              <span className="text-sm font-semibold text-emerald-400">{conversionRate}% Conversion Rate</span>
             </div>
-            <p className="text-xs text-gray-400">Industry average: 12% • You're outperforming by 42%</p>
+            <p className="text-xs text-gray-400">
+              {conversionRate > 12
+                ? `Industry average: 12% • You're outperforming by ${Math.round(((conversionRate - 12) / 12) * 100)}%`
+                : conversionRate > 0
+                  ? `Industry average: 12% • Room for improvement`
+                  : 'No conversion data available yet'}
+            </p>
           </div>
         </div>
 
@@ -697,33 +668,56 @@ const Analytics = () => {
                   <TrendingUp className="w-4 h-4 text-emerald-400" />
                   <span className="text-sm font-semibold text-emerald-400">Revenue Opportunity</span>
                 </div>
-                <p className="text-sm text-gray-300">Mobile app services showing 22% growth - consider expanding this offering. Potential $85K additional revenue in Q2.</p>
+                <p className="text-sm text-gray-300">
+                  {revenueByService.length > 0 && revenueByService[0]
+                    ? `${revenueByService[0].name} leads with $${(revenueByService[0].value / 1000).toFixed(0)}K revenue${revenueByService[0].growth > 0 ? ` and ${revenueByService[0].growth}% growth` : ''}. Consider expanding this offering.`
+                    : 'Add projects to see revenue insights.'}
+                </p>
               </div>
               <div className="p-4 bg-white/5 rounded-xl border border-white/10">
                 <div className="flex items-center gap-2 mb-2">
                   <Target className="w-4 h-4 text-blue-400" />
                   <span className="text-sm font-semibold text-blue-400">Conversion Rate</span>
                 </div>
-                <p className="text-sm text-gray-300">Your 17% funnel conversion rate is 42% above industry average. Focus on qualified leads is paying off significantly.</p>
+                <p className="text-sm text-gray-300">
+                  {conversionRate > 0
+                    ? `Your ${conversionRate}% funnel conversion rate is ${conversionRate > 12 ? `${Math.round(((conversionRate - 12) / 12) * 100)}% above` : 'near'} industry average. ${conversionRate > 12 ? 'Focus on qualified leads is paying off.' : 'Consider optimizing your qualification process.'}`
+                    : 'Add client inquiries to track conversion rates.'}
+                </p>
               </div>
               <div className="p-4 bg-white/5 rounded-xl border border-white/10">
                 <div className="flex items-center gap-2 mb-2">
                   <AlertCircle className="w-4 h-4 text-amber-400" />
                   <span className="text-sm font-semibold text-amber-400">Attention Needed</span>
                 </div>
-                <p className="text-sm text-gray-300">DevOps services growth at 9% is below target. Consider upselling to existing clients or expanding marketing efforts.</p>
+                <p className="text-sm text-gray-300">
+                  {revenueByService.length > 1
+                    ? (() => {
+                        const slowest = [...revenueByService].sort((a, b) => a.growth - b.growth)[0];
+                        return slowest.growth < 10
+                          ? `${slowest.name} growth at ${slowest.growth}% is below target. Consider upselling to existing clients.`
+                          : 'All service lines showing healthy growth. Maintain current strategies.';
+                      })()
+                    : 'Add more projects across service types for actionable insights.'}
+                </p>
               </div>
               <div className="p-4 bg-white/5 rounded-xl border border-white/10">
                 <div className="flex items-center gap-2 mb-2">
                   <Award className="w-4 h-4 text-purple-400" />
                   <span className="text-sm font-semibold text-purple-400">Client Success</span>
                 </div>
-                <p className="text-sm text-gray-300">96.2% deployment success rate and 4.8/5 satisfaction score indicate exceptional delivery quality. Leverage for case studies.</p>
+                <p className="text-sm text-gray-300">
+                  {kpis.length >= 6
+                    ? `${kpis[5]?.value || 'N/A'} deployment success rate and ${kpis[4]?.value || 'N/A'} satisfaction score. ${parseFloat(kpis[5]?.value || '0') > 90 ? 'Exceptional delivery quality — leverage for case studies.' : 'Focus on improving delivery processes.'}`
+                    : 'Complete more projects to generate client success insights.'}
+                </p>
               </div>
             </div>
           </div>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 };
