@@ -872,3 +872,87 @@ export type DeveloperStats = {
     total_hours_actual: number;
     overdue_tasks: number;
 };
+
+// ============================================================================
+// TEAM MEMBERS
+// ============================================================================
+export type TeamMemberRole = 'developer' | 'designer' | 'tech_lead' | 'devops' | 'qa' | 'pm';
+export type TeamDepartment = 'engineering' | 'design' | 'qa' | 'devops' | 'management';
+export type Seniority = 'junior' | 'mid' | 'senior' | 'lead' | 'principal';
+export type TeamMemberStatus = 'active' | 'on_leave' | 'inactive';
+export type AllocationStatus = 'active' | 'completed' | 'paused' | 'removed';
+export type ProjectRoleOnProject = 'developer' | 'lead' | 'reviewer' | 'designer' | 'qa';
+
+export type TeamMemberRow = {
+    id: string;
+    profile_id: string | null;
+    full_name: string;
+    email: string;
+    avatar_url: string | null;
+    role: TeamMemberRole;
+    department: TeamDepartment;
+    seniority: Seniority;
+    skills: string[];
+    hourly_rate: number;
+    availability: number;
+    status: TeamMemberStatus;
+    joined_at: string;
+    created_at: string;
+    updated_at: string;
+    deleted_at: string | null;
+};
+
+export type TeamMemberInsert = Omit<TeamMemberRow, 'id' | 'created_at' | 'updated_at'> & {
+    id?: string;
+    created_at?: string;
+    updated_at?: string;
+};
+
+export type TeamMemberUpdate = Partial<Omit<TeamMemberRow, 'id' | 'created_at'>>;
+
+export type DeveloperAllocationRow = {
+    id: string;
+    team_member_id: string;
+    project_id: string;
+    role_on_project: ProjectRoleOnProject;
+    allocation_pct: number;
+    hours_estimated: number;
+    hours_logged: number;
+    start_date: string | null;
+    end_date: string | null;
+    status: AllocationStatus;
+    notes: string | null;
+    created_at: string;
+    updated_at: string;
+};
+
+export type DeveloperAllocationInsert = Omit<DeveloperAllocationRow, 'id' | 'created_at' | 'updated_at'> & {
+    id?: string;
+    created_at?: string;
+    updated_at?: string;
+};
+
+export type DeveloperAllocationUpdate = Partial<Omit<DeveloperAllocationRow, 'id' | 'created_at'>>;
+
+// Joined types for UI
+export type TeamMemberWithAllocations = TeamMemberRow & {
+    allocations: (DeveloperAllocationRow & {
+        project?: { id: string; name: string; status: string } | null;
+    })[];
+    total_allocation_pct: number;
+    active_projects: number;
+};
+
+export type TeamWorkloadSummary = {
+    team_member_id: string;
+    full_name: string;
+    role: TeamMemberRole;
+    department: TeamDepartment;
+    seniority: Seniority;
+    availability: number;
+    member_status: TeamMemberStatus;
+    active_projects: number;
+    total_allocation_pct: number;
+    total_hours_estimated: number;
+    total_hours_logged: number;
+};
