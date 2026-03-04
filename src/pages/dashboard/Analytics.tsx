@@ -191,33 +191,33 @@ const Analytics = () => {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
-            <Activity className="w-8 h-8 text-emerald-400" />
-            Analytics & Insights
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2 flex items-center gap-2 sm:gap-3">
+            <Activity className="w-6 h-6 sm:w-8 sm:h-8 text-emerald-400 shrink-0" />
+            Analytics &amp; Insights
           </h1>
-          <p className="text-gray-400">Deep dive into your business performance and trends</p>
+          <p className="text-sm sm:text-base text-gray-400">Deep dive into your business performance and trends</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-gray-800/50 border border-gray-700 rounded-xl p-1">
+        <div className="flex flex-col min-[480px]:flex-row items-stretch min-[480px]:items-center gap-2 sm:gap-3">
+          <div className="grid grid-cols-4 min-[480px]:flex min-[480px]:items-center gap-1 sm:gap-2 bg-gray-800/50 border border-gray-700 rounded-xl p-1">
             {(['7d', '30d', '90d', '1y'] as const).map((range) => (
               <button
                 key={range}
                 onClick={() => setTimeRange(range)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                className={`px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
                   timeRange === range
                     ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20'
-                    : 'text-gray-400 hover:text-white'
+                    : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
                 }`}
               >
                 {range === '7d' ? '7 Days' : range === '30d' ? '30 Days' : range === '90d' ? '90 Days' : '1 Year'}
               </button>
             ))}
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-xl hover:bg-gray-800 transition-all" title="Export analytics data">
+          <button className="flex items-center justify-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-800/50 border border-gray-700 rounded-xl hover:bg-gray-800 transition-all" title="Export analytics data">
             <Download className="w-4 h-4" />
-            <span className="text-sm font-medium">Export</span>
+            <span className="text-xs sm:text-sm font-medium">Export</span>
           </button>
         </div>
       </div>
