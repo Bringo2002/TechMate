@@ -60,6 +60,7 @@ import ProjectsDashboard from './pages/dashboard/ProjectsDashboard';
 import EditProject from './pages/admin/Projects/EditProject';
 import DeveloperProfile from './pages/dashboard/DeveloperProfile';
 import ProjectTeam from './pages/dashboard/ProjectTeam';
+import BudgetManagement from './pages/dashboard/BudgetManagement';
 
 
 // Scroll to top and update title on route change
@@ -147,6 +148,7 @@ const App: React.FC = () => {
     <Route path="clients" element={<Clients />} />
     <Route path="clients/:clientId" element={<ClientDetail />} />
     <Route path="revenue" element={<Revenue />} />
+    <Route path="budgets" element={<BudgetManagement />} />
     <Route path="consulting" element={<Consulting />} />
     <Route path="deployments" element={<Deployments />} />
     <Route path="teams" element={<Teams />} />

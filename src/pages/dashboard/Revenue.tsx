@@ -1,10 +1,11 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
     DollarSign, ArrowUp, ArrowDown, Download, CreditCard, Wallet,
     PiggyBank, BarChart3, Target, Zap, Clock, CheckCircle2, AlertCircle,
     XCircle, RefreshCw, ChevronRight, ChevronDown, Briefcase, Globe,
     Smartphone, Database, Cloud, Code, FileText, TrendingUp, Loader2,
-    AlertTriangle, Pencil, Save, X, Search, PenTool
+    AlertTriangle, PenTool
 } from 'lucide-react';
 import { useRevenue } from '../../hooks/useRevenue';
 import type {
@@ -14,7 +15,6 @@ import type {
     RevenueByServiceItem,
     RevenueProjection,
     PaymentMethodBreakdown,
-    BudgetSpentUpdate,
 } from '../../services/revenue.service';
 
 // ============================================================================
@@ -600,317 +600,16 @@ const PaymentMethodsView = ({ methods }: { methods: PaymentMethodBreakdown[] }) 
     );
 };
 
-// ============================================================================
-// Budget/Spent Edit Modal
-// ============================================================================
-
-interface BudgetEditModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    projects: Array<{
-        id: string;
-        name: string;
-        client: string;
-        budget: number;
-        spent: number;
-        paymentStatus: string;
-        status: string;
-        type: string;
-    }>;
-    loading: boolean;
-    onSave: (update: BudgetSpentUpdate) => Promise<{ success: boolean; error?: string }>;
-}
-
-const BudgetEditModal = ({ isOpen, onClose, projects, loading, onSave }: BudgetEditModalProps) => {
-    const [editingId, setEditingId] = useState<string | null>(null);
-    const [editBudget, setEditBudget] = useState('');
-    const [editSpent, setEditSpent] = useState('');
-    const [editPaymentStatus, setEditPaymentStatus] = useState('unpaid');
-    const [saving, setSaving] = useState(false);
-    const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-    const [searchTerm, setSearchTerm] = useState('');
-
-    const startEdit = useCallback((project: typeof projects[number]) => {
-        setEditingId(project.id);
-        setEditBudget(String(project.budget));
-        setEditSpent(String(project.spent));
-        setEditPaymentStatus(project.paymentStatus);
-        setMessage(null);
-    }, []);
-
-    const handleSave = useCallback(async () => {
-        if (!editingId) return;
-        setSaving(true);
-        setMessage(null);
-
-        const budget = parseFloat(editBudget);
-        const spent = parseFloat(editSpent);
-
-        if (isNaN(budget) || budget < 0) {
-            setMessage({ type: 'error', text: 'Budget must be a valid positive number' });
-            setSaving(false);
-            return;
-        }
-        if (isNaN(spent) || spent < 0) {
-            setMessage({ type: 'error', text: 'Spent must be a valid positive number' });
-            setSaving(false);
-            return;
-        }
-        if (spent > budget) {
-            setMessage({ type: 'error', text: 'Spent cannot exceed budget' });
-            setSaving(false);
-            return;
-        }
-
-        const result = await onSave({
-            projectId: editingId,
-            budget,
-            spent,
-            paymentStatus: editPaymentStatus as BudgetSpentUpdate['paymentStatus'],
-        });
-
-        if (result.success) {
-            setMessage({ type: 'success', text: 'Budget updated successfully!' });
-            setEditingId(null);
-        } else {
-            setMessage({ type: 'error', text: result.error ?? 'Failed to save' });
-        }
-        setSaving(false);
-    }, [editingId, editBudget, editSpent, editPaymentStatus, onSave]);
-
-    const cancelEdit = useCallback(() => {
-        setEditingId(null);
-        setMessage(null);
-    }, []);
-
-    if (!isOpen) return null;
-
-    const filteredProjects = searchTerm
-        ? projects.filter(p =>
-            p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            p.client.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-        : projects;
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
-                {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-800">
-                    <div>
-                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                            <Pencil className="w-5 h-5 text-emerald-400" />
-                            Edit Project Budget &amp; Spent
-                        </h2>
-                        <p className="text-sm text-gray-400 mt-1">
-                            Update project financial data. Changes are saved immediately.
-                        </p>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
-                        title="Close modal"
-                    >
-                        <X className="w-5 h-5 text-gray-400" />
-                    </button>
-                </div>
-
-                {/* Search */}
-                <div className="px-6 pt-4">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                        <input
-                            type="text"
-                            placeholder="Search projects..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2.5 bg-gray-800/50 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:border-emerald-500/50 focus:outline-none transition-colors text-sm"
-                        />
-                    </div>
-                </div>
-
-                {/* Message */}
-                {message && (
-                    <div className={`mx-6 mt-3 p-3 rounded-lg text-sm font-medium ${message.type === 'success'
-                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                            : 'bg-red-500/10 text-red-400 border border-red-500/20'
-                        }`}>
-                        {message.text}
-                    </div>
-                )}
-
-                {/* Projects List */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-3">
-                    {loading ? (
-                        <div className="flex items-center justify-center py-12">
-                            <Loader2 className="w-6 h-6 text-emerald-400 animate-spin" />
-                            <span className="ml-2 text-gray-400">Loading projects...</span>
-                        </div>
-                    ) : filteredProjects.length === 0 ? (
-                        <div className="text-center py-12">
-                            <p className="text-gray-500">{searchTerm ? 'No projects match your search' : 'No projects found'}</p>
-                        </div>
-                    ) : (
-                        filteredProjects.map((project) => {
-                            const isEditing = editingId === project.id;
-                            const progress = project.budget > 0 ? (project.spent / project.budget) * 100 : 0;
-
-                            return (
-                                <div
-                                    key={project.id}
-                                    className={`p-4 rounded-xl border transition-all ${isEditing
-                                            ? 'bg-gray-800/70 border-emerald-500/30'
-                                            : 'bg-gray-800/30 border-gray-800 hover:border-gray-700'
-                                        }`}
-                                >
-                                    <div className="flex items-start justify-between gap-4">
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className="text-white font-medium text-sm truncate">{project.name}</span>
-                                                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${project.status === 'completed' ? 'bg-emerald-500/10 text-emerald-400'
-                                                        : project.status === 'active' ? 'bg-blue-500/10 text-blue-400'
-                                                            : 'bg-gray-500/10 text-gray-400'
-                                                    }`}>
-                                                    {project.status}
-                                                </span>
-                                            </div>
-                                            <div className="text-xs text-gray-400">{project.client} &middot; {project.type}</div>
-                                        </div>
-
-                                        {!isEditing ? (
-                                            <button
-                                                onClick={() => startEdit(project)}
-                                                className="p-2 hover:bg-gray-700 rounded-lg transition-colors shrink-0"
-                                                title="Edit budget &amp; spent"
-                                            >
-                                                <Pencil className="w-4 h-4 text-gray-400 hover:text-emerald-400" />
-                                            </button>
-                                        ) : (
-                                            <div className="flex items-center gap-2 shrink-0">
-                                                <button
-                                                    onClick={handleSave}
-                                                    disabled={saving}
-                                                    className="p-2 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-lg transition-colors"
-                                                    title="Save"
-                                                >
-                                                    {saving ? (
-                                                        <Loader2 className="w-4 h-4 text-emerald-400 animate-spin" />
-                                                    ) : (
-                                                        <Save className="w-4 h-4 text-emerald-400" />
-                                                    )}
-                                                </button>
-                                                <button
-                                                    onClick={cancelEdit}
-                                                    className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
-                                                    title="Cancel"
-                                                >
-                                                    <X className="w-4 h-4 text-gray-400" />
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {isEditing ? (
-                                        <div className="mt-4 space-y-3">
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <div>
-                                                    <label className="text-xs text-gray-400 block mb-1">Budget ($)</label>
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        step="100"
-                                                        value={editBudget}
-                                                        onChange={(e) => setEditBudget(e.target.value)}
-                                                        title="Budget amount"
-                                                        placeholder="0"
-                                                        className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:border-emerald-500/50 focus:outline-none text-sm"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="text-xs text-gray-400 block mb-1">Spent ($)</label>
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        step="100"
-                                                        value={editSpent}
-                                                        onChange={(e) => setEditSpent(e.target.value)}
-                                                        title="Spent amount"
-                                                        placeholder="0"
-                                                        className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:border-emerald-500/50 focus:outline-none text-sm"
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <label className="text-xs text-gray-400 block mb-1">Payment Status</label>
-                                                <select
-                                                    value={editPaymentStatus}
-                                                    onChange={(e) => setEditPaymentStatus(e.target.value)}
-                                                    title="Payment status"
-                                                    className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:border-emerald-500/50 focus:outline-none text-sm"
-                                                >
-                                                    <option value="unpaid">Unpaid</option>
-                                                    <option value="partial">Partial</option>
-                                                    <option value="paid">Paid</option>
-                                                    <option value="refunded">Refunded</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="mt-3">
-                                            <div className="flex items-center justify-between text-xs mb-1.5">
-                                                <span className="text-gray-400">
-                                                    {formatCurrency(project.spent)} / {formatCurrency(project.budget)}
-                                                </span>
-                                                <span className={`font-semibold ${project.paymentStatus === 'paid' ? 'text-emerald-400'
-                                                        : project.paymentStatus === 'partial' ? 'text-amber-400'
-                                                            : 'text-gray-400'
-                                                    }`}>
-                                                    {project.paymentStatus}
-                                                </span>
-                                            </div>
-                                            <div className="relative h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                                                <div
-                                                    className={`absolute inset-y-0 left-0 rounded-full transition-all ${progress > 90 ? 'bg-emerald-500'
-                                                            : progress > 50 ? 'bg-blue-500'
-                                                                : progress > 0 ? 'bg-amber-500'
-                                                                    : 'bg-gray-700'
-                                                        }`}
-                                                    style={{ width: `${Math.min(progress, 100)}%` }}
-                                                />
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-};
-
 export default function Revenue() {
     const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month' | 'quarter' | 'year'>('month');
-    const [budgetModalOpen, setBudgetModalOpen] = useState(false);
 
     const {
         data,
         loading,
         error,
         refetch,
-        editableProjects,
-        loadingProjects,
-        fetchProjects,
-        saveBudgetSpent,
         handleExport,
     } = useRevenue(timeRange);
-
-    const openBudgetModal = useCallback(() => {
-        setBudgetModalOpen(true);
-        fetchProjects();
-    }, [fetchProjects]);
 
     // Loading state
     if (loading) return <LoadingSkeleton />;
@@ -974,15 +673,15 @@ export default function Revenue() {
                             ))}
                         </div>
 
-                        {/* Edit Budget Button */}
-                        <button
-                            onClick={openBudgetModal}
+                        {/* Budget Management Link */}
+                        <Link
+                            to="/dashboard/budgets"
                             className="flex items-center gap-2 px-4 py-2 bg-gray-900/50 border border-gray-800 rounded-xl hover:bg-gray-800 hover:border-amber-500/50 transition-all group"
-                            title="Edit project budgets &amp; spending"
+                            title="Manage project budgets &amp; spending"
                         >
-                            <Pencil className="w-4 h-4 text-gray-400 group-hover:text-amber-400 transition-colors" />
-                            <span className="text-sm font-medium text-white">Budget</span>
-                        </button>
+                            <Wallet className="w-4 h-4 text-gray-400 group-hover:text-amber-400 transition-colors" />
+                            <span className="text-sm font-medium text-white">Budgets</span>
+                        </Link>
 
                         {/* Export Button */}
                         <button
@@ -1150,15 +849,6 @@ export default function Revenue() {
                     </div>
                 </div>
             </div>
-
-            {/* Budget/Spent Edit Modal */}
-            <BudgetEditModal
-                isOpen={budgetModalOpen}
-                onClose={() => setBudgetModalOpen(false)}
-                projects={editableProjects}
-                loading={loadingProjects}
-                onSave={saveBudgetSpent}
-            />
         </div>
     );
 }

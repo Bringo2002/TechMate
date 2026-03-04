@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart3, Activity, Users, UsersRound, Settings, ChevronLeft, ChevronRight, Code, Briefcase, DollarSign, Rocket, Layers, MessageSquare, Terminal, Sparkles, X } from 'lucide-react';
+import { BarChart3, Activity, Users, UsersRound, Settings, ChevronLeft, ChevronRight, Code, Briefcase, DollarSign, Rocket, Layers, MessageSquare, Terminal, Sparkles, X, Wallet } from 'lucide-react';
 
 const navItems = [
   { id: "overview", label: "Overview", icon: BarChart3, path: "/dashboard" },
@@ -9,6 +9,7 @@ const navItems = [
   { id: "clients", label: "Clients", icon: Users, path: "/dashboard/clients" },
   { id: "analytics", label: "Analytics", icon: Activity, path: "/dashboard/analytics" },
   { id: "revenue", label: "Revenue", icon: DollarSign, path: "/dashboard/revenue" },
+  { id: "budgets", label: "Budgets", icon: Wallet, path: "/dashboard/budgets" },
   { id: "consulting", label: "Consulting", icon: Briefcase, path: "/dashboard/consulting" },
   { id: "deployments", label: "Deployments", icon: Layers, path: "/dashboard/deployments" },
   { id: "teams", label: "Teams", icon: UsersRound, path: "/dashboard/teams" },

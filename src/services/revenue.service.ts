@@ -684,6 +684,59 @@ export async function updateProjectBudgetSpent(
 }
 
 // ============================================================================
+// Batch Update Budget/Spent (Admin action)
+// ============================================================================
+
+export async function batchUpdateProjectBudgets(
+    updates: BudgetSpentUpdate[]
+): Promise<ServiceResponse<{ succeeded: number; failed: number; errors: string[] }>> {
+    const errors: string[] = [];
+    let succeeded = 0;
+    let failed = 0;
+
+    // Get auth user once
+    let userId: string | null = null;
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        userId = user?.id ?? null;
+    } catch { /* non-critical */ }
+
+    for (const update of updates) {
+        const { projectId, budget, spent, paymentStatus } = update;
+        const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
+        if (budget !== undefined) payload.budget = budget;
+        if (spent !== undefined) payload.spent = spent;
+        if (paymentStatus !== undefined) payload.payment_status = paymentStatus;
+
+        const { error } = await supabase
+            .from('projects')
+            .update(payload)
+            .eq('id', projectId);
+
+        if (error) {
+            failed++;
+            errors.push(`Project ${projectId}: ${error.message}`);
+        } else {
+            succeeded++;
+            // Log activity
+            if (userId) {
+                try {
+                    await supabase.from('activity_logs').insert({
+                        user_id: userId,
+                        entity_type: 'project',
+                        entity_id: projectId,
+                        action: 'budget_updated',
+                        changes: { budget, spent, paymentStatus },
+                    });
+                } catch { /* non-critical */ }
+            }
+        }
+    }
+
+    return { data: { succeeded, failed, errors }, error: null };
+}
+
+// ============================================================================
 // Export Revenue Data (CSV)
 // ============================================================================
 
