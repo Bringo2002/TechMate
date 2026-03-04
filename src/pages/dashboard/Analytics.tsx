@@ -205,17 +205,17 @@ const Analytics = () => {
               <button
                 key={range}
                 onClick={() => setTimeRange(range)}
-                className={`px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
+                className={`px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors duration-100 whitespace-nowrap select-none cursor-pointer ${
                   timeRange === range
                     ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                    : 'text-gray-400 hover:text-white hover:bg-gray-700/50 active:bg-gray-600/60 active:scale-95'
                 }`}
               >
                 {range === '7d' ? '7 Days' : range === '30d' ? '30 Days' : range === '90d' ? '90 Days' : '1 Year'}
               </button>
             ))}
           </div>
-          <button className="flex items-center justify-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-800/50 border border-gray-700 rounded-xl hover:bg-gray-800 transition-all" title="Export analytics data">
+          <button className="flex items-center justify-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-800/50 border border-gray-700 rounded-xl hover:bg-gray-800 active:bg-gray-700 active:scale-95 transition-colors duration-100 select-none cursor-pointer" title="Export analytics data">
             <Download className="w-4 h-4" />
             <span className="text-xs sm:text-sm font-medium">Export</span>
           </button>
