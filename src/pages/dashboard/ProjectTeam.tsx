@@ -323,8 +323,8 @@ const ProjectTeam: React.FC = () => {
                 >
                   <option value="">Choose a team member…</option>
                   {available.map(m => (
-                    <option key={m.id} value={m.id}>
-                      {m.full_name} — {roleLabel[m.role]} ({seniorityLabel[m.seniority]}) · {m.current_allocation}% allocated · {m.skills.slice(0, 3).join(', ')}
+                    <option key={m.team_member_id} value={m.team_member_id}>
+                      {m.full_name} — {roleLabel[m.role]} ({seniorityLabel[m.seniority]}) · {m.total_allocation_pct}% allocated · {m.skills.slice(0, 3).join(', ')}
                     </option>
                   ))}
                 </select>
@@ -531,11 +531,11 @@ const ProjectTeam: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {filteredAvailable.map(m => {
                   const RoleIcon = roleIcon[m.role];
-                  const allocColor = m.current_allocation >= 80 ? 'amber' : m.current_allocation >= 50 ? 'blue' : 'emerald';
+                  const allocColor = m.total_allocation_pct >= 80 ? 'amber' : m.total_allocation_pct >= 50 ? 'blue' : 'emerald';
                   return (
-                    <div key={m.id} className="bg-gray-800/20 border border-gray-700/40 rounded-xl p-4 hover:border-gray-600/50 transition-all">
+                    <div key={m.team_member_id} className="bg-gray-800/20 border border-gray-700/40 rounded-xl p-4 hover:border-gray-600/50 transition-all">
                       <div className="flex items-center justify-between mb-3">
-                        <Link to={`/dashboard/teams/${m.id}`} className="flex items-center gap-3 group">
+                        <Link to={`/dashboard/teams/${m.team_member_id}`} className="flex items-center gap-3 group">
                           <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-400/80 to-blue-600/80 flex items-center justify-center text-white font-bold text-xs">
                             {m.full_name.split(' ').map(n => n[0]).join('')}
                           </div>
@@ -547,7 +547,7 @@ const ProjectTeam: React.FC = () => {
                           </div>
                         </Link>
                         <button
-                          onClick={() => quickAssign(m.id, m.full_name)}
+                          onClick={() => quickAssign(m.team_member_id, m.full_name)}
                           className="flex items-center gap-1 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 rounded-lg text-xs font-medium transition-all"
                           title="Quick-assign with default settings"
                         >
@@ -561,10 +561,10 @@ const ProjectTeam: React.FC = () => {
                       </div>
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-gray-500">Current allocation</span>
-                        <span className={`font-semibold text-${allocColor}-400`}>{m.current_allocation}%</span>
+                        <span className={`font-semibold text-${allocColor}-400`}>{m.total_allocation_pct}%</span>
                       </div>
                       <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden mt-1">
-                        <div className={`h-full bg-${allocColor}-500 rounded-full`} style={{ width: `${Math.min(m.current_allocation, 100)}%` }} />
+                        <div className={`h-full bg-${allocColor}-500 rounded-full`} style={{ width: `${Math.min(m.total_allocation_pct, 100)}%` }} />
                       </div>
                     </div>
                   );
