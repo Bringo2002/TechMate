@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Users, Search, Filter, UserPlus, Clock, Briefcase, Star,
   BarChart3, AlertCircle, CheckCircle2, Code2, Palette, Shield, Terminal,
@@ -53,6 +54,7 @@ const roleIcon: Record<TeamMemberRole, React.ElementType> = { developer: Code2, 
 
 /* ─────────────────────────────── component ─────────────────────────────── */
 const Teams: React.FC = () => {
+  const navigate = useNavigate();
   const { data, loading, error, refetch } = useTeams();
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<TeamMemberRole | 'all'>('all');
@@ -194,7 +196,11 @@ const Teams: React.FC = () => {
               </button>
             ))}
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl transition-all shadow-lg shadow-emerald-500/20" title="Add Team Member">
+          <button
+            onClick={() => navigate('/dashboard/teams/add-member')}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl transition-all shadow-lg shadow-emerald-500/20"
+            title="Add Team Member"
+          >
             <UserPlus className="w-4 h-4" />
             <span className="text-sm font-medium hidden sm:inline">Add Member</span>
           </button>
@@ -312,8 +318,20 @@ const Teams: React.FC = () => {
                   </div>
                   {/* Quick actions */}
                   <div className="flex items-center justify-end gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button className="p-1.5 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg transition-colors" title="View member details"><Eye className="w-3.5 h-3.5 text-gray-400" /></button>
-                    <button className="p-1.5 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg transition-colors" title="More options"><MoreHorizontal className="w-3.5 h-3.5 text-gray-400" /></button>
+                    <button
+                      onClick={e => { e.stopPropagation(); setSelectedMember(member.id === selectedMember ? null : member.id); }}
+                      className="p-1.5 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg transition-colors"
+                      title="View member details"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-gray-400" />
+                    </button>
+                    <button
+                      onClick={e => { e.stopPropagation(); navigate(`/dashboard/teams/add-member`); }}
+                      className="p-1.5 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg transition-colors"
+                      title="Add new member"
+                    >
+                      <MoreHorizontal className="w-3.5 h-3.5 text-gray-400" />
+                    </button>
                   </div>
                 </div>
               );

@@ -33,6 +33,7 @@ import Revenue from "./pages/dashboard/Revenue";
 import Consulting from "./pages/dashboard/Consulting";
 import Deployments from "./pages/dashboard/Deployments";
 import Teams from "./pages/dashboard/Teams";
+import AddTeamMember from "./pages/dashboard/AddTeamMember";
 import { InquiryPipeline } from './pages/admin/InquiryPipeline';
 import { InquiryDetail } from './pages/admin/InquiryDetail';
 import Messages from './pages/user/Messages';
@@ -147,6 +148,7 @@ const App: React.FC = () => {
     <Route path="consulting" element={<Consulting />} />
     <Route path="deployments" element={<Deployments />} />
     <Route path="teams" element={<Teams />} />
+    <Route path="teams/add-member" element={<AddTeamMember />} />
     <Route path="messages" element={<Messages />} />
     <Route path="projects/:projectId" element={<ProjectsDashboard />} />
     <Route path="projects/:projectId/edit" element={<EditProject />} />

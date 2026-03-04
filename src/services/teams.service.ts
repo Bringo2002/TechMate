@@ -230,3 +230,64 @@ export async function fetchTeamsData(): Promise<TeamsData> {
         kpis,
     };
 }
+
+// ============================================================================
+// Add a new team member
+// ============================================================================
+
+export interface AddTeamMemberPayload {
+    full_name: string;
+    email: string;
+    role: TeamMemberRole;
+    department: TeamDepartment;
+    seniority: Seniority;
+    skills: string[];
+    hourly_rate: number;
+    availability: number;
+    status: TeamMemberStatus;
+    avatar_url?: string | null;
+    profile_id?: string | null;
+}
+
+export async function addTeamMember(payload: AddTeamMemberPayload): Promise<TeamMemberRow> {
+    const { data, error } = await supabase
+        .from('team_members')
+        .insert({
+            full_name: payload.full_name,
+            email: payload.email,
+            role: payload.role,
+            department: payload.department,
+            seniority: payload.seniority,
+            skills: payload.skills,
+            hourly_rate: payload.hourly_rate,
+            availability: payload.availability,
+            status: payload.status,
+            avatar_url: payload.avatar_url ?? null,
+            profile_id: payload.profile_id ?? null,
+            joined_at: new Date().toISOString(),
+        })
+        .select('*')
+        .single();
+
+    if (error) throw new Error(`Failed to add team member: ${error.message}`);
+
+    const raw = data as Record<string, unknown>;
+    return {
+        id: String(raw.id ?? ''),
+        profile_id: raw.profile_id ? String(raw.profile_id) : null,
+        full_name: String(raw.full_name ?? ''),
+        email: String(raw.email ?? ''),
+        avatar_url: raw.avatar_url ? String(raw.avatar_url) : null,
+        role: asRole(raw.role as string),
+        department: asDept(raw.department as string),
+        seniority: asSeniority(raw.seniority as string),
+        skills: Array.isArray(raw.skills) ? (raw.skills as string[]) : [],
+        hourly_rate: Number(raw.hourly_rate ?? 0),
+        availability: Number(raw.availability ?? 40),
+        status: asStatus(raw.status as string),
+        joined_at: String(raw.joined_at ?? ''),
+        created_at: String(raw.created_at ?? ''),
+        updated_at: String(raw.updated_at ?? ''),
+        deleted_at: raw.deleted_at ? String(raw.deleted_at) : null,
+    };
+}
