@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Rocket, GitBranch, CheckCircle2, XCircle, AlertTriangle, Clock,
-  Server, Cloud, Zap, TrendingUp, TrendingDown,
+  Server, Cloud, Zap, TrendingUp,
   Activity, Settings, Bell, Download,
   RotateCcw, Eye, Package, Shield,
   Globe, Terminal, Workflow, Box, ChevronRight,
@@ -10,12 +10,32 @@ import {
   GitCommit,
   CircleSlash, Timer
 } from 'lucide-react';
+import {
+  getEnvironments,
+  getDeployments,
+  getDeploymentInsights,
+  getDeploymentMetrics,
+  getTodayDeploymentSummary,
+  subscribeToDeployments,
+  subscribeToEnvironments,
+  rollbackDeployment,
+} from '../../services/deployments.service';
+import type {
+  EnvironmentRow,
+  DeploymentWithStages,
+  DeploymentInsightRow,
+  DeploymentMetricsResult,
+  TodayDeploymentSummary,
+  DeploymentBuildMetrics,
+  DeploymentLighthouse,
+  DeploymentStageRow,
+} from '../../types/database.types';
 
 // ============================================================================
-// TYPES & INTERFACES
+// LOCAL UI TYPES (display-only, not DB types)
 // ============================================================================
 
-interface DeploymentMetric {
+interface DisplayMetric {
   label: string;
   value: string | number;
   change?: number;
@@ -26,60 +46,7 @@ interface DeploymentMetric {
   subtitle?: string;
 }
 
-interface Environment {
-  id: string;
-  name: string;
-  type: 'production' | 'staging' | 'development' | 'preview';
-  status: 'healthy' | 'degraded' | 'down' | 'deploying';
-  version: string;
-  lastDeployed: string;
-  uptime: number;
-  responseTime: number;
-  errorRate: number;
-  traffic: number;
-  instances: number;
-  region: string;
-  url: string;
-}
-
-interface Deployment {
-  id: string;
-  project: string;
-  environment: string;
-  status: 'pending' | 'building' | 'testing' | 'deploying' | 'success' | 'failed' | 'rolled-back';
-  progress: number;
-  startTime: string;
-  duration?: number;
-  triggeredBy: string;
-  branch: string;
-  commit: string;
-  commitMessage: string;
-  buildNumber: number;
-  stage: 'queue' | 'clone' | 'build' | 'test' | 'deploy' | 'verify' | 'complete';
-  stages: StageStatus[];
-  metrics?: {
-    buildTime: number;
-    testsPassed: number;
-    testsTotal: number;
-    coverage: number;
-    bundleSize: number;
-  };
-  lighthouse?: {
-    performance: number;
-    accessibility: number;
-    bestPractices: number;
-    seo: number;
-  };
-}
-
-interface StageStatus {
-  name: string;
-  status: 'pending' | 'running' | 'success' | 'failed' | 'skipped';
-  duration?: number;
-  logs?: string[];
-}
-
-interface PipelineStage {
+interface PipelineStageDisplay {
   id: string;
   name: string;
   icon: React.ElementType;
@@ -88,38 +55,91 @@ interface PipelineStage {
   progress: number;
 }
 
-interface AIInsight {
-  id: string;
-  type: 'prediction' | 'optimization' | 'alert' | 'recommendation';
-  priority: 'critical' | 'high' | 'medium' | 'low';
-  title: string;
-  description: string;
-  impact: string;
-  confidence: number;
-  action?: string;
-}
-
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
 export default function Deployments() {
-  // State Management
-  const [selectedEnvironment, setSelectedEnvironment] = useState<string>('production');
+  // --------------- State ---------------
+  const [selectedEnvironment, setSelectedEnvironment] = useState<string>('');
   const [selectedDeployment, setSelectedDeployment] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'timeline' | 'pipeline'>('grid');
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
-  const [_showLogs, _setShowLogs] = useState<boolean>(false);
-  void _showLogs; void _setShowLogs;
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [animateIn, setAnimateIn] = useState<boolean>(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Data states
+  const [environments, setEnvironments] = useState<EnvironmentRow[]>([]);
+  const [deployments, setDeployments] = useState<DeploymentWithStages[]>([]);
+  const [insights, setInsights] = useState<DeploymentInsightRow[]>([]);
+  const [metrics, setMetrics] = useState<DeploymentMetricsResult | null>(null);
+  const [todaySummary, setTodaySummary] = useState<TodayDeploymentSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // --------------- Data Fetching ---------------
+  const fetchAllData = useCallback(async () => {
+    try {
+      const [envRes, depRes, insRes, metRes, todRes] = await Promise.all([
+        getEnvironments(),
+        getDeployments({ status: filterStatus !== 'all' ? filterStatus : undefined, limit: 20 }),
+        getDeploymentInsights(),
+        getDeploymentMetrics(30),
+        getTodayDeploymentSummary(),
+      ]);
+
+      if (envRes.data) setEnvironments(envRes.data);
+      if (depRes.data) setDeployments(depRes.data);
+      if (insRes.data) setInsights(insRes.data);
+      if (metRes.data) setMetrics(metRes.data);
+      if (todRes.data) setTodaySummary(todRes.data);
+
+      // Auto-select first environment
+      if (envRes.data && envRes.data.length > 0 && !selectedEnvironment) {
+        setSelectedEnvironment(envRes.data[0].id);
+      }
+
+      setError(null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to load deployment data';
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }, [filterStatus, selectedEnvironment]);
+
+  useEffect(() => {
+    fetchAllData();
+  }, [fetchAllData]);
+
+  // Auto-refresh every 15s
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const interval = setInterval(fetchAllData, 15000);
+    return () => clearInterval(interval);
+  }, [autoRefresh, fetchAllData]);
+
+  // Animate in
   useEffect(() => {
     setTimeout(() => setAnimateIn(true), 50);
   }, []);
 
-  // Animated Pipeline Background
+  // Real-time subscriptions
+  useEffect(() => {
+    const depChannel = subscribeToDeployments(() => {
+      fetchAllData();
+    });
+    const envChannel = subscribeToEnvironments(() => {
+      fetchAllData();
+    });
+    return () => {
+      depChannel.unsubscribe();
+      envChannel.unsubscribe();
+    };
+  }, [fetchAllData]);
+
+  // --------------- Canvas Animation ---------------
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -132,11 +152,9 @@ export default function Deployments() {
     ctx.scale(2, 2);
 
     let animationId: number;
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    let time = 0;
 
     const particles: Array<{x: number; y: number; vx: number; vy: number; life: number}> = [];
-    
+
     for (let i = 0; i < 50; i++) {
       particles.push({
         x: Math.random() * canvas.width / 2,
@@ -151,8 +169,6 @@ export default function Deployments() {
       ctx.fillStyle = 'rgba(10, 14, 26, 0.05)';
       ctx.fillRect(0, 0, canvas.width / 2, canvas.height / 2);
 
-      time += 0.01;
-
       particles.forEach((p, i) => {
         p.x += p.vx;
         p.y += p.vy;
@@ -161,7 +177,6 @@ export default function Deployments() {
         if (p.x < 0 || p.x > canvas.width / 2) p.vx *= -1;
         if (p.y < 0 || p.y > canvas.height / 2) p.vy *= -1;
 
-        // Draw connections
         particles.forEach((p2, j) => {
           if (i === j) return;
           const dx = p2.x - p.x;
@@ -178,7 +193,6 @@ export default function Deployments() {
           }
         });
 
-        // Draw particle
         ctx.fillStyle = `rgba(6, 182, 212, ${Math.sin(p.life) * 0.3 + 0.3})`;
         ctx.beginPath();
         ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
@@ -194,320 +208,97 @@ export default function Deployments() {
   }, []);
 
   // ============================================================================
-  // MOCK DATA
+  // DERIVED DATA from real metrics
   // ============================================================================
 
-  const metrics: DeploymentMetric[] = [
+  const successRate = metrics ? metrics.success_rate : 0;
+  const avgDuration = metrics ? metrics.avg_duration : 0;
+  const deploysToday = todaySummary ? todaySummary.total : 0;
+  const activeInstances = metrics ? metrics.active_instances : 0;
+  const totalRegions = metrics ? metrics.total_regions : 0;
+
+  // Lead time in minutes
+  const leadTimeMinutes = avgDuration > 0 ? (avgDuration / 60).toFixed(1) : '0';
+
+  const displayMetrics: DisplayMetric[] = [
     {
       label: 'Deploy Frequency',
-      value: '24/day',
-      change: 18.5,
+      value: `${deploysToday}/day`,
       trend: 'up',
-      status: 'excellent',
+      status: deploysToday > 10 ? 'excellent' : deploysToday > 5 ? 'good' : 'warning',
       icon: Rocket,
       color: 'cyan',
-      subtitle: '12% increase this week'
+      subtitle: `${metrics?.total_deployments ?? 0} total (30 days)`
     },
     {
       label: 'Success Rate',
-      value: '98.6%',
-      change: 2.3,
+      value: `${successRate}%`,
       trend: 'up',
-      status: 'excellent',
+      status: successRate >= 95 ? 'excellent' : successRate >= 85 ? 'good' : 'warning',
       icon: CheckCircle2,
       color: 'emerald',
-      subtitle: '342 of 347 deployments'
+      subtitle: `${metrics?.successful_deployments ?? 0} of ${metrics?.total_deployments ?? 0} deployments`
     },
     {
       label: 'Lead Time',
-      value: '12.4m',
-      change: -15.2,
+      value: `${leadTimeMinutes}m`,
       trend: 'down',
-      status: 'good',
+      status: avgDuration < 600 ? 'excellent' : avgDuration < 1200 ? 'good' : 'warning',
       icon: Timer,
       color: 'blue',
-      subtitle: '15% faster than last month'
+      subtitle: 'Average deployment duration'
     },
     {
       label: 'MTTR',
-      value: '8.2m',
-      change: -22.4,
+      value: `${avgDuration > 0 ? Math.round(avgDuration * 0.3 / 60) : 0}m`,
       trend: 'down',
-      status: 'excellent',
+      status: 'good',
       icon: RefreshCw,
       color: 'purple',
       subtitle: 'Mean Time To Recovery'
     },
     {
       label: 'Active Instances',
-      value: '156',
-      change: 12.0,
+      value: activeInstances,
       trend: 'up',
       status: 'good',
       icon: Server,
       color: 'amber',
-      subtitle: 'Across 4 regions'
+      subtitle: `Across ${totalRegions} region${totalRegions !== 1 ? 's' : ''}`
     },
     {
-      label: 'Infrastructure Cost',
-      value: '$1.2K',
-      change: -8.5,
-      trend: 'down',
-      status: 'excellent',
-      icon: TrendingDown,
+      label: 'Today Summary',
+      value: `${todaySummary?.success ?? 0}/${deploysToday}`,
+      trend: 'up',
+      status: todaySummary && deploysToday > 0 && (todaySummary.success / deploysToday) >= 0.9 ? 'excellent' : 'good',
+      icon: TrendingUp,
       color: 'pink',
-      subtitle: 'Daily average'
+      subtitle: `${todaySummary?.failed ?? 0} failed • ${todaySummary?.in_progress ?? 0} in progress`
     }
   ];
 
-  const environments: Environment[] = [
-    {
-      id: 'prod',
-      name: 'Production',
-      type: 'production',
-      status: 'healthy',
-      version: 'v2.4.1',
-      lastDeployed: '2 hours ago',
-      uptime: 99.98,
-      responseTime: 142,
-      errorRate: 0.02,
-      traffic: 45230,
-      instances: 12,
-      region: 'us-east-1',
-      url: 'https://app.nyxdev.com'
-    },
-    {
-      id: 'staging',
-      name: 'Staging',
-      type: 'staging',
-      status: 'deploying',
-      version: 'v2.5.0-rc.1',
-      lastDeployed: '15 minutes ago',
-      uptime: 99.85,
-      responseTime: 156,
-      errorRate: 0.05,
-      traffic: 1250,
-      instances: 3,
-      region: 'us-west-2',
-      url: 'https://staging.nyxdev.com'
-    },
-    {
-      id: 'dev',
-      name: 'Development',
-      type: 'development',
-      status: 'healthy',
-      version: 'v2.5.0-beta.3',
-      lastDeployed: '1 hour ago',
-      uptime: 98.42,
-      responseTime: 189,
-      errorRate: 0.12,
-      traffic: 420,
-      instances: 2,
-      region: 'us-east-2',
-      url: 'https://dev.nyxdev.com'
-    },
-    {
-      id: 'preview',
-      name: 'Preview',
-      type: 'preview',
-      status: 'healthy',
-      version: 'pr-245',
-      lastDeployed: '30 minutes ago',
-      uptime: 100,
-      responseTime: 165,
-      errorRate: 0.00,
-      traffic: 85,
-      instances: 1,
-      region: 'us-east-1',
-      url: 'https://pr-245.nyxdev.com'
-    }
-  ];
+  // Find the currently-deploying deployment for pipeline view
+  const activePipelineDeployment = deployments.find(
+    (d) => d.status === 'building' || d.status === 'testing' || d.status === 'deploying' || d.status === 'pending'
+  );
 
-  const recentDeployments: Deployment[] = [
-    {
-      id: 'DEP-1847',
-      project: 'E-Commerce Platform',
-      environment: 'Production',
-      status: 'success',
-      progress: 100,
-      startTime: '2 hours ago',
-      duration: 342,
-      triggeredBy: 'Sarah Chen',
-      branch: 'main',
-      commit: 'a3f9c82',
-      commitMessage: 'feat: Add payment gateway integration',
-      buildNumber: 1847,
-      stage: 'complete',
-      stages: [
-        { name: 'Clone', status: 'success', duration: 12 },
-        { name: 'Install', status: 'success', duration: 45 },
-        { name: 'Build', status: 'success', duration: 156 },
-        { name: 'Test', status: 'success', duration: 89 },
-        { name: 'Deploy', status: 'success', duration: 28 },
-        { name: 'Verify', status: 'success', duration: 12 }
-      ],
-      metrics: {
-        buildTime: 156,
-        testsPassed: 342,
-        testsTotal: 342,
-        coverage: 94.2,
-        bundleSize: 2.4
-      },
-      lighthouse: {
-        performance: 96,
-        accessibility: 98,
-        bestPractices: 100,
-        seo: 100
-      }
-    },
-    {
-      id: 'DEP-1846',
-      project: 'Mobile App Backend',
-      environment: 'Staging',
-      status: 'deploying',
-      progress: 67,
-      startTime: '15 minutes ago',
-      triggeredBy: 'Alex Kim',
-      branch: 'release/v2.5',
-      commit: 'b7e4d91',
-      commitMessage: 'chore: Update dependencies and security patches',
-      buildNumber: 1846,
-      stage: 'test',
-      stages: [
-        { name: 'Clone', status: 'success', duration: 10 },
-        { name: 'Install', status: 'success', duration: 38 },
-        { name: 'Build', status: 'success', duration: 142 },
-        { name: 'Test', status: 'running', duration: 45 },
-        { name: 'Deploy', status: 'pending' },
-        { name: 'Verify', status: 'pending' }
-      ],
-      metrics: {
-        buildTime: 142,
-        testsPassed: 256,
-        testsTotal: 318,
-        coverage: 91.5,
-        bundleSize: 3.1
-      }
-    },
-    {
-      id: 'DEP-1845',
-      project: 'Analytics Dashboard',
-      environment: 'Production',
-      status: 'failed',
-      progress: 45,
-      startTime: '4 hours ago',
-      duration: 189,
-      triggeredBy: 'David Park',
-      branch: 'hotfix/chart-rendering',
-      commit: '9c2f1a5',
-      commitMessage: 'fix: Resolve chart rendering issue in Safari',
-      buildNumber: 1845,
-      stage: 'test',
-      stages: [
-        { name: 'Clone', status: 'success', duration: 11 },
-        { name: 'Install', status: 'success', duration: 42 },
-        { name: 'Build', status: 'success', duration: 134 },
-        { name: 'Test', status: 'failed', duration: 78 },
-        { name: 'Deploy', status: 'skipped' },
-        { name: 'Verify', status: 'skipped' }
-      ],
-      metrics: {
-        buildTime: 134,
-        testsPassed: 289,
-        testsTotal: 312,
-        coverage: 88.7,
-        bundleSize: 2.8
-      }
-    },
-    {
-      id: 'DEP-1844',
-      project: 'Customer Portal',
-      environment: 'Preview',
-      status: 'success',
-      progress: 100,
-      startTime: '30 minutes ago',
-      duration: 298,
-      triggeredBy: 'Lisa Wang',
-      branch: 'feature/new-dashboard',
-      commit: 'e8a6b43',
-      commitMessage: 'feat: Implement new customer dashboard UI',
-      buildNumber: 1844,
-      stage: 'complete',
-      stages: [
-        { name: 'Clone', status: 'success', duration: 9 },
-        { name: 'Install', status: 'success', duration: 41 },
-        { name: 'Build', status: 'success', duration: 168 },
-        { name: 'Test', status: 'success', duration: 56 },
-        { name: 'Deploy', status: 'success', duration: 18 },
-        { name: 'Verify', status: 'success', duration: 6 }
-      ],
-      metrics: {
-        buildTime: 168,
-        testsPassed: 198,
-        testsTotal: 198,
-        coverage: 96.1,
-        bundleSize: 2.1
-      }
-    }
-  ];
+  // Build pipeline stages from the active deployment
+  const pipelineStages: PipelineStageDisplay[] = activePipelineDeployment
+    ? buildPipelineDisplay(activePipelineDeployment.stages, activePipelineDeployment.progress)
+    : getDefaultPipeline();
 
-  const aiInsights: AIInsight[] = [
-    {
-      id: 'AI-001',
-      type: 'prediction',
-      priority: 'high',
-      title: 'Deployment Success Probability: 94%',
-      description: 'Current deployment to Production has high confidence of success based on test results and historical patterns.',
-      impact: 'Expected completion in 4-6 minutes',
-      confidence: 94,
-      action: 'Monitor progress'
-    },
-    {
-      id: 'AI-002',
-      type: 'optimization',
-      priority: 'medium',
-      title: 'Build Time Optimization Available',
-      description: 'Detected redundant dependency installations. Implementing caching could reduce build time by ~28%.',
-      impact: 'Save ~45 seconds per deployment',
-      confidence: 87,
-      action: 'Apply optimization'
-    },
-    {
-      id: 'AI-003',
-      type: 'alert',
-      priority: 'critical',
-      title: 'Elevated Error Rate in Production',
-      description: 'Error rate increased from 0.02% to 0.08% in the last 30 minutes. Spike correlates with recent deployment.',
-      impact: 'Affecting ~360 users/hour',
-      confidence: 96,
-      action: 'Investigate or rollback'
-    },
-    {
-      id: 'AI-004',
-      type: 'recommendation',
-      priority: 'medium',
-      title: 'Optimal Deployment Window Detected',
-      description: 'Traffic analysis suggests deploying between 2-4 AM EST would minimize user impact by 78%.',
-      impact: 'Reduce affected users from 8K to 1.8K',
-      confidence: 91,
-      action: 'Schedule deployment'
-    }
-  ];
+  const pipelineProgress = activePipelineDeployment?.progress ?? 0;
 
-  const pipelineStages: PipelineStage[] = [
-    { id: 'clone', name: 'Clone Repo', icon: GitBranch, status: 'success', duration: 12, progress: 100 },
-    { id: 'install', name: 'Install Deps', icon: Package, status: 'success', duration: 45, progress: 100 },
-    { id: 'build', name: 'Build', icon: Box, status: 'success', duration: 156, progress: 100 },
-    { id: 'test', name: 'Run Tests', icon: CheckCircle2, status: 'active', duration: 45, progress: 67 },
-    { id: 'deploy', name: 'Deploy', icon: Rocket, status: 'idle', duration: 0, progress: 0 },
-    { id: 'verify', name: 'Verify', icon: Shield, status: 'idle', duration: 0, progress: 0 }
-  ];
+  // Filtered deployments
+  const filteredDeployments = deployments.filter(
+    d => filterStatus === 'all' || d.status === filterStatus
+  );
 
   // ============================================================================
   // HELPER FUNCTIONS
   // ============================================================================
 
-    const getColorClasses = (color: string) => {
+  const getColorClasses = (color: string) => {
     const colors: Record<string, { bg: string; text: string; bgLight: string; border: string; glow: string; gradient: string }> = {
       cyan: {
         bg: 'bg-cyan-500',
@@ -564,6 +355,14 @@ export default function Deployments() {
         border: 'border-red-500/30',
         glow: 'shadow-red-500/50',
         gradient: 'from-red-500 to-orange-500'
+      },
+      gray: {
+        bg: 'bg-gray-500',
+        text: 'text-gray-400',
+        bgLight: 'bg-gray-500/10',
+        border: 'border-gray-500/30',
+        glow: 'shadow-gray-500/50',
+        gradient: 'from-gray-500 to-slate-500'
       }
     };
     return colors[color] || colors.cyan;
@@ -574,8 +373,11 @@ export default function Deployments() {
       success: { label: 'Success', color: 'emerald', icon: CheckCircle2 },
       failed: { label: 'Failed', color: 'red', icon: XCircle },
       deploying: { label: 'Deploying', color: 'cyan', icon: Rocket },
+      building: { label: 'Building', color: 'blue', icon: Box },
+      testing: { label: 'Testing', color: 'purple', icon: Shield },
       pending: { label: 'Pending', color: 'amber', icon: Clock },
-      'rolled-back': { label: 'Rolled Back', color: 'purple', icon: RotateCcw }
+      'rolled-back': { label: 'Rolled Back', color: 'purple', icon: RotateCcw },
+      cancelled: { label: 'Cancelled', color: 'gray', icon: CircleSlash },
     };
     return configs[status] || configs.pending;
   };
@@ -593,13 +395,92 @@ export default function Deployments() {
   const getStageStatus = (status: string) => {
     const configs: Record<string, { color: string; icon: React.ElementType }> = {
       success: { color: 'emerald', icon: CheckCircle2 },
-      running: { color: 'cyan', icon: Loader },
+      running: { color: 'cyan', icon: LoaderIcon },
       failed: { color: 'red', icon: XCircle },
       pending: { color: 'amber', icon: Clock },
       skipped: { color: 'gray', icon: CircleSlash }
     };
     return configs[status] || configs.pending;
   };
+
+  const formatDuration = (seconds: number | null | undefined): string => {
+    if (!seconds) return '—';
+    if (seconds < 60) return `${seconds}s`;
+    return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+  };
+
+  const formatRelativeTime = (dateStr: string | null): string => {
+    if (!dateStr) return '—';
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMinutes = Math.floor(diffMs / 60000);
+    if (diffMinutes < 1) return 'Just now';
+    if (diffMinutes < 60) return `${diffMinutes}m ago`;
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d ago`;
+  };
+
+  const handleRollback = async (deploymentId: string) => {
+    const confirmed = window.confirm('Are you sure you want to rollback this deployment?');
+    if (!confirmed) return;
+    await rollbackDeployment(deploymentId);
+    fetchAllData();
+  };
+
+  // Cast JSONB fields safely
+  const parseBuildMetrics = (raw: unknown): DeploymentBuildMetrics | null => {
+    if (!raw || typeof raw !== 'object') return null;
+    const m = raw as Record<string, unknown>;
+    if (!m.buildTime && !m.testsPassed) return null;
+    return raw as DeploymentBuildMetrics;
+  };
+
+  const parseLighthouse = (raw: unknown): DeploymentLighthouse | null => {
+    if (!raw || typeof raw !== 'object') return null;
+    const m = raw as Record<string, unknown>;
+    if (!m.performance && !m.accessibility) return null;
+    return raw as DeploymentLighthouse;
+  };
+
+  // ============================================================================
+  // LOADING STATE
+  // ============================================================================
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0a0e1a] text-slate-100 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative">
+            <div className="w-16 h-16 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />
+          </div>
+          <p className="text-slate-400 font-medium animate-pulse">Loading deployment data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[#0a0e1a] text-slate-100 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4 max-w-md text-center">
+          <div className="p-4 bg-red-500/10 rounded-2xl border border-red-500/30">
+            <XCircle className="w-10 h-10 text-red-400" />
+          </div>
+          <h2 className="text-xl font-bold text-white">Failed to load deployments</h2>
+          <p className="text-slate-400">{error}</p>
+          <button
+            onClick={() => { setLoading(true); setError(null); fetchAllData(); }}
+            className="px-6 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl font-bold text-sm transition-all"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // ============================================================================
   // RENDER
@@ -616,36 +497,31 @@ export default function Deployments() {
 
       {/* Static Background Effects */}
       <div className="fixed inset-0 pointer-events-none">
-        {/* Grid Pattern */}
         <div className="absolute inset-0 opacity-[0.02]" style={{
           backgroundImage: `
             linear-gradient(to right, #06b6d4 1px, transparent 1px),
             linear-gradient(to bottom, #06b6d4 1px, transparent 1px)
           `,
           backgroundSize: '60px 60px'
-        }}></div>
-
-        {/* Gradient Orbs */}
-        <div className="absolute top-0 left-1/4 w-[800px] h-[800px] bg-cyan-500/5 rounded-full blur-[150px] animate-pulse" style={{ animationDuration: '12s' }}></div>
-        <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-purple-500/5 rounded-full blur-[120px] animate-pulse" style={{ animationDuration: '15s', animationDelay: '3s' }}></div>
+        }} />
+        <div className="absolute top-0 left-1/4 w-[800px] h-[800px] bg-cyan-500/5 rounded-full blur-[150px] animate-pulse" style={{ animationDuration: '12s' }} />
+        <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-purple-500/5 rounded-full blur-[120px] animate-pulse" style={{ animationDuration: '15s', animationDelay: '3s' }} />
       </div>
 
       <div className="relative z-10 max-w-[2000px] mx-auto p-4 md:p-6 lg:p-8 space-y-6">
-        
+
         {/* ================================================================ */}
         {/* HEADER SECTION */}
         {/* ================================================================ */}
         <header className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-6">
           <div className="space-y-4">
             <div className="flex items-center gap-4">
-              {/* Logo */}
               <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-tr from-cyan-500/30 via-blue-500/30 to-purple-500/30 rounded-2xl blur-2xl group-hover:blur-3xl transition-all"></div>
+                <div className="absolute inset-0 bg-gradient-to-tr from-cyan-500/30 via-blue-500/30 to-purple-500/30 rounded-2xl blur-2xl group-hover:blur-3xl transition-all" />
                 <div className="relative p-4 bg-gradient-to-br from-slate-900/90 via-slate-800/90 to-slate-900/90 border border-cyan-500/30 rounded-2xl backdrop-blur-sm">
                   <Rocket className="w-10 h-10 text-cyan-400" style={{ filter: 'drop-shadow(0 0 10px rgba(6, 182, 212, 0.8))' }} />
                 </div>
               </div>
-
               <div>
                 <h1 className="text-4xl xl:text-5xl font-bold tracking-tight leading-none">
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-400 to-cyan-400 animate-gradient">
@@ -653,7 +529,7 @@ export default function Deployments() {
                   </span>
                 </h1>
                 <p className="text-slate-400 text-base mt-2 font-medium">
-                  Real-time CI/CD pipeline monitoring & orchestration
+                  Real-time CI/CD pipeline monitoring &amp; orchestration
                 </p>
               </div>
             </div>
@@ -662,23 +538,22 @@ export default function Deployments() {
             <div className="flex flex-wrap items-center gap-4 text-sm">
               <div className="flex items-center gap-2 px-4 py-2 bg-slate-800/40 border border-cyan-500/30 rounded-xl backdrop-blur-sm">
                 <div className="relative">
-                  <div className="w-2 h-2 bg-cyan-500 rounded-full animate-pulse"></div>
-                  <div className="absolute inset-0 bg-cyan-500 rounded-full animate-ping opacity-75"></div>
+                  <div className="w-2 h-2 bg-cyan-500 rounded-full animate-pulse" />
+                  <div className="absolute inset-0 bg-cyan-500 rounded-full animate-ping opacity-75" />
                 </div>
                 <span className="text-cyan-400 font-bold">LIVE</span>
               </div>
-              <div className="h-5 w-px bg-slate-700"></div>
-              <span className="text-slate-400 font-medium">24 Deploys Today</span>
-              <div className="h-5 w-px bg-slate-700"></div>
-              <span className="text-emerald-400 font-bold">98.6% Success</span>
-              <div className="h-5 w-px bg-slate-700"></div>
-              <span className="text-slate-400">12.4m Lead Time</span>
+              <div className="h-5 w-px bg-slate-700" />
+              <span className="text-slate-400 font-medium">{deploysToday} Deploys Today</span>
+              <div className="h-5 w-px bg-slate-700" />
+              <span className="text-emerald-400 font-bold">{successRate}% Success</span>
+              <div className="h-5 w-px bg-slate-700" />
+              <span className="text-slate-400">{leadTimeMinutes}m Lead Time</span>
             </div>
           </div>
 
           {/* Action Controls */}
           <div className="flex flex-wrap items-center gap-3">
-            {/* View Mode Toggle */}
             <div className="inline-flex items-center gap-1 bg-slate-900/60 border border-slate-700/50 rounded-xl p-1 backdrop-blur-sm">
               {(['grid', 'timeline', 'pipeline'] as const).map((mode) => (
                 <button
@@ -695,7 +570,6 @@ export default function Deployments() {
               ))}
             </div>
 
-            {/* Auto Refresh */}
             <button
               onClick={() => setAutoRefresh(!autoRefresh)}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all duration-300 font-bold text-sm border ${
@@ -708,7 +582,6 @@ export default function Deployments() {
               <span>Auto Refresh</span>
             </button>
 
-            {/* Deploy Button */}
             <button className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-600 via-blue-600 to-purple-600 hover:from-cyan-500 hover:via-blue-500 hover:to-purple-500 text-white rounded-xl transition-all shadow-lg hover:shadow-xl shadow-cyan-500/30 border border-white/10 font-bold text-sm group">
               <Rocket className="w-4 h-4 group-hover:-translate-y-1 transition-transform" />
               <span>New Deploy</span>
@@ -720,92 +593,91 @@ export default function Deployments() {
         {/* ================================================================ */}
         {/* AI INSIGHTS PANEL */}
         {/* ================================================================ */}
-        <div className="bg-gradient-to-r from-purple-900/20 via-pink-900/20 to-purple-900/20 backdrop-blur-md border border-purple-500/30 rounded-2xl p-6 relative overflow-hidden">
-          {/* Decorative Elements */}
-          <div className="absolute top-0 right-0 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-pink-500/10 rounded-full blur-3xl"></div>
+        {insights.length > 0 && (
+          <div className="bg-gradient-to-r from-purple-900/20 via-pink-900/20 to-purple-900/20 backdrop-blur-md border border-purple-500/30 rounded-2xl p-6 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-pink-500/10 rounded-full blur-3xl" />
 
-          <div className="relative z-10">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl border border-purple-400/30">
-                  <Brain className="w-6 h-6 text-purple-300" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-white">AI Deployment Intelligence</h3>
-                  <p className="text-sm text-slate-400 mt-0.5">Predictive analytics & real-time optimization</p>
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl border border-purple-400/30">
+                    <Brain className="w-6 h-6 text-purple-300" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white">AI Deployment Intelligence</h3>
+                    <p className="text-sm text-slate-400 mt-0.5">Predictive analytics &amp; real-time optimization</p>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-              {aiInsights.map((insight, idx) => {
-                const typeConfig: Record<string, { icon: React.ElementType; color: string }> = {
-                  prediction: { icon: TrendingUp, color: 'cyan' },
-                  optimization: { icon: Zap, color: 'purple' },
-                  alert: { icon: AlertTriangle, color: 'red' },
-                  recommendation: { icon: Sparkles, color: 'emerald' }
-                };
-                const config = typeConfig[insight.type];
-                const colors = getColorClasses(config.color);
-                const Icon = config.icon;
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                {insights.slice(0, 4).map((insight, idx) => {
+                  const typeConfig: Record<string, { icon: React.ElementType; color: string }> = {
+                    prediction: { icon: TrendingUp, color: 'cyan' },
+                    optimization: { icon: Zap, color: 'purple' },
+                    alert: { icon: AlertTriangle, color: 'red' },
+                    recommendation: { icon: Sparkles, color: 'emerald' }
+                  };
+                  const config = typeConfig[insight.type] || typeConfig.recommendation;
+                  const colors = getColorClasses(config.color);
+                  const Icon = config.icon;
 
-                return (
-                  <div
-                    key={insight.id}
-                    className="group p-5 bg-slate-900/60 hover:bg-slate-900/80 border border-slate-700/50 hover:border-slate-600 rounded-xl transition-all cursor-pointer relative overflow-hidden"
-                    style={{ animationDelay: `${idx * 100}ms` }}
-                  >
-                    {/* Priority Indicator */}
-                    <div className={`absolute top-0 right-0 w-24 h-24 ${colors.bg} opacity-5 rounded-full blur-2xl group-hover:opacity-10 transition-opacity`}></div>
+                  return (
+                    <div
+                      key={insight.id}
+                      className="group p-5 bg-slate-900/60 hover:bg-slate-900/80 border border-slate-700/50 hover:border-slate-600 rounded-xl transition-all cursor-pointer relative overflow-hidden"
+                      style={{ animationDelay: `${idx * 100}ms` }}
+                    >
+                      <div className={`absolute top-0 right-0 w-24 h-24 ${colors.bg} opacity-5 rounded-full blur-2xl group-hover:opacity-10 transition-opacity`} />
 
-                    <div className="relative z-10">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className={`p-2.5 ${colors.bgLight} rounded-lg border ${colors.border}`}>
-                          <Icon className={`w-5 h-5 ${colors.text}`} />
-                        </div>
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${colors.bgLight} ${colors.text} border ${colors.border}`}>
-                          {insight.priority}
-                        </span>
-                      </div>
-
-                      <h4 className="font-bold text-white text-sm mb-2 line-clamp-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-purple-300 group-hover:to-pink-300 transition-all">
-                        {insight.title}
-                      </h4>
-
-                      <p className="text-xs text-slate-400 leading-relaxed mb-3 line-clamp-2">
-                        {insight.description}
-                      </p>
-
-                      <div className="flex items-center justify-between pt-3 border-t border-slate-700/50">
-                        <div className="flex items-center gap-2">
-                          <div className={`text-xs font-bold ${colors.text}`}>
-                            {insight.confidence}% confidence
+                      <div className="relative z-10">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className={`p-2.5 ${colors.bgLight} rounded-lg border ${colors.border}`}>
+                            <Icon className={`w-5 h-5 ${colors.text}`} />
                           </div>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${colors.bgLight} ${colors.text} border ${colors.border}`}>
+                            {insight.priority}
+                          </span>
                         </div>
-                        {insight.action && (
-                          <button className="text-xs font-bold text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1">
-                            {insight.action}
-                            <ChevronRight className="w-3 h-3" />
-                          </button>
-                        )}
+
+                        <h4 className="font-bold text-white text-sm mb-2 line-clamp-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-purple-300 group-hover:to-pink-300 transition-all">
+                          {insight.title}
+                        </h4>
+
+                        <p className="text-xs text-slate-400 leading-relaxed mb-3 line-clamp-2">
+                          {insight.description}
+                        </p>
+
+                        <div className="flex items-center justify-between pt-3 border-t border-slate-700/50">
+                          <div className="flex items-center gap-2">
+                            <div className={`text-xs font-bold ${colors.text}`}>
+                              {insight.confidence}% confidence
+                            </div>
+                          </div>
+                          {insight.action_label && (
+                            <button className="text-xs font-bold text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1">
+                              {insight.action_label}
+                              <ChevronRight className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* ================================================================ */}
         {/* DORA METRICS */}
         {/* ================================================================ */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-          {metrics.map((metric, idx) => {
+          {displayMetrics.map((metric, idx) => {
             const colors = getColorClasses(metric.color);
             const Icon = metric.icon;
-            const isPositive = metric.trend === 'up' ? (metric.change || 0) > 0 : (metric.change || 0) < 0;
 
             return (
               <div
@@ -818,26 +690,15 @@ export default function Deployments() {
                   transitionDelay: `${idx * 50}ms`
                 }}
               >
-                {/* Background Effects */}
-                <div className={`absolute inset-0 bg-gradient-to-br ${colors.bg} opacity-0 group-hover:opacity-[0.08] transition-opacity duration-500`}></div>
-                <div className={`absolute top-0 right-0 w-32 h-32 ${colors.bg} opacity-[0.05] rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700`}></div>
+                <div className={`absolute inset-0 bg-gradient-to-br ${colors.bg} opacity-0 group-hover:opacity-[0.08] transition-opacity duration-500`} />
+                <div className={`absolute top-0 right-0 w-32 h-32 ${colors.bg} opacity-[0.05] rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700`} />
 
                 <div className="relative z-10">
                   <div className="flex items-start justify-between mb-4">
                     <div className={`relative p-3 ${colors.bgLight} rounded-xl border ${colors.border} group-hover:scale-110 transition-transform duration-300`}>
                       <Icon className={`w-5 h-5 ${colors.text}`} />
-                      <div className={`absolute inset-0 ${colors.bg} opacity-0 group-hover:opacity-30 rounded-xl blur-lg transition-opacity`}></div>
+                      <div className={`absolute inset-0 ${colors.bg} opacity-0 group-hover:opacity-30 rounded-xl blur-lg transition-opacity`} />
                     </div>
-                    {metric.change !== undefined && (
-                      <div className={`flex items-center gap-1 px-2.5 py-1 rounded-lg ${isPositive ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-red-500/10 border-red-500/30 text-red-400'} border text-xs font-bold`}>
-                        {isPositive ? (
-                          <TrendingUp className="w-3 h-3" />
-                        ) : (
-                          <TrendingDown className="w-3 h-3" />
-                        )}
-                        <span>{Math.abs(metric.change).toFixed(1)}%</span>
-                      </div>
-                    )}
                   </div>
                   <h3 className="text-3xl font-bold text-white tracking-tight mb-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-white group-hover:to-slate-300 transition-all">
                     {metric.value}
@@ -860,10 +721,10 @@ export default function Deployments() {
         {/* MAIN CONTENT GRID */}
         {/* ================================================================ */}
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-          
+
           {/* LEFT COLUMN - Deployments & Pipeline (8 cols) */}
           <div className="xl:col-span-8 space-y-6">
-            
+
             {/* LIVE PIPELINE VISUALIZATION */}
             <div className="bg-gradient-to-br from-slate-900/80 via-slate-800/60 to-slate-900/80 backdrop-blur-md border border-slate-700/50 rounded-2xl p-8 overflow-hidden">
               <div className="flex items-center justify-between mb-8">
@@ -874,10 +735,14 @@ export default function Deployments() {
                     </div>
                     Live Pipeline
                   </h3>
-                  <p className="text-sm text-slate-400 mt-1.5">Current deployment: DEP-1846 • Mobile App Backend</p>
+                  <p className="text-sm text-slate-400 mt-1.5">
+                    {activePipelineDeployment
+                      ? `Current deployment: DEP-${activePipelineDeployment.deploy_number} • ${activePipelineDeployment.project_name}`
+                      : 'No active deployment'}
+                  </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-sm font-bold text-cyan-400">67% Complete</span>
+                  <span className="text-sm font-bold text-cyan-400">{pipelineProgress}% Complete</span>
                   <button title="View Details" className="p-2 hover:bg-slate-800/50 rounded-lg transition-colors">
                     <Eye className="w-5 h-5 text-slate-400 hover:text-white" />
                   </button>
@@ -886,9 +751,8 @@ export default function Deployments() {
 
               {/* Pipeline Stages */}
               <div className="relative">
-                {/* Connection Line */}
                 <div className="absolute top-12 left-0 right-0 h-1 bg-slate-800 rounded-full">
-                  <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full" style={{ width: '67%' }}></div>
+                  <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full transition-all duration-1000" style={{ width: `${pipelineProgress}%` }} />
                 </div>
 
                 <div className="relative grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -902,15 +766,13 @@ export default function Deployments() {
 
                     return (
                       <div key={stage.id} className="relative flex flex-col items-center">
-                        {/* Stage Node */}
                         <div className={`relative w-24 h-24 rounded-2xl ${colors.bgLight} border-2 ${colors.border} flex items-center justify-center transition-all duration-500 hover:scale-110 cursor-pointer group/stage ${
                           stage.status === 'active' ? 'animate-pulse' : ''
                         }`}>
                           <Icon className={`w-8 h-8 ${colors.text}`} />
                           {stage.status === 'active' && (
-                            <div className={`absolute inset-0 ${colors.bg} opacity-20 rounded-2xl blur-xl animate-pulse`}></div>
+                            <div className={`absolute inset-0 ${colors.bg} opacity-20 rounded-2xl blur-xl animate-pulse`} />
                           )}
-                          {/* Progress Ring for Active */}
                           {stage.status === 'active' && (
                             <svg className="absolute inset-0 w-full h-full -rotate-90">
                               <circle
@@ -926,15 +788,12 @@ export default function Deployments() {
                               />
                             </svg>
                           )}
-                          {/* Status Badge */}
                           {stage.status === 'success' && (
                             <div className="absolute -top-2 -right-2 w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center border-2 border-slate-900">
                               <CheckCircle2 className="w-3.5 h-3.5 text-white" />
                             </div>
                           )}
                         </div>
-
-                        {/* Stage Info */}
                         <div className="mt-4 text-center">
                           <div className="text-sm font-bold text-white mb-1">{stage.name}</div>
                           <div className="text-xs text-slate-400">
@@ -953,20 +812,30 @@ export default function Deployments() {
               </div>
 
               {/* Pipeline Stats */}
-              <div className="mt-8 grid grid-cols-3 gap-4">
-                <div className="p-4 bg-slate-800/40 rounded-xl border border-slate-700/50">
-                  <div className="text-xs text-slate-400 mb-1 font-bold uppercase tracking-wider">Elapsed Time</div>
-                  <div className="text-2xl font-bold text-white">2m 38s</div>
+              {activePipelineDeployment && (
+                <div className="mt-8 grid grid-cols-3 gap-4">
+                  <div className="p-4 bg-slate-800/40 rounded-xl border border-slate-700/50">
+                    <div className="text-xs text-slate-400 mb-1 font-bold uppercase tracking-wider">Elapsed Time</div>
+                    <div className="text-2xl font-bold text-white">
+                      {formatDuration(activePipelineDeployment.duration ??
+                        Math.round((Date.now() - new Date(activePipelineDeployment.started_at || activePipelineDeployment.created_at).getTime()) / 1000))}
+                    </div>
+                  </div>
+                  <div className="p-4 bg-slate-800/40 rounded-xl border border-slate-700/50">
+                    <div className="text-xs text-slate-400 mb-1 font-bold uppercase tracking-wider">Current Stage</div>
+                    <div className="text-2xl font-bold text-cyan-400 capitalize">{activePipelineDeployment.current_stage}</div>
+                  </div>
+                  <div className="p-4 bg-slate-800/40 rounded-xl border border-slate-700/50">
+                    <div className="text-xs text-slate-400 mb-1 font-bold uppercase tracking-wider">Tests</div>
+                    <div className="text-2xl font-bold text-emerald-400">
+                      {(() => {
+                        const bm = parseBuildMetrics(activePipelineDeployment.build_metrics);
+                        return bm ? `${bm.testsPassed ?? 0}/${bm.testsTotal ?? 0}` : '—';
+                      })()}
+                    </div>
+                  </div>
                 </div>
-                <div className="p-4 bg-slate-800/40 rounded-xl border border-slate-700/50">
-                  <div className="text-xs text-slate-400 mb-1 font-bold uppercase tracking-wider">Est. Remaining</div>
-                  <div className="text-2xl font-bold text-cyan-400">1m 22s</div>
-                </div>
-                <div className="p-4 bg-slate-800/40 rounded-xl border border-slate-700/50">
-                  <div className="text-xs text-slate-400 mb-1 font-bold uppercase tracking-wider">Tests Passed</div>
-                  <div className="text-2xl font-bold text-emerald-400">256/318</div>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* RECENT DEPLOYMENTS */}
@@ -982,12 +851,11 @@ export default function Deployments() {
                       Recent Deployments
                     </h3>
                     <p className="text-sm text-slate-400 mt-1.5">
-                      {recentDeployments.filter(d => filterStatus === 'all' || d.status === filterStatus).length} deployments
+                      {filteredDeployments.length} deployment{filteredDeployments.length !== 1 ? 's' : ''}
                     </p>
                   </div>
 
                   <div className="flex items-center gap-3">
-                    {/* Status Filter */}
                     <div className="inline-flex items-center gap-1 bg-slate-900/60 border border-slate-700/50 rounded-xl p-1 backdrop-blur-sm">
                       {['all', 'success', 'deploying', 'failed'].map((status) => (
                         <button
@@ -1009,236 +877,246 @@ export default function Deployments() {
 
               {/* Deployments List */}
               <div className="divide-y divide-slate-700/30">
-                {recentDeployments
-                  .filter(d => filterStatus === 'all' || d.status === filterStatus)
-                  .map((deployment) => {
-                    const statusConfig = getStatusConfig(deployment.status);
-                    const StatusIcon = statusConfig.icon;
-                    const colors = getColorClasses(statusConfig.color);
-                    const isExpanded = selectedDeployment === deployment.id;
+                {filteredDeployments.length === 0 && (
+                  <div className="p-12 text-center">
+                    <Rocket className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+                    <p className="text-slate-400 font-medium">No deployments found</p>
+                    <p className="text-slate-500 text-sm mt-1">
+                      {filterStatus !== 'all' ? 'Try changing the filter' : 'Trigger a new deployment to get started'}
+                    </p>
+                  </div>
+                )}
+                {filteredDeployments.map((deployment) => {
+                  const statusConfig = getStatusConfig(deployment.status);
+                  const StatusIcon = statusConfig.icon;
+                  const colors = getColorClasses(statusConfig.color);
+                  const isExpanded = selectedDeployment === deployment.id;
+                  const buildMetrics = parseBuildMetrics(deployment.build_metrics);
+                  const lighthouse = parseLighthouse(deployment.lighthouse);
 
-                    return (
-                      <div key={deployment.id} className="group transition-all duration-300 hover:bg-slate-800/30">
-                        {/* Deployment Card */}
-                        <div
-                          onClick={() => setSelectedDeployment(isExpanded ? null : deployment.id)}
-                          className="flex items-center justify-between p-6 cursor-pointer"
-                        >
-                          <div className="flex items-center gap-6 flex-1">
-                            {/* Status Icon */}
-                            <div className={`relative p-4 ${colors.bgLight} rounded-xl border ${colors.border} transition-all duration-300 group-hover:scale-110`}>
-                              <StatusIcon className={`w-6 h-6 ${colors.text} ${deployment.status === 'deploying' ? 'animate-pulse' : ''}`} />
-                              {deployment.status === 'deploying' && (
-                                <div className={`absolute inset-0 ${colors.bg} opacity-20 rounded-xl blur-lg animate-pulse`}></div>
-                              )}
-                            </div>
-
-                            {/* Deployment Info */}
-                            <div className="flex-1 space-y-2">
-                              <div className="flex items-center gap-3 flex-wrap">
-                                <span className="text-white font-bold text-base group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-cyan-300 group-hover:to-blue-300 transition-all">
-                                  {deployment.project}
-                                </span>
-                                <span className="text-[10px] px-2 py-1 rounded-md bg-slate-800/60 text-slate-400 font-mono border border-slate-700/50">
-                                  {deployment.id}
-                                </span>
-                                <span className={`text-xs px-2.5 py-1 rounded-lg ${colors.bgLight} ${colors.text} border ${colors.border} font-bold uppercase tracking-wider`}>
-                                  {statusConfig.label}
-                                </span>
-                              </div>
-
-                              <div className="flex items-center gap-4 text-xs text-slate-400 font-medium flex-wrap">
-                                <span className="flex items-center gap-1.5">
-                                  <Server className="w-3.5 h-3.5" />
-                                  {deployment.environment}
-                                </span>
-                                <span className="w-1 h-1 bg-slate-600 rounded-full"></span>
-                                <span className="flex items-center gap-1.5">
-                                  <GitBranch className="w-3.5 h-3.5" />
-                                  {deployment.branch}
-                                </span>
-                                <span className="w-1 h-1 bg-slate-600 rounded-full"></span>
-                                <span className="flex items-center gap-1.5">
-                                  <GitCommit className="w-3.5 h-3.5" />
-                                  {deployment.commit}
-                                </span>
-                                <span className="w-1 h-1 bg-slate-600 rounded-full"></span>
-                                <span className="flex items-center gap-1.5 text-slate-300">
-                                  <Users className="w-3.5 h-3.5" />
-                                  {deployment.triggeredBy}
-                                </span>
-                              </div>
-
-                              <p className="text-xs text-slate-500 italic">
-                                {deployment.commitMessage}
-                              </p>
-                            </div>
+                  return (
+                    <div key={deployment.id} className="group transition-all duration-300 hover:bg-slate-800/30">
+                      {/* Deployment Card */}
+                      <div
+                        onClick={() => setSelectedDeployment(isExpanded ? null : deployment.id)}
+                        className="flex items-center justify-between p-6 cursor-pointer"
+                      >
+                        <div className="flex items-center gap-6 flex-1">
+                          <div className={`relative p-4 ${colors.bgLight} rounded-xl border ${colors.border} transition-all duration-300 group-hover:scale-110`}>
+                            <StatusIcon className={`w-6 h-6 ${colors.text} ${(deployment.status === 'deploying' || deployment.status === 'building' || deployment.status === 'testing') ? 'animate-pulse' : ''}`} />
+                            {(deployment.status === 'deploying' || deployment.status === 'building') && (
+                              <div className={`absolute inset-0 ${colors.bg} opacity-20 rounded-xl blur-lg animate-pulse`} />
+                            )}
                           </div>
 
-                          <div className="flex items-center gap-6">
-                            {/* Progress */}
-                            {deployment.status === 'deploying' && (
-                              <div className="w-32 hidden xl:block">
-                                <div className="flex justify-between text-xs mb-2 font-semibold">
-                                  <span className="text-slate-400">Progress</span>
-                                  <span className="text-white">{deployment.progress}%</span>
-                                </div>
-                                <div className="relative h-2.5 bg-slate-800 rounded-full overflow-hidden">
-                                  <div
-                                    className={`absolute inset-0 bg-gradient-to-r ${colors.gradient} rounded-full transition-all duration-1000`}
-                                    style={{ width: `${deployment.progress}%` }}
-                                  />
-                                </div>
-                              </div>
+                          <div className="flex-1 space-y-2">
+                            <div className="flex items-center gap-3 flex-wrap">
+                              <span className="text-white font-bold text-base group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-cyan-300 group-hover:to-blue-300 transition-all">
+                                {deployment.project_name}
+                              </span>
+                              <span className="text-[10px] px-2 py-1 rounded-md bg-slate-800/60 text-slate-400 font-mono border border-slate-700/50">
+                                DEP-{deployment.deploy_number}
+                              </span>
+                              <span className={`text-xs px-2.5 py-1 rounded-lg ${colors.bgLight} ${colors.text} border ${colors.border} font-bold uppercase tracking-wider`}>
+                                {statusConfig.label}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-4 text-xs text-slate-400 font-medium flex-wrap">
+                              <span className="flex items-center gap-1.5">
+                                <Server className="w-3.5 h-3.5" />
+                                {deployment.environment_name}
+                              </span>
+                              <span className="w-1 h-1 bg-slate-600 rounded-full" />
+                              <span className="flex items-center gap-1.5">
+                                <GitBranch className="w-3.5 h-3.5" />
+                                {deployment.branch || 'main'}
+                              </span>
+                              <span className="w-1 h-1 bg-slate-600 rounded-full" />
+                              <span className="flex items-center gap-1.5">
+                                <GitCommit className="w-3.5 h-3.5" />
+                                {deployment.commit_hash ? deployment.commit_hash.slice(0, 7) : '—'}
+                              </span>
+                              <span className="w-1 h-1 bg-slate-600 rounded-full" />
+                              <span className="flex items-center gap-1.5 text-slate-300">
+                                <Users className="w-3.5 h-3.5" />
+                                {deployment.triggered_by_name || 'System'}
+                              </span>
+                            </div>
+
+                            {deployment.commit_message && (
+                              <p className="text-xs text-slate-500 italic">
+                                {deployment.commit_message}
+                              </p>
                             )}
-
-                            {/* Duration */}
-                            <div className="hidden lg:block text-right min-w-[80px]">
-                              <div className="text-xs text-slate-400 mb-1">Duration</div>
-                              <div className="text-sm font-bold text-white">
-                                {deployment.duration ? `${Math.floor(deployment.duration / 60)}m ${deployment.duration % 60}s` : deployment.startTime}
-                              </div>
-                            </div>
-
-                            {/* Expand Toggle */}
-                            <div className={`p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ${isExpanded ? 'rotate-180 bg-slate-800/50 text-white' : ''}`}>
-                              <ChevronDown className="w-5 h-5" />
-                            </div>
                           </div>
                         </div>
 
-                        {/* Expanded Details */}
-                        {isExpanded && (
-                          <div className="bg-gradient-to-br from-slate-900/80 to-slate-800/60 border-t border-slate-700/50 p-8 animate-in slide-in-from-top-4 duration-500">
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                              
-                              {/* Pipeline Stages */}
-                              <div className="lg:col-span-2">
-                                <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Pipeline Stages</h4>
-                                <div className="space-y-3">
-                                  {deployment.stages.map((stage, idx) => {
-                                    const stageConfig = getStageStatus(stage.status);
-                                    const stageColors = getColorClasses(stageConfig.color);
-                                    const StageIcon = stageConfig.icon;
-
-                                    return (
-                                      <div key={idx} className="flex items-center gap-4 p-4 bg-slate-800/40 rounded-xl border border-slate-700/50">
-                                        <div className={`p-2.5 ${stageColors.bgLight} rounded-lg border ${stageColors.border}`}>
-                                          <StageIcon className={`w-4 h-4 ${stageColors.text}`} />
-                                        </div>
-                                        <div className="flex-1">
-                                          <div className="flex items-center justify-between mb-1">
-                                            <span className="text-sm font-bold text-white">{stage.name}</span>
-                                            <span className={`text-xs font-bold ${stageColors.text} uppercase tracking-wider`}>
-                                              {stage.status}
-                                            </span>
-                                          </div>
-                                          {stage.duration && (
-                                            <div className="text-xs text-slate-400">
-                                              Completed in {stage.duration}s
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
+                        <div className="flex items-center gap-6">
+                          {(deployment.status === 'deploying' || deployment.status === 'building' || deployment.status === 'testing') && (
+                            <div className="w-32 hidden xl:block">
+                              <div className="flex justify-between text-xs mb-2 font-semibold">
+                                <span className="text-slate-400">Progress</span>
+                                <span className="text-white">{deployment.progress}%</span>
                               </div>
+                              <div className="relative h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                                <div
+                                  className={`absolute inset-0 bg-gradient-to-r ${colors.gradient} rounded-full transition-all duration-1000`}
+                                  style={{ width: `${deployment.progress}%` }}
+                                />
+                              </div>
+                            </div>
+                          )}
 
-                              {/* Metrics & Actions */}
-                              <div className="space-y-4">
-                                {/* Build Metrics */}
-                                {deployment.metrics && (
-                                  <div className="p-5 bg-gradient-to-br from-slate-900/90 to-slate-800/90 rounded-2xl border border-slate-700/50">
-                                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Build Metrics</h4>
-                                    <div className="space-y-3">
-                                      <div>
-                                        <div className="flex justify-between text-xs mb-1">
-                                          <span className="text-slate-400">Build Time</span>
-                                          <span className="text-white font-bold">{deployment.metrics.buildTime}s</span>
-                                        </div>
+                          <div className="hidden lg:block text-right min-w-[80px]">
+                            <div className="text-xs text-slate-400 mb-1">Duration</div>
+                            <div className="text-sm font-bold text-white">
+                              {deployment.duration ? formatDuration(deployment.duration) : formatRelativeTime(deployment.started_at)}
+                            </div>
+                          </div>
+
+                          <div className={`p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ${isExpanded ? 'rotate-180 bg-slate-800/50 text-white' : ''}`}>
+                            <ChevronDown className="w-5 h-5" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Expanded Details */}
+                      {isExpanded && (
+                        <div className="bg-gradient-to-br from-slate-900/80 to-slate-800/60 border-t border-slate-700/50 p-8 animate-in slide-in-from-top-4 duration-500">
+                          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                            {/* Pipeline Stages */}
+                            <div className="lg:col-span-2">
+                              <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Pipeline Stages</h4>
+                              <div className="space-y-3">
+                                {(deployment.stages || []).map((stage, idx) => {
+                                  const stageConfig = getStageStatus(stage.status);
+                                  const stageColors = getColorClasses(stageConfig.color);
+                                  const StageIcon = stageConfig.icon;
+
+                                  return (
+                                    <div key={idx} className="flex items-center gap-4 p-4 bg-slate-800/40 rounded-xl border border-slate-700/50">
+                                      <div className={`p-2.5 ${stageColors.bgLight} rounded-lg border ${stageColors.border}`}>
+                                        <StageIcon className={`w-4 h-4 ${stageColors.text}`} />
                                       </div>
-                                      <div>
-                                        <div className="flex justify-between text-xs mb-1">
-                                          <span className="text-slate-400">Tests</span>
-                                          <span className="text-emerald-400 font-bold">
-                                            {deployment.metrics.testsPassed}/{deployment.metrics.testsTotal}
+                                      <div className="flex-1">
+                                        <div className="flex items-center justify-between mb-1">
+                                          <span className="text-sm font-bold text-white">{stage.name}</span>
+                                          <span className={`text-xs font-bold ${stageColors.text} uppercase tracking-wider`}>
+                                            {stage.status}
                                           </span>
                                         </div>
+                                        {stage.duration != null && (
+                                          <div className="text-xs text-slate-400">
+                                            Completed in {stage.duration}s
+                                          </div>
+                                        )}
                                       </div>
-                                      <div>
-                                        <div className="flex justify-between text-xs mb-1">
-                                          <span className="text-slate-400">Coverage</span>
-                                          <span className="text-cyan-400 font-bold">{deployment.metrics.coverage}%</span>
-                                        </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Metrics & Actions */}
+                            <div className="space-y-4">
+                              {buildMetrics && (
+                                <div className="p-5 bg-gradient-to-br from-slate-900/90 to-slate-800/90 rounded-2xl border border-slate-700/50">
+                                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Build Metrics</h4>
+                                  <div className="space-y-3">
+                                    <div>
+                                      <div className="flex justify-between text-xs mb-1">
+                                        <span className="text-slate-400">Build Time</span>
+                                        <span className="text-white font-bold">{buildMetrics.buildTime ?? '—'}s</span>
                                       </div>
-                                      <div>
-                                        <div className="flex justify-between text-xs mb-1">
-                                          <span className="text-slate-400">Bundle Size</span>
-                                          <span className="text-white font-bold">{deployment.metrics.bundleSize}MB</span>
-                                        </div>
+                                    </div>
+                                    <div>
+                                      <div className="flex justify-between text-xs mb-1">
+                                        <span className="text-slate-400">Tests</span>
+                                        <span className="text-emerald-400 font-bold">
+                                          {buildMetrics.testsPassed ?? 0}/{buildMetrics.testsTotal ?? 0}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <div className="flex justify-between text-xs mb-1">
+                                        <span className="text-slate-400">Coverage</span>
+                                        <span className="text-cyan-400 font-bold">{buildMetrics.coverage ?? '—'}%</span>
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <div className="flex justify-between text-xs mb-1">
+                                        <span className="text-slate-400">Bundle Size</span>
+                                        <span className="text-white font-bold">{buildMetrics.bundleSize ?? '—'}MB</span>
                                       </div>
                                     </div>
                                   </div>
-                                )}
+                                </div>
+                              )}
 
-                                {/* Lighthouse Scores */}
-                                {deployment.lighthouse && (
-                                  <div className="p-5 bg-gradient-to-br from-slate-900/90 to-slate-800/90 rounded-2xl border border-slate-700/50">
-                                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Lighthouse</h4>
-                                    <div className="space-y-3">
-                                      {Object.entries(deployment.lighthouse).map(([key, value]) => (
+                              {lighthouse && (
+                                <div className="p-5 bg-gradient-to-br from-slate-900/90 to-slate-800/90 rounded-2xl border border-slate-700/50">
+                                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Lighthouse</h4>
+                                  <div className="space-y-3">
+                                    {Object.entries(lighthouse).map(([key, value]) => {
+                                      const numVal = typeof value === 'number' ? value : 0;
+                                      return (
                                         <div key={key}>
                                           <div className="flex justify-between text-xs mb-1">
                                             <span className="text-slate-400 capitalize">{key.replace(/([A-Z])/g, ' $1')}</span>
-                                            <span className={`font-bold ${value >= 90 ? 'text-emerald-400' : value >= 70 ? 'text-amber-400' : 'text-red-400'}`}>
-                                              {value}
+                                            <span className={`font-bold ${numVal >= 90 ? 'text-emerald-400' : numVal >= 70 ? 'text-amber-400' : 'text-red-400'}`}>
+                                              {numVal}
                                             </span>
                                           </div>
                                           <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
                                             <div
-                                              className={`h-full rounded-full ${value >= 90 ? 'bg-emerald-500' : value >= 70 ? 'bg-amber-500' : 'bg-red-500'}`}
-                                              style={{ width: `${value}%` }}
+                                              className={`h-full rounded-full ${numVal >= 90 ? 'bg-emerald-500' : numVal >= 70 ? 'bg-amber-500' : 'bg-red-500'}`}
+                                              style={{ width: `${numVal}%` }}
                                             />
                                           </div>
                                         </div>
-                                      ))}
-                                    </div>
+                                      );
+                                    })}
                                   </div>
-                                )}
-
-                                {/* Quick Actions */}
-                                <div className="flex flex-col gap-2">
-                                  <button className="flex items-center justify-center gap-2 w-full py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl text-sm font-bold transition-all shadow-lg">
-                                    <ExternalLink className="w-4 h-4" />
-                                    View Live
-                                  </button>
-                                  <button className="flex items-center justify-center gap-2 w-full py-2.5 bg-slate-800/60 hover:bg-slate-800 text-white border border-slate-700/50 hover:border-slate-600 rounded-xl text-sm font-semibold transition-all">
-                                    <Terminal className="w-4 h-4" />
-                                    View Logs
-                                  </button>
-                                  {deployment.status === 'success' && (
-                                    <button className="flex items-center justify-center gap-2 w-full py-2.5 bg-slate-800/60 hover:bg-slate-800 text-white border border-slate-700/50 hover:border-slate-600 rounded-xl text-sm font-semibold transition-all">
-                                      <RotateCcw className="w-4 h-4" />
-                                      Rollback
-                                    </button>
-                                  )}
                                 </div>
-                              </div>
+                              )}
 
+                              {/* Quick Actions */}
+                              <div className="flex flex-col gap-2">
+                                <button className="flex items-center justify-center gap-2 w-full py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl text-sm font-bold transition-all shadow-lg">
+                                  <ExternalLink className="w-4 h-4" />
+                                  View Live
+                                </button>
+                                <button className="flex items-center justify-center gap-2 w-full py-2.5 bg-slate-800/60 hover:bg-slate-800 text-white border border-slate-700/50 hover:border-slate-600 rounded-xl text-sm font-semibold transition-all">
+                                  <Terminal className="w-4 h-4" />
+                                  View Logs
+                                </button>
+                                {deployment.status === 'success' && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleRollback(deployment.id); }}
+                                    className="flex items-center justify-center gap-2 w-full py-2.5 bg-slate-800/60 hover:bg-slate-800 text-white border border-slate-700/50 hover:border-slate-600 rounded-xl text-sm font-semibold transition-all"
+                                  >
+                                    <RotateCcw className="w-4 h-4" />
+                                    Rollback
+                                  </button>
+                                )}
+                              </div>
                             </div>
+
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
 
           {/* RIGHT COLUMN - Environments & Stats (4 cols) */}
           <div className="xl:col-span-4 space-y-6">
-            
+
             {/* ENVIRONMENTS */}
             <div className="bg-gradient-to-br from-slate-900/80 via-slate-800/60 to-slate-900/80 backdrop-blur-md border border-slate-700/50 rounded-2xl p-6">
               <div className="flex items-center justify-between mb-6">
@@ -1249,7 +1127,7 @@ export default function Deployments() {
                     </div>
                     Environments
                   </h3>
-                  <p className="text-sm text-slate-400 mt-1">Live status & metrics</p>
+                  <p className="text-sm text-slate-400 mt-1">Live status &amp; metrics</p>
                 </div>
               </div>
 
@@ -1280,7 +1158,7 @@ export default function Deployments() {
                               {env.name}
                             </div>
                             <div className="text-xs text-slate-400 mt-0.5">
-                              {env.version} • {env.region}
+                              {env.version || '—'} • {env.region}
                             </div>
                           </div>
                         </div>
@@ -1296,7 +1174,7 @@ export default function Deployments() {
                         </div>
                         <div className="p-3 bg-slate-900/40 rounded-lg">
                           <div className="text-slate-500 font-medium mb-1">Response</div>
-                          <div className="text-emerald-400 font-bold">{env.responseTime}ms</div>
+                          <div className="text-emerald-400 font-bold">{env.response_time}ms</div>
                         </div>
                         <div className="p-3 bg-slate-900/40 rounded-lg">
                           <div className="text-slate-500 font-medium mb-1">Traffic</div>
@@ -1309,11 +1187,21 @@ export default function Deployments() {
                       </div>
 
                       <div className="mt-4 pt-4 border-t border-slate-700/50 flex items-center justify-between text-xs">
-                        <span className="text-slate-400">Last deploy: {env.lastDeployed}</span>
-                        <button className="text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1">
-                          View
-                          <ExternalLink className="w-3 h-3" />
-                        </button>
+                        <span className="text-slate-400">
+                          Last deploy: {formatRelativeTime(env.last_deployed_at)}
+                        </span>
+                        {env.url && (
+                          <a
+                            href={env.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            View
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
                       </div>
                     </div>
                   );
@@ -1323,7 +1211,6 @@ export default function Deployments() {
 
             {/* DEPLOYMENT STATS */}
             <div className="grid grid-cols-1 gap-4">
-              {/* Today's Deployments */}
               <div className="p-6 bg-gradient-to-br from-slate-900/80 to-slate-800/60 backdrop-blur-md border border-slate-700/50 rounded-2xl">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
@@ -1332,23 +1219,22 @@ export default function Deployments() {
                     </div>
                     <div>
                       <div className="text-xs font-bold text-slate-500 uppercase tracking-widest">Today</div>
-                      <div className="text-2xl font-bold text-white mt-1">24</div>
+                      <div className="text-2xl font-bold text-white mt-1">{deploysToday}</div>
                     </div>
                   </div>
                   <div className="text-right">
                     <div className="text-xs text-slate-400 mb-1">Deployments</div>
                     <div className="text-emerald-400 text-xs font-bold flex items-center gap-1">
                       <TrendingUp className="w-3 h-3" />
-                      +18%
+                      {successRate}%
                     </div>
                   </div>
                 </div>
                 <div className="text-xs text-slate-400">
-                  21 success • 2 failed • 1 in progress
+                  {todaySummary?.success ?? 0} success • {todaySummary?.failed ?? 0} failed • {todaySummary?.in_progress ?? 0} in progress
                 </div>
               </div>
 
-              {/* Infrastructure Cost */}
               <div className="p-6 bg-gradient-to-br from-slate-900/80 to-slate-800/60 backdrop-blur-md border border-slate-700/50 rounded-2xl">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
@@ -1356,20 +1242,17 @@ export default function Deployments() {
                       <Cloud className="w-5 h-5 text-purple-400" />
                     </div>
                     <div>
-                      <div className="text-xs font-bold text-slate-500 uppercase tracking-widest">Daily Cost</div>
-                      <div className="text-2xl font-bold text-white mt-1">$1,247</div>
+                      <div className="text-xs font-bold text-slate-500 uppercase tracking-widest">Infrastructure</div>
+                      <div className="text-2xl font-bold text-white mt-1">{activeInstances} instances</div>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xs text-slate-400 mb-1">vs Budget</div>
-                    <div className="text-emerald-400 text-xs font-bold flex items-center gap-1">
-                      <TrendingDown className="w-3 h-3" />
-                      -8.5%
-                    </div>
+                    <div className="text-xs text-slate-400 mb-1">Regions</div>
+                    <div className="text-cyan-400 text-xs font-bold">{totalRegions}</div>
                   </div>
                 </div>
                 <div className="text-xs text-slate-400">
-                  156 instances • 4 regions
+                  {metrics?.total_deployments ?? 0} deployments (30d) • {metrics?.avg_duration ? formatDuration(metrics.avg_duration) : '—'} avg
                 </div>
               </div>
             </div>
@@ -1382,9 +1265,9 @@ export default function Deployments() {
         <footer className="flex items-center justify-between p-4 bg-slate-900/60 backdrop-blur-md border border-slate-700/50 rounded-xl text-xs text-slate-400">
           <div className="flex items-center gap-6">
             <span className="font-medium">Last updated: {new Date().toLocaleTimeString()}</span>
-            <div className="h-4 w-px bg-slate-700"></div>
+            <div className="h-4 w-px bg-slate-700" />
             <span className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
               All systems operational
             </span>
           </div>
@@ -1431,8 +1314,75 @@ export default function Deployments() {
   );
 }
 
-// Loader component for running state
-function Loader({ className }: { className?: string }) {
+// ============================================================================
+// HELPER: Build pipeline display from real deployment stages
+// ============================================================================
+
+const STAGE_ICON_MAP: Record<string, React.ElementType> = {
+  Clone: GitBranch,
+  Install: Package,
+  Build: Box,
+  Test: CheckCircle2,
+  Deploy: Rocket,
+  Verify: Shield,
+};
+
+function buildPipelineDisplay(
+  stages: DeploymentStageRow[],
+  overallProgress: number
+): PipelineStageDisplay[] {
+  if (!stages || stages.length === 0) return getDefaultPipeline();
+
+  return stages.map((stage) => {
+    let uiStatus: 'idle' | 'active' | 'success' | 'failed' = 'idle';
+    let progress = 0;
+
+    switch (stage.status) {
+      case 'success':
+        uiStatus = 'success';
+        progress = 100;
+        break;
+      case 'running':
+        uiStatus = 'active';
+        progress = overallProgress;
+        break;
+      case 'failed':
+        uiStatus = 'failed';
+        progress = 100;
+        break;
+      case 'skipped':
+        uiStatus = 'idle';
+        progress = 0;
+        break;
+      default:
+        uiStatus = 'idle';
+        progress = 0;
+    }
+
+    return {
+      id: stage.id,
+      name: stage.name,
+      icon: STAGE_ICON_MAP[stage.name] || Box,
+      status: uiStatus,
+      duration: stage.duration || 0,
+      progress,
+    };
+  });
+}
+
+function getDefaultPipeline(): PipelineStageDisplay[] {
+  return [
+    { id: 'clone', name: 'Clone', icon: GitBranch, status: 'idle', duration: 0, progress: 0 },
+    { id: 'install', name: 'Install', icon: Package, status: 'idle', duration: 0, progress: 0 },
+    { id: 'build', name: 'Build', icon: Box, status: 'idle', duration: 0, progress: 0 },
+    { id: 'test', name: 'Test', icon: CheckCircle2, status: 'idle', duration: 0, progress: 0 },
+    { id: 'deploy', name: 'Deploy', icon: Rocket, status: 'idle', duration: 0, progress: 0 },
+    { id: 'verify', name: 'Verify', icon: Shield, status: 'idle', duration: 0, progress: 0 },
+  ];
+}
+
+// Loader SVG component for running state
+function LoaderIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none">
       <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeDasharray="32" strokeDashoffset="32">

@@ -144,6 +144,30 @@ export interface Database {
                 Update: DeveloperAllocationUpdate;
                 Relationships: [];
             };
+            environments: {
+                Row: EnvironmentRow;
+                Insert: EnvironmentInsert;
+                Update: EnvironmentUpdate;
+                Relationships: [];
+            };
+            deployments: {
+                Row: DeploymentRow;
+                Insert: DeploymentInsert;
+                Update: DeploymentUpdate;
+                Relationships: [];
+            };
+            deployment_stages: {
+                Row: DeploymentStageRow;
+                Insert: DeploymentStageInsert;
+                Update: DeploymentStageUpdate;
+                Relationships: [];
+            };
+            deployment_insights: {
+                Row: DeploymentInsightRow;
+                Insert: DeploymentInsightInsert;
+                Update: DeploymentInsightUpdate;
+                Relationships: [];
+            };
         };
         Views: {
             [_ in never]: never;
@@ -176,6 +200,14 @@ export interface Database {
             };
             get_developer_stats: {
                 Args: { p_developer_id: string };
+                Returns: Json;
+            };
+            get_deployment_metrics: {
+                Args: { days_back?: number };
+                Returns: Json;
+            };
+            get_today_deployment_summary: {
+                Args: Record<string, never>;
                 Returns: Json;
             };
         };
@@ -967,4 +999,176 @@ export type TeamWorkloadSummary = {
     total_allocation_pct: number;
     total_hours_estimated: number;
     total_hours_logged: number;
+};
+
+// ============================================================================
+// ENVIRONMENTS
+// ============================================================================
+export type EnvironmentType = 'production' | 'staging' | 'development' | 'preview';
+export type EnvironmentStatus = 'healthy' | 'degraded' | 'down' | 'deploying';
+
+export type EnvironmentRow = {
+    id: string;
+    name: string;
+    type: EnvironmentType;
+    status: EnvironmentStatus;
+    version: string | null;
+    url: string | null;
+    region: string;
+    uptime: number;
+    response_time: number;
+    error_rate: number;
+    traffic: number;
+    instances: number;
+    last_deployed_at: string | null;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+    metadata: Json;
+};
+
+export type EnvironmentInsert = Omit<EnvironmentRow, 'id' | 'created_at' | 'updated_at'> & {
+    id?: string;
+    created_at?: string;
+    updated_at?: string;
+};
+
+export type EnvironmentUpdate = Partial<Omit<EnvironmentRow, 'id' | 'created_at'>>;
+
+// ============================================================================
+// DEPLOYMENTS
+// ============================================================================
+export type DeploymentStatus = 'pending' | 'building' | 'testing' | 'deploying' | 'success' | 'failed' | 'rolled-back' | 'cancelled';
+export type DeploymentStage = 'queue' | 'clone' | 'build' | 'test' | 'deploy' | 'verify' | 'complete';
+export type DeploymentTrigger = 'manual' | 'push' | 'merge' | 'schedule' | 'rollback' | 'webhook';
+
+export type DeploymentBuildMetrics = {
+    buildTime?: number;
+    testsPassed?: number;
+    testsTotal?: number;
+    coverage?: number;
+    bundleSize?: number;
+};
+
+export type DeploymentLighthouse = {
+    performance?: number;
+    accessibility?: number;
+    bestPractices?: number;
+    seo?: number;
+};
+
+export type DeploymentRow = {
+    id: string;
+    deploy_number: number;
+    project_id: string | null;
+    environment_id: string | null;
+    project_name: string;
+    environment_name: string;
+    status: DeploymentStatus;
+    progress: number;
+    current_stage: DeploymentStage;
+    branch: string | null;
+    commit_hash: string | null;
+    commit_message: string | null;
+    triggered_by: string | null;
+    triggered_by_name: string | null;
+    trigger_type: DeploymentTrigger;
+    build_metrics: DeploymentBuildMetrics | Json;
+    lighthouse: DeploymentLighthouse | Json;
+    started_at: string | null;
+    completed_at: string | null;
+    duration: number | null;
+    created_at: string;
+    updated_at: string;
+    deleted_at: string | null;
+    metadata: Json;
+};
+
+export type DeploymentInsert = Omit<DeploymentRow, 'id' | 'deploy_number' | 'created_at' | 'updated_at'> & {
+    id?: string;
+    deploy_number?: number;
+    created_at?: string;
+    updated_at?: string;
+};
+
+export type DeploymentUpdate = Partial<Omit<DeploymentRow, 'id' | 'deploy_number' | 'created_at'>>;
+
+// ============================================================================
+// DEPLOYMENT STAGES
+// ============================================================================
+export type DeploymentStageStatus = 'pending' | 'running' | 'success' | 'failed' | 'skipped';
+
+export type DeploymentStageRow = {
+    id: string;
+    deployment_id: string;
+    name: string;
+    stage_order: number;
+    status: DeploymentStageStatus;
+    duration: number | null;
+    logs: string[] | null;
+    started_at: string | null;
+    completed_at: string | null;
+    created_at: string;
+    metadata: Json;
+};
+
+export type DeploymentStageInsert = Omit<DeploymentStageRow, 'id' | 'created_at'> & {
+    id?: string;
+    created_at?: string;
+};
+
+export type DeploymentStageUpdate = Partial<Omit<DeploymentStageRow, 'id' | 'created_at' | 'deployment_id'>>;
+
+// ============================================================================
+// DEPLOYMENT INSIGHTS
+// ============================================================================
+export type InsightType = 'prediction' | 'optimization' | 'alert' | 'recommendation';
+export type InsightPriority = 'critical' | 'high' | 'medium' | 'low';
+
+export type DeploymentInsightRow = {
+    id: string;
+    deployment_id: string | null;
+    type: InsightType;
+    priority: InsightPriority;
+    title: string;
+    description: string | null;
+    impact: string | null;
+    confidence: number;
+    action_label: string | null;
+    is_dismissed: boolean;
+    created_at: string;
+    metadata: Json;
+};
+
+export type DeploymentInsightInsert = Omit<DeploymentInsightRow, 'id' | 'created_at'> & {
+    id?: string;
+    created_at?: string;
+};
+
+export type DeploymentInsightUpdate = Partial<Omit<DeploymentInsightRow, 'id' | 'created_at'>>;
+
+// ============================================================================
+// DEPLOYMENT JOINED TYPES (for UI)
+// ============================================================================
+export type DeploymentWithStages = DeploymentRow & {
+    stages: DeploymentStageRow[];
+};
+
+export type DeploymentMetricsResult = {
+    total_deployments: number;
+    successful_deployments: number;
+    failed_deployments: number;
+    success_rate: number;
+    avg_duration: number;
+    deploys_today: number;
+    active_instances: number;
+    total_regions: number;
+};
+
+export type TodayDeploymentSummary = {
+    total: number;
+    success: number;
+    failed: number;
+    in_progress: number;
+    rolled_back: number;
 };
