@@ -1057,6 +1057,8 @@ export type DeploymentLighthouse = {
     seo?: number;
 };
 
+export type DeploymentApprovalStatus = 'not_required' | 'pending' | 'approved' | 'rejected';
+
 export type DeploymentRow = {
     id: string;
     deploy_number: number;
@@ -1078,6 +1080,13 @@ export type DeploymentRow = {
     started_at: string | null;
     completed_at: string | null;
     duration: number | null;
+    // V2: Approval gating
+    approval_status: DeploymentApprovalStatus;
+    approved_by: string | null;
+    approved_at: string | null;
+    // V2: Promotion & rollback chain
+    promoted_from_deployment_id: string | null;
+    rollback_from_deployment_id: string | null;
     created_at: string;
     updated_at: string;
     deleted_at: string | null;
@@ -1171,4 +1180,84 @@ export type TodayDeploymentSummary = {
     failed: number;
     in_progress: number;
     rolled_back: number;
+};
+
+// ============================================================================
+// DEPLOYMENT LOGS (V2)
+// ============================================================================
+export type DeploymentLogLevel = 'info' | 'warn' | 'error' | 'debug' | 'success';
+
+export type DeploymentLogRow = {
+    id: string;
+    deployment_id: string;
+    stage_name: string | null;
+    level: DeploymentLogLevel;
+    message: string;
+    timestamp: string;
+    source: string | null;
+    metadata: Json;
+};
+
+export type DeploymentLogInsert = Omit<DeploymentLogRow, 'id'> & {
+    id?: string;
+};
+
+// ============================================================================
+// DEPLOYMENT APPROVALS (V2)
+// ============================================================================
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected' | 'expired';
+
+export type DeploymentApprovalRow = {
+    id: string;
+    deployment_id: string;
+    requested_by: string | null;
+    requested_by_name: string | null;
+    reviewer: string | null;
+    reviewer_name: string | null;
+    status: ApprovalStatus;
+    notes: string | null;
+    requested_at: string;
+    resolved_at: string | null;
+    expires_at: string | null;
+    created_at: string;
+    metadata: Json;
+};
+
+export type DeploymentApprovalInsert = Omit<DeploymentApprovalRow, 'id' | 'created_at'> & {
+    id?: string;
+    created_at?: string;
+};
+
+export type DeploymentApprovalUpdate = Partial<Omit<DeploymentApprovalRow, 'id' | 'created_at' | 'deployment_id'>>;
+
+// ============================================================================
+// V2 JOINED / RESULT TYPES
+// ============================================================================
+export type DeploymentWithDetails = DeploymentRow & {
+    stages: DeploymentStageRow[];
+    approvals?: DeploymentApprovalRow[];
+    logs?: DeploymentLogRow[];
+};
+
+export type DeploymentSearchResult = {
+    deployments: DeploymentWithDetails[];
+    total: number;
+    page: number;
+    page_size: number;
+    total_pages: number;
+};
+
+export type DeploymentHistoryResult = {
+    deployments: Array<Pick<DeploymentRow,
+        'id' | 'deploy_number' | 'project_id' | 'project_name' |
+        'environment_id' | 'environment_name' | 'status' |
+        'branch' | 'commit_hash' | 'commit_message' |
+        'triggered_by_name' | 'trigger_type' | 'approval_status' |
+        'duration' | 'started_at' | 'completed_at' | 'created_at' |
+        'build_metrics' | 'lighthouse'
+    >>;
+    total: number;
+    page: number;
+    per_page: number;
+    total_pages: number;
 };

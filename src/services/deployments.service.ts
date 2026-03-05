@@ -9,6 +9,7 @@ import type {
     DeploymentInsert,
     DeploymentUpdate,
     DeploymentWithStages,
+    DeploymentWithDetails,
     DeploymentStageRow,
     DeploymentStageInsert,
     EnvironmentRow,
@@ -16,6 +17,12 @@ import type {
     DeploymentInsightRow,
     DeploymentMetricsResult,
     TodayDeploymentSummary,
+    DeploymentLogRow,
+    DeploymentLogInsert,
+    DeploymentApprovalRow,
+    DeploymentApprovalUpdate,
+    DeploymentSearchResult,
+    DeploymentHistoryResult,
 } from '../types/database.types';
 import type { ServiceResponse, ServiceError } from '../types/api.types';
 
@@ -413,4 +420,309 @@ export function subscribeToEnvironments(
             }
         )
         .subscribe();
+}
+
+// ============================================================================
+// Deployment Logs (V2)
+// ============================================================================
+
+/** Get deployment logs, optionally filtered by stage */
+export async function getDeploymentLogs(
+    deploymentId: string,
+    stageName?: string
+): Promise<ServiceResponse<DeploymentLogRow[]>> {
+    try {
+        let query = supabase
+            .from('deployment_logs')
+            .select('*')
+            .eq('deployment_id', deploymentId)
+            .order('timestamp', { ascending: true });
+
+        if (stageName) {
+            query = query.eq('stage_name', stageName);
+        }
+
+        const { data, error } = await query;
+
+        if (error) throw error;
+        return { data: data as DeploymentLogRow[], error: null };
+    } catch (error) {
+        console.error('Error in getDeploymentLogs:', error);
+        return { data: null, error: formatError(error) };
+    }
+}
+
+/** Add a log entry to a deployment */
+export async function addDeploymentLog(
+    log: DeploymentLogInsert
+): Promise<ServiceResponse<DeploymentLogRow>> {
+    try {
+        const { data, error } = await supabase
+            .from('deployment_logs')
+            .insert(log)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return { data: data as DeploymentLogRow, error: null };
+    } catch (error) {
+        console.error('Error in addDeploymentLog:', error);
+        return { data: null, error: formatError(error) };
+    }
+}
+
+// ============================================================================
+// Deployment Approvals (V2)
+// ============================================================================
+
+/** Get approvals for a deployment */
+export async function getDeploymentApprovals(
+    deploymentId: string
+): Promise<ServiceResponse<DeploymentApprovalRow[]>> {
+    try {
+        const { data, error } = await supabase
+            .from('deployment_approvals')
+            .select('*')
+            .eq('deployment_id', deploymentId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return { data: data as DeploymentApprovalRow[], error: null };
+    } catch (error) {
+        console.error('Error in getDeploymentApprovals:', error);
+        return { data: null, error: formatError(error) };
+    }
+}
+
+/** Request approval for a deployment */
+export async function requestApproval(
+    deploymentId: string,
+    requestedBy: string,
+    requestedByName: string
+): Promise<ServiceResponse<DeploymentApprovalRow>> {
+    try {
+        // Create approval request
+        const { data, error } = await supabase
+            .from('deployment_approvals')
+            .insert({
+                deployment_id: deploymentId,
+                requested_by: requestedBy,
+                requested_by_name: requestedByName,
+                status: 'pending',
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        // Update deployment approval status
+        await supabase
+            .from('deployments')
+            .update({ approval_status: 'pending' })
+            .eq('id', deploymentId);
+
+        return { data: data as DeploymentApprovalRow, error: null };
+    } catch (error) {
+        console.error('Error in requestApproval:', error);
+        return { data: null, error: formatError(error) };
+    }
+}
+
+/** Resolve (approve/reject) an approval request */
+export async function resolveApproval(
+    approvalId: string,
+    status: 'approved' | 'rejected',
+    reviewerId: string,
+    reviewerName: string,
+    notes?: string
+): Promise<ServiceResponse<DeploymentApprovalRow>> {
+    try {
+        const updates: DeploymentApprovalUpdate = {
+            status,
+            reviewer: reviewerId,
+            reviewer_name: reviewerName,
+            notes: notes || null,
+            resolved_at: new Date().toISOString(),
+        };
+
+        const { data, error } = await supabase
+            .from('deployment_approvals')
+            .update(updates)
+            .eq('id', approvalId)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        const approval = data as DeploymentApprovalRow;
+
+        // Update parent deployment
+        await supabase
+            .from('deployments')
+            .update({
+                approval_status: status,
+                approved_by: status === 'approved' ? reviewerId : null,
+                approved_at: status === 'approved' ? new Date().toISOString() : null,
+                // If approved, move to building; if rejected, cancel
+                status: status === 'approved' ? 'building' : 'cancelled',
+            })
+            .eq('id', approval.deployment_id);
+
+        return { data: approval, error: null };
+    } catch (error) {
+        console.error('Error in resolveApproval:', error);
+        return { data: null, error: formatError(error) };
+    }
+}
+
+// ============================================================================
+// Search & History (V2)
+// ============================================================================
+
+export interface SearchDeploymentParams {
+    query?: string;
+    status?: string;
+    projectId?: string;
+    environmentId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    page?: number;
+    pageSize?: number;
+}
+
+/** Full-text search deployments with filters and pagination */
+export async function searchDeployments(
+    params: SearchDeploymentParams
+): Promise<ServiceResponse<DeploymentSearchResult>> {
+    try {
+        const { data, error } = await supabase.rpc('search_deployments', {
+            search_query: params.query || null,
+            status_filter: params.status || null,
+            project_filter: params.projectId || null,
+            env_filter: params.environmentId || null,
+            date_from: params.dateFrom || null,
+            date_to: params.dateTo || null,
+            page_num: params.page || 1,
+            page_size: params.pageSize || 20,
+        });
+
+        if (error) throw error;
+        return { data: data as DeploymentSearchResult, error: null };
+    } catch (error) {
+        console.error('Error in searchDeployments:', error);
+        return { data: null, error: formatError(error) };
+    }
+}
+
+/** Get deployment history for a project (paginated) */
+export async function getDeploymentHistory(
+    projectId?: string,
+    page = 1,
+    perPage = 20
+): Promise<ServiceResponse<DeploymentHistoryResult>> {
+    try {
+        const { data, error } = await supabase.rpc('get_deployment_history', {
+            p_project_id: projectId || null,
+            p_page: page,
+            p_per_page: perPage,
+        });
+
+        if (error) throw error;
+        return { data: data as DeploymentHistoryResult, error: null };
+    } catch (error) {
+        console.error('Error in getDeploymentHistory:', error);
+        return { data: null, error: formatError(error) };
+    }
+}
+
+// ============================================================================
+// Environment Promotion (V2)
+// ============================================================================
+
+/** Promote a successful deployment to a target environment */
+export async function promoteDeployment(
+    sourceDeploymentId: string,
+    targetEnvironmentId: string,
+    promoterId: string
+): Promise<ServiceResponse<DeploymentRow>> {
+    try {
+        const { data, error } = await supabase.rpc('promote_deployment', {
+            source_deployment_id: sourceDeploymentId,
+            target_environment_id: targetEnvironmentId,
+            promoter_id: promoterId,
+        });
+
+        if (error) throw error;
+        return { data: data as DeploymentRow, error: null };
+    } catch (error) {
+        console.error('Error in promoteDeployment:', error);
+        return { data: null, error: formatError(error) };
+    }
+}
+
+/** Get distinct project names from deployments (for filter dropdown) */
+export async function getDeploymentProjects(): Promise<ServiceResponse<Array<{ project_id: string; project_name: string }>>> {
+    try {
+        const { data, error } = await supabase
+            .from('deployments')
+            .select('project_id, project_name')
+            .is('deleted_at', null)
+            .not('project_id', 'is', null)
+            .order('project_name', { ascending: true });
+
+        if (error) throw error;
+
+        // Deduplicate by project_id
+        const seen = new Set<string>();
+        const unique = (data || []).filter((d) => {
+            if (!d.project_id || seen.has(d.project_id)) return false;
+            seen.add(d.project_id);
+            return true;
+        });
+
+        return { data: unique as Array<{ project_id: string; project_name: string }>, error: null };
+    } catch (error) {
+        console.error('Error in getDeploymentProjects:', error);
+        return { data: null, error: formatError(error) };
+    }
+}
+
+/** Get a single deployment with full details (stages, approvals, logs) */
+export async function getDeploymentWithDetails(
+    id: string
+): Promise<ServiceResponse<DeploymentWithDetails>> {
+    try {
+        const [depRes, logsRes, approvalsRes] = await Promise.all([
+            supabase
+                .from('deployments')
+                .select('*, stages:deployment_stages(*)')
+                .eq('id', id)
+                .is('deleted_at', null)
+                .single(),
+            supabase
+                .from('deployment_logs')
+                .select('*')
+                .eq('deployment_id', id)
+                .order('timestamp', { ascending: true }),
+            supabase
+                .from('deployment_approvals')
+                .select('*')
+                .eq('deployment_id', id)
+                .order('created_at', { ascending: false }),
+        ]);
+
+        if (depRes.error) throw depRes.error;
+
+        const deployment = depRes.data as DeploymentWithDetails;
+        deployment.stages = (deployment.stages || []).sort(
+            (a: DeploymentStageRow, b: DeploymentStageRow) => a.stage_order - b.stage_order
+        );
+        deployment.logs = (logsRes.data as DeploymentLogRow[]) || [];
+        deployment.approvals = (approvalsRes.data as DeploymentApprovalRow[]) || [];
+
+        return { data: deployment, error: null };
+    } catch (error) {
+        console.error('Error in getDeploymentWithDetails:', error);
+        return { data: null, error: formatError(error) };
+    }
 }

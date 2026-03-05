@@ -8,7 +8,9 @@ import {
   ChevronDown, ArrowUpRight, Sparkles, Brain, Users,
   ExternalLink, RefreshCw,
   GitCommit,
-  CircleSlash, Timer
+  CircleSlash, Timer,
+  // V2 icons
+  Search, Filter, Calendar, ChevronLeft, ShieldCheck, ArrowRightLeft
 } from 'lucide-react';
 import {
   getEnvironments,
@@ -19,6 +21,14 @@ import {
   subscribeToDeployments,
   subscribeToEnvironments,
   rollbackDeployment,
+  // V2 service functions
+  getDeploymentLogs,
+  getDeploymentWithDetails,
+  searchDeployments,
+  getDeploymentHistory,
+  getDeploymentProjects,
+  promoteDeployment,
+  resolveApproval,
 } from '../../services/deployments.service';
 import type {
   EnvironmentRow,
@@ -29,6 +39,12 @@ import type {
   DeploymentBuildMetrics,
   DeploymentLighthouse,
   DeploymentStageRow,
+  // V2 types
+  DeploymentWithDetails,
+  DeploymentLogRow,
+  DeploymentApprovalRow,
+  DeploymentSearchResult,
+  DeploymentHistoryResult,
 } from '../../types/database.types';
 
 // ============================================================================
@@ -78,6 +94,56 @@ export default function Deployments() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // V2 states
+  const [projectsList, setProjectsList] = useState<Array<{ project_id: string; project_name: string }>>([]);
+  const [projectFilter, setProjectFilter] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
+  const [searchResults, setSearchResults] = useState<DeploymentSearchResult | null>(null);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'search' | 'history'>('dashboard');
+  const [logsPanel, setLogsPanel] = useState<{ open: boolean; deploymentId: string | null }>({ open: false, deploymentId: null });
+  const [logs, setLogs] = useState<DeploymentLogRow[]>([]);
+  const [logsLoading, setLogsLoading] = useState<boolean>(false);
+  const [approvalModal, setApprovalModal] = useState<{ open: boolean; approvalId: string | null }>({ open: false, approvalId: null });
+
+  // ---------------- V2 Fetch Functions ----------------
+  useEffect(() => {
+    async function fetchProjects() {
+      const res = await getDeploymentProjects();
+      if (res.data) setProjectsList(res.data);
+    }
+    fetchProjects();
+  }, []);
+
+  const handleSearch = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = {
+        query: searchQuery,
+        projectId: projectFilter,
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+        page: currentPage,
+        pageSize: 20,
+        status: filterStatus !== 'all' ? filterStatus : undefined,
+      };
+      const res = await searchDeployments(params);
+      if (res.data) {
+        setSearchResults(res.data);
+        setTotalPages(res.data.total_pages || 1);
+      }
+      setError(null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to search deployments';
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }, [searchQuery, projectFilter, dateFrom, dateTo, currentPage, filterStatus]);
+
   // --------------- Data Fetching ---------------
   const fetchAllData = useCallback(async () => {
     try {
@@ -95,115 +161,161 @@ export default function Deployments() {
       if (metRes.data) setMetrics(metRes.data);
       if (todRes.data) setTodaySummary(todRes.data);
 
-      // Auto-select first environment
-      if (envRes.data && envRes.data.length > 0 && !selectedEnvironment) {
-        setSelectedEnvironment(envRes.data[0].id);
-      }
-
       setError(null);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load deployment data';
       setError(msg);
     } finally {
       setLoading(false);
+      setAnimateIn(true);
     }
-  }, [filterStatus, selectedEnvironment]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterStatus]);
 
+  // Initial load + auto-refresh
   useEffect(() => {
+    fetchAllData();
+    if (!autoRefresh) return;
+    const interval = setInterval(fetchAllData, 30000);
+    return () => clearInterval(interval);
+  }, [fetchAllData, autoRefresh]);
+
+  // --------------- Logs Panel ---------------
+  const handleOpenLogs = useCallback(async (deploymentId: string) => {
+    setLogsPanel({ open: true, deploymentId });
+    setLogsLoading(true);
+    try {
+      const res = await getDeploymentLogs(deploymentId);
+      if (res.data) setLogs(res.data);
+    } catch { /* silent */ } finally {
+      setLogsLoading(false);
+    }
+  }, []);
+
+  // --------------- Approval Handling ---------------
+  const handleApproval = useCallback(async (approvalId: string, status: 'approved' | 'rejected', notes?: string) => {
+    await resolveApproval(approvalId, status, 'admin', 'Admin', notes);
+    setApprovalModal({ open: false, approvalId: null });
     fetchAllData();
   }, [fetchAllData]);
 
-  // Auto-refresh every 15s
-  useEffect(() => {
-    if (!autoRefresh) return;
-    const interval = setInterval(fetchAllData, 15000);
-    return () => clearInterval(interval);
-  }, [autoRefresh, fetchAllData]);
+  // --------------- History Fetching ---------------
+  const [historyData, setHistoryData] = useState<import('../../types/database.types').DeploymentHistoryResult | null>(null);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyProject, setHistoryProject] = useState<string>('');
 
-  // Animate in
-  useEffect(() => {
-    setTimeout(() => setAnimateIn(true), 50);
-  }, []);
+  const fetchHistory = useCallback(async (page = 1) => {
+    setHistoryLoading(true);
+    try {
+      const res = await getDeploymentHistory(historyProject || undefined, page, 20);
+      if (res.data) setHistoryData(res.data);
+    } catch { /* silent */ } finally {
+      setHistoryLoading(false);
+    }
+  }, [historyProject]);
 
-  // Real-time subscriptions
   useEffect(() => {
-    const depChannel = subscribeToDeployments(() => {
-      fetchAllData();
+    if (activeTab === 'history') fetchHistory(historyPage);
+  }, [activeTab, historyPage, fetchHistory]);
+
+  useEffect(() => {
+    if (activeTab === 'search' && searchQuery) handleSearch();
+  }, [activeTab, currentPage]);
+
+  // ============================================================================
+  // HELPER: Build pipeline display from real deployment stages
+  // ============================================================================
+  const STAGE_ICON_MAP: Record<string, React.ElementType> = {
+    Clone: GitBranch,
+    Install: Package,
+    Build: Box,
+    Test: CheckCircle2,
+    Deploy: Rocket,
+    Verify: Shield,
+  };
+
+  function buildPipelineDisplay(
+    stages: DeploymentStageRow[],
+    overallProgress: number
+  ): PipelineStageDisplay[] {
+    if (!stages || stages.length === 0) return getDefaultPipeline();
+    return stages.map((stage) => {
+      let uiStatus: 'idle' | 'active' | 'success' | 'failed' = 'idle';
+      let progress = 0;
+      switch (stage.status) {
+        case 'success': uiStatus = 'success'; progress = 100; break;
+        case 'running': uiStatus = 'active'; progress = overallProgress; break;
+        case 'failed': uiStatus = 'failed'; progress = 100; break;
+        default: uiStatus = 'idle'; progress = 0;
+      }
+      return {
+        id: stage.name.toLowerCase(),
+        name: stage.name,
+        icon: STAGE_ICON_MAP[stage.name] || Box,
+        status: uiStatus,
+        duration: stage.duration || 0,
+        progress,
+      };
     });
-    const envChannel = subscribeToEnvironments(() => {
-      fetchAllData();
-    });
-    return () => {
-      depChannel.unsubscribe();
-      envChannel.unsubscribe();
-    };
-  }, [fetchAllData]);
+  }
 
-  // --------------- Canvas Animation ---------------
+  function getDefaultPipeline(): PipelineStageDisplay[] {
+    return [
+      { id: 'clone', name: 'Clone', icon: GitBranch, status: 'idle', duration: 0, progress: 0 },
+      { id: 'install', name: 'Install', icon: Package, status: 'idle', duration: 0, progress: 0 },
+      { id: 'build', name: 'Build', icon: Box, status: 'idle', duration: 0, progress: 0 },
+      { id: 'test', name: 'Test', icon: CheckCircle2, status: 'idle', duration: 0, progress: 0 },
+      { id: 'deploy', name: 'Deploy', icon: Rocket, status: 'idle', duration: 0, progress: 0 },
+      { id: 'verify', name: 'Verify', icon: Shield, status: 'idle', duration: 0, progress: 0 },
+    ];
+  }
+
+  // Loader SVG component for running state
+  function LoaderIcon({ className }: { className?: string }) {
+    return (
+      <svg className={className} viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeDasharray="32" strokeDashoffset="32">
+          <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/>
+        </circle>
+      </svg>
+    );
+  }
+
+  // Canvas background animation
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-
     canvas.width = canvas.offsetWidth * 2;
     canvas.height = canvas.offsetHeight * 2;
-    ctx.scale(2, 2);
-
+    const particles = Array.from({ length: 40 }, () => ({
+      x: Math.random() * canvas.width / 2, y: Math.random() * canvas.height / 2,
+      vx: (Math.random() - 0.5) * 0.5, vy: (Math.random() - 0.5) * 0.5, life: Math.random() * Math.PI * 2,
+    }));
     let animationId: number;
-
-    const particles: Array<{x: number; y: number; vx: number; vy: number; life: number}> = [];
-
-    for (let i = 0; i < 50; i++) {
-      particles.push({
-        x: Math.random() * canvas.width / 2,
-        y: Math.random() * canvas.height / 2,
-        vx: (Math.random() - 0.5) * 0.5,
-        vy: (Math.random() - 0.5) * 0.5,
-        life: Math.random()
-      });
-    }
-
     const animate = () => {
-      ctx.fillStyle = 'rgba(10, 14, 26, 0.05)';
+      ctx.fillStyle = 'rgba(10, 14, 26, 0.1)';
       ctx.fillRect(0, 0, canvas.width / 2, canvas.height / 2);
-
       particles.forEach((p, i) => {
-        p.x += p.vx;
-        p.y += p.vy;
-        p.life += 0.005;
-
+        p.x += p.vx; p.y += p.vy; p.life += 0.005;
         if (p.x < 0 || p.x > canvas.width / 2) p.vx *= -1;
         if (p.y < 0 || p.y > canvas.height / 2) p.vy *= -1;
-
         particles.forEach((p2, j) => {
           if (i === j) return;
-          const dx = p2.x - p.x;
-          const dy = p2.y - p.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-
+          const dx = p2.x - p.x, dy = p2.y - p.y, dist = Math.sqrt(dx * dx + dy * dy);
           if (dist < 100) {
             ctx.strokeStyle = `rgba(6, 182, 212, ${(1 - dist / 100) * 0.2})`;
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(p.x, p.y);
-            ctx.lineTo(p2.x, p2.y);
-            ctx.stroke();
+            ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
           }
         });
-
         ctx.fillStyle = `rgba(6, 182, 212, ${Math.sin(p.life) * 0.3 + 0.3})`;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI * 2); ctx.fill();
       });
-
       animationId = requestAnimationFrame(animate);
     };
-
     animate();
-
     return () => cancelAnimationFrame(animationId);
   }, []);
 
@@ -589,9 +701,169 @@ export default function Deployments() {
             </button>
           </div>
         </header>
+        {/* V2 Tab Switcher */}
+        <div className="flex items-center gap-2 px-2 py-2 bg-[#101624] border-b border-slate-800 rounded-xl mb-4">
+          <button
+            className={`px-4 py-2 rounded font-semibold ${activeTab === 'dashboard' ? 'bg-cyan-700 text-white' : 'bg-slate-800 text-slate-300'}`}
+            onClick={() => setActiveTab('dashboard')}
+          >Dashboard</button>
+          <button
+            className={`px-4 py-2 rounded font-semibold ${activeTab === 'search' ? 'bg-purple-700 text-white' : 'bg-slate-800 text-slate-300'}`}
+            onClick={() => setActiveTab('search')}
+          >Search</button>
+          <button
+            className={`px-4 py-2 rounded font-semibold ${activeTab === 'history' ? 'bg-green-700 text-white' : 'bg-slate-800 text-slate-300'}`}
+            onClick={() => setActiveTab('history')}
+          >History</button>
+        </div>
 
         {/* ================================================================ */}
         {/* AI INSIGHTS PANEL */}
+                {/* ================================================================ */}
+                {/* Tab Content: Dashboard, Search, History */}
+                {activeTab === 'dashboard' && (
+                  <section>{/* Dashboard content rendered below */}</section>
+                )}
+
+                {/* ──── SEARCH TAB ──── */}
+                {activeTab === 'search' && (
+                  <section className="space-y-6">
+                    {/* Search Filters */}
+                    <div className="bg-gradient-to-br from-slate-900/80 via-slate-800/60 to-slate-900/80 backdrop-blur-md border border-slate-700/50 rounded-2xl p-6">
+                      <div className="flex items-center gap-3 mb-5">
+                        <div className="p-2.5 bg-purple-500/10 rounded-lg border border-purple-500/30"><Search className="w-5 h-5 text-purple-400" /></div>
+                        <h3 className="text-xl font-bold text-white">Search Deployments</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+                        <input type="text" placeholder="Search commits, branches…" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                          className="px-4 py-2.5 bg-slate-800/60 border border-slate-700/50 rounded-xl text-white text-sm focus:outline-none focus:border-purple-500/50" />
+                        <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}
+                          className="px-4 py-2.5 bg-slate-800/60 border border-slate-700/50 rounded-xl text-white text-sm focus:outline-none focus:border-purple-500/50">
+                          <option value="">All Projects</option>
+                          {projectsList.map((p: any) => <option key={p.project_id || p} value={p.project_id || p}>{p.project_name || p}</option>)}
+                        </select>
+                        <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
+                          className="px-4 py-2.5 bg-slate-800/60 border border-slate-700/50 rounded-xl text-white text-sm focus:outline-none focus:border-purple-500/50" />
+                        <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
+                          className="px-4 py-2.5 bg-slate-800/60 border border-slate-700/50 rounded-xl text-white text-sm focus:outline-none focus:border-purple-500/50" />
+                        <button onClick={() => { setCurrentPage(1); handleSearch(); }}
+                          className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2">
+                          <Search className="w-4 h-4" /> Search
+                        </button>
+                      </div>
+                    </div>
+                    {/* Search Results */}
+                    {searchResults && searchResults.deployments.length > 0 ? (
+                      <>
+                        <div className="text-sm text-slate-400 font-medium">{searchResults.total} result{searchResults.total !== 1 ? 's' : ''} found</div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                          {searchResults.deployments.map((dep) => {
+                            const sc = getStatusConfig(dep.status); const clr = getColorClasses(sc.color);
+                            return (
+                              <div key={dep.id} className="group p-5 bg-gradient-to-br from-slate-900/80 to-slate-800/60 border border-slate-700/50 hover:border-purple-500/40 rounded-2xl transition-all cursor-pointer"
+                                onClick={() => { setActiveTab('dashboard'); setSelectedDeployment(dep.id); }}>
+                                <div className="flex items-center justify-between mb-3">
+                                  <span className={`text-xs px-2.5 py-1 rounded-lg ${clr.bgLight} ${clr.text} border ${clr.border} font-bold uppercase tracking-wider`}>{sc.label}</span>
+                                  <span className="text-[10px] text-slate-500 font-mono">DEP-{dep.deploy_number}</span>
+                                </div>
+                                <h4 className="text-white font-bold mb-2 group-hover:text-purple-300 transition-colors">{dep.project_name}</h4>
+                                <div className="flex items-center gap-3 text-xs text-slate-400">
+                                  <span className="flex items-center gap-1"><GitBranch className="w-3 h-3" />{dep.branch || 'main'}</span>
+                                  <span className="flex items-center gap-1"><Server className="w-3 h-3" />{dep.environment_name}</span>
+                                </div>
+                                <div className="mt-3 pt-3 border-t border-slate-700/50 flex items-center justify-between text-xs text-slate-500">
+                                  <span>{dep.triggered_by_name || 'System'}</span>
+                                  <span>{dep.duration ? formatDuration(dep.duration) : '—'}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {/* Pagination */}
+                        <div className="flex items-center justify-center gap-4">
+                          <button disabled={currentPage <= 1} onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                            className="px-4 py-2 bg-slate-800/60 border border-slate-700/50 rounded-xl text-white text-sm font-bold disabled:opacity-30 hover:border-purple-500/50 transition-all">
+                            <ChevronLeft className="w-4 h-4" />
+                          </button>
+                          <span className="text-sm text-slate-400">Page {currentPage} of {totalPages}</span>
+                          <button disabled={currentPage >= totalPages} onClick={() => setCurrentPage((p) => p + 1)}
+                            className="px-4 py-2 bg-slate-800/60 border border-slate-700/50 rounded-xl text-white text-sm font-bold disabled:opacity-30 hover:border-purple-500/50 transition-all">
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </>
+                    ) : searchResults ? (
+                      <div className="text-center py-16"><Search className="w-12 h-12 text-slate-600 mx-auto mb-4" /><p className="text-slate-400 font-medium">No deployments found</p></div>
+                    ) : (
+                      <div className="text-center py-16 text-slate-500">Enter a search query to find deployments</div>
+                    )}
+                  </section>
+                )}
+
+                {/* ──── HISTORY TAB ──── */}
+                {activeTab === 'history' && (
+                  <section className="space-y-6">
+                    <div className="bg-gradient-to-br from-slate-900/80 via-slate-800/60 to-slate-900/80 backdrop-blur-md border border-slate-700/50 rounded-2xl p-6">
+                      <div className="flex items-center justify-between mb-5">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2.5 bg-emerald-500/10 rounded-lg border border-emerald-500/30"><Clock className="w-5 h-5 text-emerald-400" /></div>
+                          <h3 className="text-xl font-bold text-white">Deployment History</h3>
+                        </div>
+                        <select value={historyProject} onChange={(e) => { setHistoryProject(e.target.value); setHistoryPage(1); }}
+                          className="px-4 py-2 bg-slate-800/60 border border-slate-700/50 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500/50">
+                          <option value="">All Projects</option>
+                          {projectsList.map((p: any) => <option key={p.project_id || p} value={p.project_id || p}>{p.project_name || p}</option>)}
+                        </select>
+                      </div>
+                      {historyLoading ? (
+                        <div className="flex items-center justify-center py-12"><div className="w-8 h-8 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" /></div>
+                      ) : historyData && historyData.deployments.length > 0 ? (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead><tr className="text-xs text-slate-500 uppercase tracking-wider border-b border-slate-700/50">
+                              <th className="text-left py-3 px-4">Deploy</th><th className="text-left py-3 px-4">Project</th><th className="text-left py-3 px-4">Env</th>
+                              <th className="text-left py-3 px-4">Status</th><th className="text-left py-3 px-4">Branch</th><th className="text-left py-3 px-4">By</th>
+                              <th className="text-left py-3 px-4">Duration</th><th className="text-left py-3 px-4">Date</th>
+                            </tr></thead>
+                            <tbody className="divide-y divide-slate-700/30">
+                              {historyData.deployments.map((dep) => {
+                                const sc = getStatusConfig(dep.status); const clr = getColorClasses(sc.color);
+                                return (
+                                  <tr key={dep.id} className="hover:bg-slate-800/30 transition-colors cursor-pointer" onClick={() => { setActiveTab('dashboard'); setSelectedDeployment(dep.id); }}>
+                                    <td className="py-3 px-4 font-mono text-xs text-slate-400">DEP-{dep.deploy_number}</td>
+                                    <td className="py-3 px-4 font-bold text-white">{dep.project_name}</td>
+                                    <td className="py-3 px-4 text-slate-400">{dep.environment_name}</td>
+                                    <td className="py-3 px-4"><span className={`text-xs px-2 py-0.5 rounded ${clr.bgLight} ${clr.text} font-bold`}>{sc.label}</span></td>
+                                    <td className="py-3 px-4 text-slate-400 flex items-center gap-1"><GitBranch className="w-3 h-3" />{dep.branch || 'main'}</td>
+                                    <td className="py-3 px-4 text-slate-400">{dep.triggered_by_name || 'System'}</td>
+                                    <td className="py-3 px-4 text-slate-400">{dep.duration ? formatDuration(dep.duration) : '—'}</td>
+                                    <td className="py-3 px-4 text-slate-500 text-xs">{formatRelativeTime(dep.created_at)}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="text-center py-12 text-slate-500">No deployment history found</div>
+                      )}
+                      {/* Pagination */}
+                      {historyData && historyData.total_pages > 1 && (
+                        <div className="flex items-center justify-center gap-4 mt-6">
+                          <button disabled={historyPage <= 1} onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+                            className="px-4 py-2 bg-slate-800/60 border border-slate-700/50 rounded-xl text-white text-sm font-bold disabled:opacity-30 hover:border-emerald-500/50 transition-all">
+                            <ChevronLeft className="w-4 h-4" />
+                          </button>
+                          <span className="text-sm text-slate-400">Page {historyPage} of {historyData.total_pages}</span>
+                          <button disabled={historyPage >= historyData.total_pages} onClick={() => setHistoryPage((p) => p + 1)}
+                            className="px-4 py-2 bg-slate-800/60 border border-slate-700/50 rounded-xl text-white text-sm font-bold disabled:opacity-30 hover:border-emerald-500/50 transition-all">
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </section>
+                )}
         {/* ================================================================ */}
         {insights.length > 0 && (
           <div className="bg-gradient-to-r from-purple-900/20 via-pink-900/20 to-purple-900/20 backdrop-blur-md border border-purple-500/30 rounded-2xl p-6 relative overflow-hidden">
@@ -1088,7 +1360,8 @@ export default function Deployments() {
                                   <ExternalLink className="w-4 h-4" />
                                   View Live
                                 </button>
-                                <button className="flex items-center justify-center gap-2 w-full py-2.5 bg-slate-800/60 hover:bg-slate-800 text-white border border-slate-700/50 hover:border-slate-600 rounded-xl text-sm font-semibold transition-all">
+                                <button onClick={(e) => { e.stopPropagation(); handleOpenLogs(deployment.id); }}
+                                  className="flex items-center justify-center gap-2 w-full py-2.5 bg-slate-800/60 hover:bg-slate-800 text-white border border-slate-700/50 hover:border-slate-600 rounded-xl text-sm font-semibold transition-all">
                                   <Terminal className="w-4 h-4" />
                                   View Logs
                                 </button>
@@ -1209,6 +1482,18 @@ export default function Deployments() {
               </div>
             </div>
 
+            {/* PROJECT FILTER */}
+            <div className="p-4 bg-gradient-to-br from-slate-900/80 to-slate-800/60 backdrop-blur-md border border-slate-700/50 rounded-2xl">
+              <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Filter by Project</div>
+              <select
+                value={projectFilter}
+                onChange={(e) => { setProjectFilter(e.target.value); setFilterStatus('all'); }}
+                className="w-full px-3 py-2.5 bg-slate-800/60 border border-slate-700/50 rounded-xl text-white text-sm focus:outline-none focus:border-cyan-500/50">
+                <option value="">All Projects</option>
+                {projectsList.map((p: any) => <option key={p.project_id || p} value={p.project_id || p}>{p.project_name || p}</option>)}
+              </select>
+            </div>
+
             {/* DEPLOYMENT STATS */}
             <div className="grid grid-cols-1 gap-4">
               <div className="p-6 bg-gradient-to-br from-slate-900/80 to-slate-800/60 backdrop-blur-md border border-slate-700/50 rounded-2xl">
@@ -1260,6 +1545,79 @@ export default function Deployments() {
         </div>
 
         {/* ================================================================ */}
+        {/* SCHEDULING & AUTOMATION */}
+        {/* ================================================================ */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          {/* Deployment Windows */}
+          <div className="bg-gradient-to-br from-slate-900/80 via-slate-800/60 to-slate-900/80 backdrop-blur-md border border-slate-700/50 rounded-2xl p-6">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="p-2.5 bg-amber-500/10 rounded-lg border border-amber-500/30"><Calendar className="w-5 h-5 text-amber-400" /></div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Deployment Windows</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Control when deployments are allowed</p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              {['Monday–Thursday', 'Friday', 'Weekends'].map((window, i) => {
+                const configs = [
+                  { hours: '09:00 – 22:00', status: 'allowed', color: 'emerald' },
+                  { hours: '09:00 – 16:00', status: 'restricted', color: 'amber' },
+                  { hours: 'Blocked', status: 'blocked', color: 'red' },
+                ];
+                const cfg = configs[i];
+                const clr = getColorClasses(cfg.color);
+                return (
+                  <div key={window} className="flex items-center justify-between p-3 bg-slate-800/40 rounded-xl border border-slate-700/50">
+                    <div><div className="text-sm font-bold text-white">{window}</div><div className="text-xs text-slate-400 mt-0.5">{cfg.hours}</div></div>
+                    <span className={`text-xs px-2.5 py-1 rounded-lg ${clr.bgLight} ${clr.text} border ${clr.border} font-bold uppercase tracking-wider`}>{cfg.status}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Team Deploy Metrics */}
+          <div className="bg-gradient-to-br from-slate-900/80 via-slate-800/60 to-slate-900/80 backdrop-blur-md border border-slate-700/50 rounded-2xl p-6">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="p-2.5 bg-blue-500/10 rounded-lg border border-blue-500/30"><Users className="w-5 h-5 text-blue-400" /></div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Team Productivity</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Deployment metrics by team member</p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              {(() => {
+                const teamMap = new Map<string, { deploys: number; successes: number }>();
+                deployments.forEach((d) => {
+                  const name = d.triggered_by_name || 'System';
+                  const current = teamMap.get(name) || { deploys: 0, successes: 0 };
+                  current.deploys++;
+                  if (d.status === 'success') current.successes++;
+                  teamMap.set(name, current);
+                });
+                const sorted = [...teamMap.entries()].sort((a, b) => b[1].deploys - a[1].deploys).slice(0, 5);
+                if (sorted.length === 0) return <div className="text-sm text-slate-500 text-center py-6">No deployment data available</div>;
+                const maxDeploys = Math.max(...sorted.map(([, v]) => v.deploys));
+                return sorted.map(([name, stats]) => {
+                  const rate = stats.deploys > 0 ? Math.round((stats.successes / stats.deploys) * 100) : 0;
+                  return (
+                    <div key={name} className="p-3 bg-slate-800/40 rounded-xl border border-slate-700/50">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-bold text-white">{name}</span>
+                        <span className="text-xs text-slate-400">{stats.deploys} deploy{stats.deploys !== 1 ? 's' : ''} • <span className={rate >= 90 ? 'text-emerald-400' : rate >= 70 ? 'text-amber-400' : 'text-red-400'}>{rate}%</span></span>
+                      </div>
+                      <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full transition-all" style={{ width: `${(stats.deploys / maxDeploys) * 100}%` }} />
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          </div>
+        </div>
+
+        {/* ================================================================ */}
         {/* FOOTER STATUS BAR */}
         {/* ================================================================ */}
         <footer className="flex items-center justify-between p-4 bg-slate-900/60 backdrop-blur-md border border-slate-700/50 rounded-xl text-xs text-slate-400">
@@ -1289,6 +1647,48 @@ export default function Deployments() {
 
       </div>
 
+      {/* ================================================================ */}
+      {/* LOGS PANEL OVERLAY */}
+      {/* ================================================================ */}
+      {logsPanel.open && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setLogsPanel({ open: false, deploymentId: null })} />
+          <div className="relative w-full max-w-2xl bg-[#0a0e1a] border-l border-slate-700/50 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+            <div className="flex items-center justify-between p-5 border-b border-slate-700/50">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-cyan-500/10 rounded-lg border border-cyan-500/30"><Terminal className="w-5 h-5 text-cyan-400" /></div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Deployment Logs</h3>
+                  <p className="text-xs text-slate-400 font-mono">{logsPanel.deploymentId?.slice(0, 8)}</p>
+                </div>
+              </div>
+              <button onClick={() => setLogsPanel({ open: false, deploymentId: null })} className="p-2 hover:bg-slate-800 rounded-lg transition-colors">
+                <XCircle className="w-5 h-5 text-slate-400 hover:text-white" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5 font-mono text-xs space-y-1 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+              {logsLoading ? (
+                <div className="flex items-center justify-center py-12"><div className="w-8 h-8 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" /></div>
+              ) : logs.length > 0 ? (
+                logs.map((log) => {
+                  const levelColors: Record<string, string> = { info: 'text-blue-400', warn: 'text-amber-400', error: 'text-red-400', debug: 'text-slate-500', success: 'text-emerald-400' };
+                  return (
+                    <div key={log.id} className="flex gap-3 py-1 hover:bg-slate-800/30 px-2 rounded">
+                      <span className="text-slate-600 shrink-0">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                      <span className={`shrink-0 uppercase font-bold w-14 ${levelColors[log.level] || 'text-slate-400'}`}>{log.level}</span>
+                      {log.stage_name && <span className="text-purple-400 shrink-0">[{log.stage_name}]</span>}
+                      <span className="text-slate-300">{log.message}</span>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-center py-12 text-slate-500">No logs available for this deployment</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* CUSTOM STYLES */}
       <style>{`
         @keyframes gradient {
@@ -1314,80 +1714,5 @@ export default function Deployments() {
   );
 }
 
-// ============================================================================
-// HELPER: Build pipeline display from real deployment stages
-// ============================================================================
 
-const STAGE_ICON_MAP: Record<string, React.ElementType> = {
-  Clone: GitBranch,
-  Install: Package,
-  Build: Box,
-  Test: CheckCircle2,
-  Deploy: Rocket,
-  Verify: Shield,
-};
 
-function buildPipelineDisplay(
-  stages: DeploymentStageRow[],
-  overallProgress: number
-): PipelineStageDisplay[] {
-  if (!stages || stages.length === 0) return getDefaultPipeline();
-
-  return stages.map((stage) => {
-    let uiStatus: 'idle' | 'active' | 'success' | 'failed' = 'idle';
-    let progress = 0;
-
-    switch (stage.status) {
-      case 'success':
-        uiStatus = 'success';
-        progress = 100;
-        break;
-      case 'running':
-        uiStatus = 'active';
-        progress = overallProgress;
-        break;
-      case 'failed':
-        uiStatus = 'failed';
-        progress = 100;
-        break;
-      case 'skipped':
-        uiStatus = 'idle';
-        progress = 0;
-        break;
-      default:
-        uiStatus = 'idle';
-        progress = 0;
-    }
-
-    return {
-      id: stage.id,
-      name: stage.name,
-      icon: STAGE_ICON_MAP[stage.name] || Box,
-      status: uiStatus,
-      duration: stage.duration || 0,
-      progress,
-    };
-  });
-}
-
-function getDefaultPipeline(): PipelineStageDisplay[] {
-  return [
-    { id: 'clone', name: 'Clone', icon: GitBranch, status: 'idle', duration: 0, progress: 0 },
-    { id: 'install', name: 'Install', icon: Package, status: 'idle', duration: 0, progress: 0 },
-    { id: 'build', name: 'Build', icon: Box, status: 'idle', duration: 0, progress: 0 },
-    { id: 'test', name: 'Test', icon: CheckCircle2, status: 'idle', duration: 0, progress: 0 },
-    { id: 'deploy', name: 'Deploy', icon: Rocket, status: 'idle', duration: 0, progress: 0 },
-    { id: 'verify', name: 'Verify', icon: Shield, status: 'idle', duration: 0, progress: 0 },
-  ];
-}
-
-// Loader SVG component for running state
-function LoaderIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none">
-      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeDasharray="32" strokeDashoffset="32">
-        <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/>
-      </circle>
-    </svg>
-  );
-}
