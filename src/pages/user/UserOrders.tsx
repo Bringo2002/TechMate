@@ -38,7 +38,7 @@ interface ProjectListItem {
   updated_at: string;
   health_score: number;
   next_milestone?: string | null;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
   source: 'order' | 'inquiry';
 }
 
@@ -127,7 +127,7 @@ const UserOrders: React.FC = () => {
       if (inquiriesError) throw inquiriesError;
 
       // Map both to a common shape
-      const ordersMapped: ProjectListItem[] = (ordersData ?? []).map((o: any) => ({
+      const ordersMapped: ProjectListItem[] = (ordersData ?? []).map((o: Record<string, unknown>) => ({
         id: o.id,
         title: o.title,
         type: o.type,
@@ -144,7 +144,7 @@ const UserOrders: React.FC = () => {
         source: 'order'
       }));
 
-      const inquiriesMapped: ProjectListItem[] = (inquiriesData ?? []).map((i: any) => ({
+      const inquiriesMapped: ProjectListItem[] = (inquiriesData ?? []).map((i: Record<string, unknown>) => ({
         id: i.id,
         title: i.title,
         type: i.project_type, // maps to type field
@@ -278,6 +278,7 @@ const UserOrders: React.FC = () => {
                 <div className="relative min-w-[150px]">
                     <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
                     <select 
+                        title="Filter by status"
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
                         className="w-full bg-slate-900/50 border border-white/10 rounded-lg pl-10 pr-4 py-2.5 text-white focus:outline-none focus:border-cyan-500/50 appearance-none cursor-pointer"

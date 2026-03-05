@@ -31,7 +31,7 @@ type UserProfile = {
   bio: string | null;
   company: string | null;
   job_title: string | null;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 // For order and inquiry items
@@ -123,7 +123,7 @@ const UserOverview: React.FC = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [orders, setOrders] = useState<ProjectListItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
   // Parallax mouse effect
@@ -164,7 +164,7 @@ const UserOverview: React.FC = () => {
           .is('deleted_at', null)
           .order('created_at', { ascending: false });
 
-        const projectsMapped: ProjectListItem[] = (projectsData ?? []).map((p: any) => {
+        const projectsMapped: ProjectListItem[] = (projectsData ?? []).map((p: Record<string, unknown>) => {
           // Map project status to display status
           const statusMap: Record<string, string> = {
             active: 'in_progress',
@@ -195,7 +195,7 @@ const UserOverview: React.FC = () => {
           .eq('user_id', user.id)
           .order('created_at', { ascending: false });
 
-        const ordersMapped: ProjectListItem[] = (ordersData ?? []).map((o: any) => ({
+        const ordersMapped: ProjectListItem[] = (ordersData ?? []).map((o: Record<string, unknown>) => ({
           id: o.id,
           title: o.title,
           type: o.type,
@@ -216,7 +216,7 @@ const UserOverview: React.FC = () => {
           .is('deleted_at', null)
           .order('created_at', { ascending: false });
 
-        const inquiriesMapped: ProjectListItem[] = (inquiriesData ?? []).map((i: any) => ({
+        const inquiriesMapped: ProjectListItem[] = (inquiriesData ?? []).map((i: Record<string, unknown>) => ({
           id: i.id,
           title: i.title,
           type: i.project_type ?? 'other',
@@ -232,7 +232,7 @@ const UserOverview: React.FC = () => {
         // Merge all sources — projects first (primary), then orders, then inquiries
         setOrders([...projectsMapped, ...ordersMapped, ...inquiriesMapped]);
       } catch (err) {
-        setError(err);
+        setError(err instanceof Error ? err.message : 'An unexpected error occurred');
       } finally {
         setLoading(false);
       }

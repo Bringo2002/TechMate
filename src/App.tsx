@@ -46,6 +46,7 @@ import Billing from './pages/user/Billing';
 import Notifications from './pages/user/Notifications';
 import Stats from './pages/user/Stats';
 import OrderDetail from './pages/user/OrderDetail';
+import RequestDetail from './pages/user/RequestDetail';
 import UserProjectDetail from './pages/user/UserProjectDetail';
 import ErrorBoundary from './components/ErrorBoundary';
 import SettingsLayout from './pages/dashboard/settings/SettingsLayout';
@@ -185,6 +186,7 @@ const App: React.FC = () => {
     <Route index element={<ErrorBoundary fallbackTitle="Overview failed to load"><UserOverview /></ErrorBoundary>} />
     <Route path="orders" element={<ErrorBoundary fallbackTitle="Orders failed to load"><UserOrders /></ErrorBoundary>} />
     <Route path="orders/:orderId" element={<ErrorBoundary fallbackTitle="Order details failed to load"><OrderDetail /></ErrorBoundary>} />
+    <Route path="requests/:requestId" element={<ErrorBoundary fallbackTitle="Request details failed to load"><RequestDetail /></ErrorBoundary>} />
     <Route path="projects/:projectId" element={<ErrorBoundary fallbackTitle="Project details failed to load"><UserProjectDetail /></ErrorBoundary>} />
     <Route path="profile" element={<ErrorBoundary fallbackTitle="Profile failed to load"><UserProfile /></ErrorBoundary>} />
     <Route path="support" element={<ErrorBoundary fallbackTitle="Support failed to load"><UserSupport /></ErrorBoundary>} />
