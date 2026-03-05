@@ -4,13 +4,19 @@
 // ============================================================================
 
 import supabase from '../lib/supabaseClient';
-import type { MessageRow, MessageInsert, } from '../types/database.types';
-import type { ProfileRow } from '../types/database.types';
+import type { MessageRow, MessageInsert, Json } from '../types/database.types';
 import type { ServiceResponse } from '../types/api.types';
-
 // ============================================================================
 // Conversations (aggregated contacts)
 // ============================================================================
+
+/** Lightweight shape for the profile columns we actually SELECT. */
+interface ContactProfile {
+    id: string;
+    full_name: string;
+    avatar_url: string | null;
+}
+
 export interface ConversationSummary {
     contactId: string;
     contactName: string;
@@ -57,11 +63,11 @@ export async function getConversations(userId: string): Promise<ServiceResponse<
         .from('profiles')
         .select('id, full_name, avatar_url')
         .in('id', contactIds)
-        .returns<ProfileRow[]>();
+        .returns<ContactProfile[]>();
 
-    const profileMap = new Map<string, ProfileRow>();
+    const profileMap = new Map<string, ContactProfile>();
     for (const p of profiles ?? []) {
-        profileMap.set(p.id, p as ProfileRow);
+        profileMap.set(p.id, p);
     }
 
     const conversations: ConversationSummary[] = contactIds.map(contactId => {
@@ -150,6 +156,24 @@ export async function getUnreadMessageCount(userId: string): Promise<number> {
         .is('deleted_at', null);
 
     return count ?? 0;
+}
+
+// ============================================================================
+// Start a new conversation (convenience wrapper for New Conversation flows)
+// ============================================================================
+export async function startConversation(
+    senderId: string,
+    recipientId: string,
+    content: string,
+    attachments: Json = []
+): Promise<ServiceResponse<MessageRow>> {
+    return sendMessage({
+        sender_id: senderId,
+        recipient_id: recipientId,
+        content,
+        is_read: false,
+        attachments,
+    });
 }
 
 // ============================================================================

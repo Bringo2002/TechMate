@@ -16,14 +16,17 @@ import {
   Image as ImageIcon,
   Download,
   X,
-  Loader2
+  Loader2,
+  Plus,
+  Users,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../hooks/useAuth';
+import { useLocation } from 'react-router-dom';
 import * as messagesService from '../../services/messages.service';
 import type { ConversationSummary } from '../../services/messages.service';
-import type { MessageRow } from '../../types/database.types';
+import type { MessageRow, ProfileRow, Json } from '../../types/database.types';
 import supabase from '../../lib/supabaseClient';
 
 // ============================================================================
@@ -74,7 +77,9 @@ const shouldShowTimestamp = (current: MessageRow, prev: MessageRow | null) => {
 // ============================================================================
 
 export default function Messages() {
-  const { user } = useAuth();
+  const { user, userRole } = useAuth();
+  const location = useLocation();
+  const isAdmin = userRole === 'admin' || location.pathname.startsWith('/dashboard');
 
   // State
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -88,6 +93,12 @@ export default function Messages() {
   const [showMobileSidebar, setShowMobileSidebar] = useState(true);
   const [pendingAttachment, setPendingAttachment] = useState<Attachment | null>(null);
   const [uploading, setUploading] = useState(false);
+
+  // New Conversation state
+  const [showNewConversation, setShowNewConversation] = useState(false);
+  const [contactSearchQuery, setContactSearchQuery] = useState('');
+  const [availableContacts, setAvailableContacts] = useState<ProfileRow[]>([]);
+  const [loadingContacts, setLoadingContacts] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -139,6 +150,42 @@ export default function Messages() {
     }
   }, [user]);
 
+  // Load available contacts for "New Conversation" modal
+  const loadAvailableContacts = useCallback(async () => {
+    if (!user) return;
+    setLoadingContacts(true);
+    try {
+      if (isAdmin) {
+        // Admin: Load all non-admin users (clients)
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .is('deleted_at', null)
+          .neq('id', user.id)
+          .order('full_name', { ascending: true });
+
+        if (error) throw error;
+        setAvailableContacts(data || []);
+      } else {
+        // User: Load admin/team profiles they can message
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .is('deleted_at', null)
+          .eq('role', 'admin')
+          .neq('id', user.id)
+          .order('full_name', { ascending: true });
+
+        if (error) throw error;
+        setAvailableContacts(data || []);
+      }
+    } catch {
+      toast.error('Failed to load contacts');
+    } finally {
+      setLoadingContacts(false);
+    }
+  }, [user, isAdmin]);
+
   useEffect(() => {
     loadConversations();
   }, [loadConversations]);
@@ -169,13 +216,20 @@ export default function Messages() {
         messagesService.markMessagesAsRead(user.id, activeContact.contactId);
       } else {
         // Update unread in sidebar
-        setConversations(prev =>
-          prev.map(c =>
-            c.contactId === newMessage.sender_id
-              ? { ...c, unreadCount: c.unreadCount + 1, lastMessage: newMessage.content, lastMessageTime: newMessage.created_at }
-              : c
-          )
-        );
+        setConversations(prev => {
+          const exists = prev.some(c => c.contactId === newMessage.sender_id);
+          if (exists) {
+            return prev.map(c =>
+              c.contactId === newMessage.sender_id
+                ? { ...c, unreadCount: c.unreadCount + 1, lastMessage: newMessage.content, lastMessageTime: newMessage.created_at }
+                : c
+            );
+          } else {
+            // New conversation from unknown contact — refresh the list
+            loadConversations();
+            return prev;
+          }
+        });
         // Show toast for messages not in active conversation
         toast(`New message received`, {
           icon: '💬',
@@ -185,7 +239,7 @@ export default function Messages() {
     });
 
     return unsubscribe;
-  }, [user, activeContact]);
+  }, [user, activeContact, loadConversations]);
 
   // ============================================================================
   // ACTIONS
@@ -205,7 +259,7 @@ export default function Messages() {
         recipient_id: activeContact.contactId,
         content,
         is_read: false,
-        attachments,
+        attachments: attachments as unknown as Json,
       });
 
       if (error) {
@@ -228,6 +282,38 @@ export default function Messages() {
       setSending(false);
       inputRef.current?.focus();
     }
+  };
+
+  // Start a new conversation with a contact
+  const handleStartConversation = async (contact: ProfileRow) => {
+    if (!user) return;
+
+    // Check if conversation already exists
+    const existing = conversations.find(c => c.contactId === contact.id);
+    if (existing) {
+      setActiveContact(existing);
+      setShowNewConversation(false);
+      setShowMobileSidebar(false);
+      return;
+    }
+
+    // Create a new conversation summary and select it
+    const newConv: ConversationSummary = {
+      contactId: contact.id,
+      contactName: contact.full_name || contact.email,
+      contactAvatar: contact.avatar_url ?? null,
+      lastMessage: '',
+      lastMessageTime: new Date().toISOString(),
+      unreadCount: 0,
+      isOnline: false,
+    };
+
+    setConversations(prev => [newConv, ...prev]);
+    setActiveContact(newConv);
+    setShowNewConversation(false);
+    setShowMobileSidebar(false);
+    setMessages([]);
+    inputRef.current?.focus();
   };
 
   // File upload handler
@@ -293,6 +379,14 @@ export default function Messages() {
     c.contactName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const filteredContacts = availableContacts.filter(c => {
+    const name = (c.full_name || c.email || '').toLowerCase();
+    const query = contactSearchQuery.toLowerCase();
+    // Exclude contacts that already have conversations
+    const hasConversation = conversations.some(conv => conv.contactId === c.id);
+    return name.includes(query) && !hasConversation;
+  });
+
   const totalUnread = conversations.reduce((sum, c) => sum + c.unreadCount, 0);
 
   // ============================================================================
@@ -317,13 +411,25 @@ export default function Messages() {
                 </span>
               )}
             </h2>
-            <button
-              onClick={loadConversations}
-              className="p-2 text-slate-500 hover:text-white hover:bg-slate-800/50 rounded-lg transition-colors"
-              title="Refresh"
-            >
-              <RefreshCw size={16} />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => {
+                  setShowNewConversation(true);
+                  loadAvailableContacts();
+                }}
+                className="p-2 text-slate-500 hover:text-white hover:bg-cyan-500/10 rounded-lg transition-colors"
+                title="New Conversation"
+              >
+                <Plus size={18} />
+              </button>
+              <button
+                onClick={loadConversations}
+                className="p-2 text-slate-500 hover:text-white hover:bg-slate-800/50 rounded-lg transition-colors"
+                title="Refresh"
+              >
+                <RefreshCw size={16} />
+              </button>
+            </div>
           </div>
 
           {/* Search */}
@@ -338,6 +444,69 @@ export default function Messages() {
             />
           </div>
         </div>
+
+        {/* New Conversation Panel */}
+        {showNewConversation && (
+          <div className="border-b border-white/5 bg-cyan-500/5">
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                  <Users size={14} className="text-cyan-400" />
+                  {isAdmin ? 'Select a Client' : 'Contact Support'}
+                </h3>
+                <button
+                  onClick={() => setShowNewConversation(false)}
+                  className="p-1 text-slate-400 hover:text-white transition-colors"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+              <div className="relative mb-3">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
+                <input
+                  type="text"
+                  placeholder={isAdmin ? 'Search clients...' : 'Search team...'}
+                  value={contactSearchQuery}
+                  onChange={(e) => setContactSearchQuery(e.target.value)}
+                  className="w-full bg-slate-900/60 border border-white/10 rounded-lg pl-8 pr-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500/50 placeholder:text-slate-600 transition-colors"
+                  autoFocus
+                />
+              </div>
+              <div className="max-h-48 overflow-y-auto space-y-1 custom-scrollbar">
+                {loadingContacts ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 size={18} className="text-cyan-400 animate-spin" />
+                  </div>
+                ) : filteredContacts.length === 0 ? (
+                  <p className="text-xs text-slate-500 text-center py-4">
+                    {contactSearchQuery ? 'No contacts found' : 'No new contacts available'}
+                  </p>
+                ) : (
+                  filteredContacts.map((contact) => (
+                    <button
+                      key={contact.id}
+                      onClick={() => handleStartConversation(contact)}
+                      className="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-white/5 transition-colors text-left"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center overflow-hidden border border-white/10 shrink-0">
+                        {contact.avatar_url ? (
+                          <img src={contact.avatar_url} alt={contact.full_name || ''} className="w-full h-full object-cover" />
+                        ) : (
+                          <User size={14} className="text-slate-400" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-white truncate">{contact.full_name || contact.email}</p>
+                        {contact.company && <p className="text-[10px] text-slate-500 truncate">{contact.company}</p>}
+                        {!contact.full_name && <p className="text-[10px] text-slate-500 truncate">{contact.email}</p>}
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Conversation List */}
         <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -359,7 +528,19 @@ export default function Messages() {
                 <Inbox size={28} className="text-slate-600" />
               </div>
               <h4 className="text-white font-semibold mb-1">No conversations yet</h4>
-              <p className="text-slate-500 text-sm">Messages from your project team will appear here.</p>
+              <p className="text-slate-500 text-sm mb-4">
+                {isAdmin ? 'Start a conversation with any client.' : 'Messages from your project team will appear here.'}
+              </p>
+              <button
+                onClick={() => {
+                  setShowNewConversation(true);
+                  loadAvailableContacts();
+                }}
+                className="px-4 py-2 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-lg text-sm hover:bg-cyan-500/20 transition-colors inline-flex items-center gap-2"
+              >
+                <Plus size={14} />
+                New Conversation
+              </button>
             </div>
           ) : (
             filteredConversations.map((conv) => (
@@ -510,7 +691,7 @@ export default function Messages() {
                           {/* Attachments */}
                           {Array.isArray(msg.attachments) && msg.attachments.length > 0 && (
                             <div className="mt-2 space-y-2">
-                              {(msg.attachments as Attachment[]).map((att, ai) => (
+                              {(msg.attachments as unknown as Attachment[]).map((att, ai) => (
                                 <div key={ai}>
                                   {att.type?.startsWith('image/') ? (
                                     <a href={att.url} target="_blank" rel="noopener noreferrer" className="block">
@@ -649,9 +830,22 @@ export default function Messages() {
                 <MessageSquare size={40} className="text-slate-600" />
               </div>
               <h3 className="text-2xl font-bold text-white mb-2 font-orbitron">Your Messages</h3>
-              <p className="text-slate-400 max-w-sm mx-auto">
-                Select a conversation from the sidebar to start messaging, or wait for your project team to reach out.
+              <p className="text-slate-400 max-w-sm mx-auto mb-6">
+                {isAdmin
+                  ? 'Select a conversation or start a new one with any client.'
+                  : 'Select a conversation from the sidebar to start messaging, or reach out to the TechMate team.'}
               </p>
+              <button
+                onClick={() => {
+                  setShowNewConversation(true);
+                  setShowMobileSidebar(true);
+                  loadAvailableContacts();
+                }}
+                className="px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl font-medium shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 transition-all inline-flex items-center gap-2"
+              >
+                <Plus size={16} />
+                New Conversation
+              </button>
               <div className="mt-6 flex items-center justify-center gap-2 text-xs text-slate-500">
                 <Sparkles size={14} className="text-slate-600" />
                 Real-time messaging enabled
