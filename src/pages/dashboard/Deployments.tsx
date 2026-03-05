@@ -112,8 +112,17 @@ export default function Deployments() {
   // ---------------- V2 Fetch Functions ----------------
   useEffect(() => {
     async function fetchProjects() {
-      const res = await getDeploymentProjects();
-      if (res.data) setProjectsList(res.data);
+      // Use getAllProjects to populate filter with live projects instead of past deployments
+      const { getAllProjects } = await import('../../services/admin.service');
+      const res = await getAllProjects();
+      if (res.data) {
+        // Map the real project model (id, name) to the expected format
+        const formatted = res.data.map(p => ({
+          project_id: p.id,
+          project_name: p.name
+        }));
+        setProjectsList(formatted);
+      }
     }
     fetchProjects();
   }, []);
