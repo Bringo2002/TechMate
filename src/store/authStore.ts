@@ -1,25 +1,27 @@
 // src/store/authStore.ts
 import { create } from "zustand";
-
-
-import type { ProfileRow } from "../types/database.types";
+import type { User } from "../services/authService";
 
 interface AuthState {
-  token: string | null;
-  user: ProfileRow | null;
-  setAuth: (token: string, user: ProfileRow) => void;
+  accessToken: string | null;
+  refreshToken: string | null;
+  user: User | null;
+  setAuth: (accessToken: string, refreshToken: string, user: User) => void;
   clearAuth: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-  token: localStorage.getItem("token"),
+  accessToken: localStorage.getItem("techmate_access_token"),
+  refreshToken: localStorage.getItem("techmate_refresh_token"),
   user: null,
-  setAuth: (token, user) => {
-    localStorage.setItem("token", token);
-    set({ token, user });
+  setAuth: (accessToken, refreshToken, user) => {
+    localStorage.setItem("techmate_access_token", accessToken);
+    localStorage.setItem("techmate_refresh_token", refreshToken);
+    set({ accessToken, refreshToken, user });
   },
   clearAuth: () => {
-    localStorage.removeItem("token");
-    set({ token: null, user: null });
+    localStorage.removeItem("techmate_access_token");
+    localStorage.removeItem("techmate_refresh_token");
+    set({ accessToken: null, refreshToken: null, user: null });
   },
 }));

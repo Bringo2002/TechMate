@@ -1,8 +1,9 @@
 // src/pages/AuthCallback.tsx
+// Handles the redirect from Google OAuth (tokens come as query params)
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import supabase from "../lib/supabaseClient";
-import { ProfileRow, UserRole } from "../types/database.types";
+import { setTokens } from "../lib/apiClient";
+import authService from "../services/authService";
 import { motion } from "framer-motion";
 
 const AuthCallback: React.FC = () => {
@@ -13,60 +14,30 @@ const AuthCallback: React.FC = () => {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        // 1️⃣ Get the session (contains user)
-        const { data, error } = await supabase.auth.getSession();
-        if (error || !data.session || !data.session.user) {
+        const params = new URLSearchParams(window.location.search);
+        const accessToken = params.get("accessToken");
+        const refreshToken = params.get("refreshToken");
+
+        if (!accessToken || !refreshToken) {
           setStatus("error");
-          setMessage("Verification link is invalid or expired. Please try signing up again.");
+          setMessage("Invalid authentication callback. Missing tokens.");
           return;
         }
 
-        const user = data.session.user;
+        // Store tokens
+        setTokens(accessToken, refreshToken);
 
-        // 2️⃣ Check if profile exists
-        const { data: profileData, error: profileError } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", user.id)
-          .single();
+        // Clean the URL
+        window.history.replaceState({}, "", "/auth/callback");
 
-        if (profileError && profileError.code !== "PGRST116") {
-          // unexpected error
-          throw profileError;
-        }
+        // Fetch user info to determine role
+        const userData = await authService.getMe();
 
-        // 3️⃣ Insert profile if first-time Google signup
-        let role: UserRole = "user"; // default
-        if (!profileData) {
-          if (!user.email) {
-            throw new Error("User email is missing.");
-          }
-
-          const fullName = user.user_metadata?.full_name || user.user_metadata?.name || "";
-
-          const { error: insertError } = await supabase.from("profiles").insert({
-            id: user.id,
-            email: user.email,
-            role: role,
-            full_name: fullName,
-            user_type: "client",
-            is_admin: false,
-            is_active: true,
-            email_verified: true,
-            timezone: "UTC",
-          } as any);
-
-          if (insertError) throw insertError;
-        } else {
-          role = (profileData as ProfileRow).role;
-        }
-
-        // 4️⃣ Redirect based on role
         setStatus("success");
         setMessage("Your account is verified! Redirecting you...");
 
         setTimeout(() => {
-          if (role === "admin") navigate("/dashboard", { replace: true });
+          if (userData.role === "ADMIN") navigate("/dashboard", { replace: true });
           else navigate("/user", { replace: true });
         }, 1500);
       } catch (err: unknown) {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import supabase from '../../lib/supabaseClient';
+import authService from '../../services/authService';
 import { getOrderStats } from '../../services/orders.service';
 import { 
   User, Mail, MapPin, Calendar, Globe, Camera,
@@ -78,7 +79,12 @@ const UserProfile: React.FC = () => {
 
   const fetchStats = async () => {
     try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
+      let authUser;
+      try {
+        authUser = await authService.getMe();
+      } catch {
+        return;
+      }
       if (!authUser) return;
       const orderStats = await getOrderStats(authUser.id);
 
@@ -104,7 +110,13 @@ const UserProfile: React.FC = () => {
     try {
       setLoading(true);
       
-      const { data: { user } } = await supabase.auth.getUser();
+      let user;
+      try {
+        user = await authService.getMe();
+      } catch {
+        window.location.href = '/login';
+        return;
+      }
       
       if (!user) {
         window.location.href = '/login';
@@ -255,11 +267,10 @@ const UserProfile: React.FC = () => {
     }
 
     try {
-      const { error } = await supabase.auth.updateUser({ 
-        password: security.newPassword 
-      });
-
-      if (error) throw error;
+      // TODO: Add PATCH /api/auth/change-password endpoint to NestJS backend
+      // For now, use the password reset flow via email
+      const { default: api } = await import('../../lib/apiClient');
+      await api.patch('/auth/change-password', { newPassword: security.newPassword });
 
       toast.success('Password updated successfully');
       setSecurity({ newPassword: '', confirmPassword: '' });
@@ -270,7 +281,7 @@ const UserProfile: React.FC = () => {
 
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut();
+      await authService.logout();
       window.location.href = '/login';
     } catch (error) {
       console.error('Error signing out:', error);

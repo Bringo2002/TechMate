@@ -5,6 +5,7 @@
 // ============================================================================
 
 import supabase from '../lib/supabaseClient';
+import authService from './authService';
 import type { InvoiceRow, ProjectRow } from '../types/database.types';
 import type { ServiceResponse } from '../types/api.types';
 
@@ -666,7 +667,7 @@ export async function updateProjectBudgetSpent(
 
     // Log the activity
     try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const user = await authService.getMe();
         if (user) {
             await supabase.from('activity_logs').insert({
                 user_id: user.id,
@@ -697,7 +698,7 @@ export async function batchUpdateProjectBudgets(
     // Get auth user once
     let userId: string | null = null;
     try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const user = await authService.getMe();
         userId = user?.id ?? null;
     } catch { /* non-critical */ }
 

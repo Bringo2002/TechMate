@@ -4,7 +4,7 @@
 // ============================================================================
 
 import { useState, useEffect, useCallback } from 'react';
-import supabase from '../lib/supabaseClient';
+import authService from '../services/authService';
 import type { NotificationRow } from '../types/database.types';
 import type { NotificationFilters } from '../types/api.types';
 import * as notificationsService from '../services/notifications.service';
@@ -34,7 +34,7 @@ export function useNotifications(filters?: NotificationFilters): UseNotification
         setError(null);
 
         try {
-            const { data: { user } } = await supabase.auth.getUser();
+            const user = await authService.getMe();
             if (!user) {
                 setLoading(false);
                 return;
@@ -65,16 +65,20 @@ export function useNotifications(filters?: NotificationFilters): UseNotification
         let unsubscribe: (() => void) | undefined;
 
         const setup = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
+            try {
+                const user = await authService.getMe();
+                if (!user) return;
 
-            unsubscribe = notificationsService.subscribeToNotifications(
-                user.id,
-                (newNotification) => {
-                    setNotifications(prev => [newNotification, ...prev]);
-                    setUnreadCount(prev => prev + 1);
-                }
-            );
+                unsubscribe = notificationsService.subscribeToNotifications(
+                    user.id,
+                    (newNotification) => {
+                        setNotifications(prev => [newNotification, ...prev]);
+                        setUnreadCount(prev => prev + 1);
+                    }
+                );
+            } catch {
+                // Ignore auth failure in subscription setup
+            }
         };
 
         setup();
@@ -90,11 +94,15 @@ export function useNotifications(filters?: NotificationFilters): UseNotification
     };
 
     const markAllAsRead = async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-        await notificationsService.markAllAsRead(user.id);
-        setNotifications(prev => prev.map(n => ({ ...n, is_read: true, read_at: new Date().toISOString() })));
-        setUnreadCount(0);
+        try {
+            const user = await authService.getMe();
+            if (!user) return;
+            await notificationsService.markAllAsRead(user.id);
+            setNotifications(prev => prev.map(n => ({ ...n, is_read: true, read_at: new Date().toISOString() })));
+            setUnreadCount(0);
+        } catch (err) {
+            console.error('Failed to mark all notifications as read:', err);
+        }
     };
 
     const deleteNotification = async (id: string) => {
@@ -103,11 +111,15 @@ export function useNotifications(filters?: NotificationFilters): UseNotification
     };
 
     const clearAll = async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-        await notificationsService.clearAllNotifications(user.id);
-        setNotifications([]);
-        setUnreadCount(0);
+        try {
+            const user = await authService.getMe();
+            if (!user) return;
+            await notificationsService.clearAllNotifications(user.id);
+            setNotifications([]);
+            setUnreadCount(0);
+        } catch (err) {
+            console.error('Failed to clear all notifications:', err);
+        }
     };
 
     return {

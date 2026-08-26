@@ -1,13 +1,22 @@
-import supabase from "../lib/supabaseClient";
+// ============================================================================
+// TechMate Auth Service
+// All auth operations via NestJS backend API
+// ============================================================================
+
+import api, { setTokens, clearTokens, getRefreshToken } from '../lib/apiClient';
 
 interface User {
   id: string;
   name: string;
   email: string;
+  role: string;
+  avatarUrl?: string;
 }
 
 interface AuthResponse {
-  user?: User;
+  user: User;
+  accessToken: string;
+  refreshToken: string;
 }
 
 interface MessageResponse {
@@ -18,22 +27,9 @@ interface MessageResponse {
 
 // Login user
 const login = async (email: string, password: string): Promise<AuthResponse> => {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (error) throw new Error(error.message);
-
-  return {
-    user: data.user
-      ? {
-          id: data.user.id,
-          name: data.user.user_metadata?.full_name || "",
-          email: data.user.email || "",
-        }
-      : undefined,
-  };
+  const data = await api.post<AuthResponse>('/auth/login', { email, password }, { skipAuth: true });
+  setTokens(data.accessToken, data.refreshToken);
+  return data;
 };
 
 // Signup user
@@ -42,70 +38,65 @@ const signup = async (
   email: string,
   password: string
 ): Promise<AuthResponse> => {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { full_name: name }, // ✅ standard key
-    },
-  });
-
-  if (error) throw new Error(error.message);
-
-  return {
-    user: data.user
-      ? {
-          id: data.user.id,
-          name: data.user.user_metadata?.full_name || name,
-          email: data.user.email || "",
-        }
-      : undefined,
-  };
+  const data = await api.post<AuthResponse>('/auth/register', { name, email, password }, { skipAuth: true });
+  setTokens(data.accessToken, data.refreshToken);
+  return data;
 };
 
 /* ========== PASSWORD RESET ========== */
 const requestPasswordReset = async (email: string): Promise<MessageResponse> => {
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/reset-password`,
-  });
-
-  if (error) throw new Error(error.message);
-
-  return { message: "Password reset email sent successfully" };
+  return api.post<MessageResponse>('/auth/reset-password', { email }, { skipAuth: true });
 };
 
 const confirmPasswordReset = async (
-  newPassword: string
+  token: string,
+  newPassword: string,
 ): Promise<MessageResponse> => {
-  const { error } = await supabase.auth.updateUser({
-    password: newPassword,
-  });
-
-  if (error) throw new Error(error.message);
-
-  return { message: "Password updated successfully" };
+  return api.post<MessageResponse>('/auth/reset-password/confirm', { token, newPassword }, { skipAuth: true });
 };
 
 // Logout user
 const logout = async (): Promise<void> => {
-  await supabase.auth.signOut();
+  const refreshToken = getRefreshToken();
+  try {
+    await api.post('/auth/logout', { refreshToken });
+  } catch {
+    // Ignore errors during logout
+  }
+  clearTokens();
+};
+
+// Get current user (verify session is valid)
+const getMe = async (): Promise<User> => {
+  return api.get<User>('/auth/me');
 };
 
 // Verify session token
 const verifyToken = async (): Promise<boolean> => {
-  const { data, error } = await supabase.auth.getSession();
-  if (error || !data.session) {
-    await supabase.auth.signOut(); // ✅ force logout if session invalid
+  try {
+    await getMe();
+    return true;
+  } catch {
+    clearTokens();
     return false;
   }
-  return true;
+};
+
+// Google OAuth — redirect to backend
+const getGoogleAuthUrl = (): string => {
+  const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+  return `${apiBase}/auth/google`;
 };
 
 export default {
   login,
   signup,
   logout,
+  getMe,
   verifyToken,
   requestPasswordReset,
   confirmPasswordReset,
+  getGoogleAuthUrl,
 };
+
+export type { User, AuthResponse, MessageResponse };

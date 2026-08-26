@@ -6,8 +6,7 @@ import { FiEye, FiEyeOff, FiUser, FiMail, FiLock } from "react-icons/fi";
 import { motion } from "framer-motion";
 import { toast } from "react-hot-toast";
 import { validateEmail, validatePassword } from "../utils/validateForm";
-import supabase from "../lib/supabaseClient"; 
-import { Database } from "../types/database.types";
+import authService from "../services/authService";
 import AuthLayout from "../layouts/AuthLayout";
 
 const SignupPage: React.FC = () => {
@@ -58,65 +57,10 @@ const SignupPage: React.FC = () => {
     const loadingToast = toast.loading("Creating your account...");
 
     try {
-      // ---------- 1) Sign up the user with Supabase Auth ----------
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: { name: formData.name },
-        },
-      });
+      const data = await authService.signup(formData.name.trim(), formData.email, formData.password);
 
-      if (signUpError) throw signUpError;
-
-      const userId = signUpData?.user?.id;
-
-      // ---------- 2) Insert profile row into "profiles" table ----------
-      if (userId) {
-        // Explicitly type the payload to ensure it matches the schema
-        const newProfile: Database['public']['Tables']['profiles']['Insert'] = {
-          id: userId,
-          email: formData.email,
-          full_name: formData.name,
-          role: "user",
-        };
-
-        const { error: profileError } = await supabase.from("profiles").insert(newProfile);
-
-        if (profileError) {
-            console.error("Profile creation error:", profileError);
-            // Non-blocking but worth logging
-        }
-      }
-
-      // ---------- 3) Handle success + optional auto-login ----------
-      // If Supabase returned a session (user is already authenticated), redirect immediately.
-      if (signUpData?.session) {
-        toast.success("Account created successfully! Logging you in...", { id: loadingToast });
-        navigate("/user", { replace: true });
-        return;
-      }
-
-      // If no session returned, attempt optional auto-login
-      try {
-        const { data: loginData } = await supabase.auth.signInWithPassword({
-          email: formData.email,
-          password: formData.password,
-        });
-
-        if (loginData?.session) {
-          toast.success("Account created! Welcome aboard.", { id: loadingToast });
-          navigate("/user", { replace: true });
-          return;
-        }
-      } catch (loginErr) {
-        console.warn("Auto-login failed:", loginErr);
-      }
-
-      // ---------- 4) No session means email confirmation required ----------
-      toast.success("Account created! Please check your email to activate.", { id: loadingToast, duration: 6000 });
-      // Clear sensitive fields
-      setFormData(prev => ({ ...prev, password: "", confirmPassword: "" }));
+      toast.success("Account created! Welcome aboard.", { id: loadingToast });
+      navigate("/user", { replace: true });
 
     } catch (err: unknown) {
       const error = err as Error;
@@ -128,29 +72,7 @@ const SignupPage: React.FC = () => {
   };
 
   const handleGoogleSignup = async () => {
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-          skipBrowserRedirect: true,
-        },
-      });
-
-      if (error) throw error;
-
-      if (data?.url) {
-        try {
-           // @ts-expect-error - accessing window.top.location may fail in cross-origin iframes
-           window.top.location.href = data.url; 
-        } catch {
-           window.location.href = data.url;
-        }
-      }
-    } catch (err: unknown) {
-      console.error("Google signup error:", err);
-      toast.error("Google sign up failed.");
-    }
+    window.location.href = authService.getGoogleAuthUrl();
   };
 
   // Animation variants

@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { X, Loader2, DollarSign, Calendar, AlertCircle, Briefcase, Sparkles, Zap } from 'lucide-react';
 import supabase from '../../lib/supabaseClient';
+import authService from '../../services/authService';
 
 interface NewProjectDialogProps {
   onClose: () => void;
@@ -60,8 +61,7 @@ export default function NewProjectDialog({ onClose, onProjectCreated }: NewProje
         throw new Error('Invalid deadline format. Please select a valid date.');
       }
 
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError) throw new Error(`Authentication error: ${authError.message}`);
+      const user = await authService.getMe();
       if (!user) throw new Error('User not authenticated');
 
       const { data, error } = await supabase

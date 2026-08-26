@@ -17,6 +17,7 @@ import {
   Key
 } from 'lucide-react';
 import supabase from '../../../../lib/supabaseClient';
+import authService from '../../../../services/authService';
 import { DeleteAccountButton } from '../../../../components/Buttons/DeleteAccountButton';
 
 // Define interfaces
@@ -88,9 +89,16 @@ export default function ProfileSettings() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        if (authError || !user) {
+        let user;
+        try {
+          user = await authService.getMe();
+        } catch (authError) {
           console.error("Authentication Error:", authError);
+          showNotif("Failed to fetch profile data: User not authenticated", "error");
+          return;
+        }
+
+        if (!user) {
           showNotif("Failed to fetch profile data: User not authenticated", "error");
           return;
         }
@@ -208,9 +216,9 @@ export default function ProfileSettings() {
     setIsSaving(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await authService.getMe();
       
-      if (! user) {
+      if (!user) {
         throw new Error('No authenticated user found');
       }
 
@@ -273,7 +281,7 @@ export default function ProfileSettings() {
       const { error } = await supabase.rpc('delete_own_account');
       if (error) throw error;
 
-      await supabase.auth.signOut();
+      await authService.logout();
       window.location.href = '/goodbye';
     } catch (error) {
       console.error('Failed to delete account:', error);

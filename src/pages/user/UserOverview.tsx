@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import supabase from '../../lib/supabaseClient';
+import authService from '../../services/authService';
 import {
   Package,
   Clock,
@@ -145,7 +146,12 @@ const UserOverview: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        let user;
+        try {
+          user = await authService.getMe();
+        } catch {
+          throw new Error('User not found');
+        }
         if (!user) throw new Error('User not found');
 
         // Profile

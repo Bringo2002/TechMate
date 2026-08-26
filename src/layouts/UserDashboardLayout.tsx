@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import supabase from '../lib/supabaseClient';
+import authService from '../services/authService';
 import { NavLink } from 'react-router-dom';
 import { 
   Home, Package, User, HelpCircle, LogOut, MessageSquare, Bell, 
@@ -23,18 +24,20 @@ const UserDashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children
     let mounted = true;
 
     const fetchCounts = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user || !mounted) return;
+      try {
+        const user = await authService.getMe();
+        if (!user || !mounted) return;
 
-      const [msgCount, notifCount] = await Promise.all([
-        getUnreadMessageCount(user.id),
-        getUnreadNotifications(user.id),
-      ]);
+        const [msgCount, notifCount] = await Promise.all([
+          getUnreadMessageCount(user.id),
+          getUnreadNotifications(user.id),
+        ]);
 
-      if (mounted) {
-        setUnreadMessages(msgCount);
-        setUnreadNotifications(notifCount);
-      }
+        if (mounted) {
+          setUnreadMessages(msgCount);
+          setUnreadNotifications(notifCount);
+        }
+      } catch { /* ignore auth errors */ }
     };
 
     fetchCounts();
@@ -44,8 +47,9 @@ const UserDashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Fetch active orders
     const fetchActiveOrders = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user || !mounted) return;
+      try {
+        const user = await authService.getMe();
+        if (!user || !mounted) return;
 
       const { data } = await supabase
         .from('orders')
@@ -58,13 +62,17 @@ const UserDashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children
       if (mounted && data) {
         setActiveOrders(data);
       }
+      } catch { /* ignore auth errors */ }
     };
 
     fetchActiveOrders();
 
     // Real-time subscriptions for instant updates
     const setupRealtime = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      let user;
+      try {
+        user = await authService.getMe();
+      } catch { return; }
       if (!user) return;
 
       const notifChannel = supabase
@@ -145,10 +153,10 @@ const UserDashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
+    try {
+      await authService.logout();
+    } catch (error) {
       console.error("Logout error:", error);
-      return;
     }
     window.location.href = "/login";
   };

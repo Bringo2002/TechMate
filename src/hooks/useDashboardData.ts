@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import supabase from '../lib/supabaseClient';
+import authService from '../services/authService';
 
 export interface DashboardData {
     profile: Record<string, unknown> | null;
@@ -23,7 +24,7 @@ export const useDashboardData = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const { data: { user } } = await supabase.auth.getUser();
+                const user = await authService.getMe();
 
                 if (!user) {
                     throw new Error('No user found');

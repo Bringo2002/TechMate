@@ -6,7 +6,7 @@ import { FiEye, FiEyeOff, FiMail, FiLock } from "react-icons/fi";
 import { motion } from "framer-motion";
 import { toast } from "react-hot-toast";
 import { validateEmail } from "../utils/validateForm";
-import supabase from "../lib/supabaseClient";
+import authService from "../services/authService";
 import AuthLayout from "../layouts/AuthLayout";
 
 const LoginPage: React.FC = () => {
@@ -38,34 +38,12 @@ const LoginPage: React.FC = () => {
     const loadingToast = toast.loading("Signing in...");
 
     try {
-      // 1️⃣ Sign in with email/password
-      const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password,
-      });
-
-      if (loginError) throw loginData ? loginError : new Error(loginError?.message || "Invalid credentials");
-
-      if (!loginData.user) throw new Error("User not found");
-
-      // 2️⃣ Fetch user role from profiles
-      const { data: profileData, error: profileError } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", loginData.user.id)
-        .single();
-
-      if (profileError) {
-        // Fallback if profile doesn't exist (edge case) -> default to user
-        console.warn("Profile fetch error:", profileError);
-      }
-
-      const role = (profileData as unknown as Record<string, unknown>)?.role;
+      const data = await authService.login(formData.email, formData.password);
 
       toast.success("Welcome back!", { id: loadingToast });
 
-      // 3️⃣ Redirect based on role
-      if (role === "admin") {
+      // Redirect based on role
+      if (data.user.role === "ADMIN") {
         navigate("/dashboard", { replace: true });
       } else {
         navigate("/user", { replace: true });
@@ -75,13 +53,10 @@ const LoginPage: React.FC = () => {
       console.error("Login failed:", error);
       let errorMessage = error.message || "Unable to sign in.";
       
-      // Handle known Supabase/Network errors
-      if (error.message?.toLowerCase().includes("email not confirmed")) {
-        errorMessage = "Please confirm your email address first.";
-      } else if (error.message?.toLowerCase().includes("invalid login")) {
+      if (error.message?.toLowerCase().includes("invalid")) {
         errorMessage = "Invalid email or password.";
-      } else if (error.message?.includes("Connection to server failed")) {
-         errorMessage = error.message; // Use the detailed message from useAuth
+      } else if (error.message?.includes("Connection to server failed") || error.message?.includes("Failed to fetch")) {
+        errorMessage = "Connection to server failed. Please check if the backend is running.";
       }
       
       toast.error(errorMessage, { id: loadingToast, duration: 6000 });
@@ -91,30 +66,7 @@ const LoginPage: React.FC = () => {
   };
 
   const handleGoogleLogin = async () => {
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-          skipBrowserRedirect: true,
-        },
-      });
-      if (error) throw error;
-      
-      if (data?.url) {
-        // Attempt to redirect via top window to break out of iframes if possible
-        try {
-           // @ts-expect-error - accessing window.top.location may fail in cross-origin iframes
-           window.top.location.href = data.url; 
-        } catch {
-           // Fallback if blocked
-           window.location.href = data.url;
-        }
-      }
-    } catch (err: unknown) {
-      console.error("Google login failed:", err);
-      toast.error("Google sign in failed.");
-    }
+    window.location.href = authService.getGoogleAuthUrl();
   };
 
   // Animation variants for staggered entrance

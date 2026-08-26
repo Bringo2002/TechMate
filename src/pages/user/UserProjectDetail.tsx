@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import supabase from '../../lib/supabaseClient';
+import authService from '../../services/authService';
 import type { ProjectRow, Json } from '../../types/database.types';
 
 // ─── Currency formatter ───────────────────────────────────────────────────────
@@ -273,7 +274,13 @@ export default function UserProjectDetail() {
     setError(null);
 
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      let user;
+      try {
+        user = await authService.getMe();
+      } catch {
+        if (isMounted.current) { setError('Not authenticated'); setLoading(false); }
+        return;
+      }
       if (!user) {
         if (isMounted.current) { setError('Not authenticated'); setLoading(false); }
         return;

@@ -4,6 +4,7 @@
 // ============================================================================
 
 import supabase from '../lib/supabaseClient';
+import authService from './authService';
 import type { ProfileRow, ProfileUpdate } from '../types/database.types';
 import type {
     PaginatedResponse,
@@ -102,7 +103,12 @@ export async function getUserByEmail(email: string): Promise<ServiceResponse<Pro
 }
 
 export async function getCurrentUser(): Promise<ServiceResponse<ProfileRow>> {
-    const { data: { user } } = await supabase.auth.getUser();
+    let user;
+    try {
+        user = await authService.getMe();
+    } catch {
+        return { data: null, error: { code: 'AUTH_ERROR', message: 'Not authenticated' } };
+    }
     if (!user) {
         return { data: null, error: { code: 'AUTH_ERROR', message: 'Not authenticated' } };
     }

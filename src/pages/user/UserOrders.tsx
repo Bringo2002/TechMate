@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import supabase from '../../lib/supabaseClient';
+import authService from '../../services/authService';
 import { 
   Package, 
   Search, 
@@ -104,7 +105,13 @@ const UserOrders: React.FC = () => {
 
   const fetchOrdersAndInquiries = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      let user;
+      try {
+        user = await authService.getMe();
+      } catch (authError) {
+        console.error('Authentication error:', authError);
+        return;
+      }
       if (!user) return;
 
       // Fetch orders

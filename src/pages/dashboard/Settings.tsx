@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import supabase from '../../lib/supabaseClient';
+import authService from '../../services/authService';
 import {
   Settings, User, Bell, Shield, Clock, Users, Save, X, Check, Info, 
   CheckCircle, XCircle, Search, UserPlus, UserCheck, Laptop, Smartphone,
@@ -106,7 +107,7 @@ export default function AdminSettings() {
       if (error) throw error;
   
       // Sign out and redirect
-      await supabase.auth.signOut();
+      await authService.logout();
       window.location.href = '/goodbye';
       
     } catch (error) {

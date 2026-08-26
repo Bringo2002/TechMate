@@ -4,7 +4,7 @@
 // ============================================================================
 
 import { useState, useEffect, useCallback } from 'react';
-import supabase from '../lib/supabaseClient';
+import authService from '../services/authService';
 import type { MessageRow } from '../types/database.types';
 import * as messagesService from '../services/messages.service';
 import type { ConversationSummary } from '../services/messages.service';
@@ -34,8 +34,12 @@ export function useMessages(): UseMessagesReturn {
     // Get current user
     useEffect(() => {
         const getUser = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            setUserId(user?.id ?? null);
+            try {
+                const user = await authService.getMe();
+                setUserId(user?.id ?? null);
+            } catch {
+                setUserId(null);
+            }
         };
         getUser();
     }, []);
