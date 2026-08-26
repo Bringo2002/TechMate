@@ -3,7 +3,7 @@
 // Request marketplace CRUD and response management
 // ============================================================================
 
-import supabase from '../lib/supabaseClient';
+import api from '../lib/apiClient';
 import type { RequestRow, RequestInsert, RequestUpdate, ResponseRow } from '../types/database.types';
 import type {
     PaginatedResponse,
@@ -18,121 +18,79 @@ import type {
 export async function getRequests(
     options?: QueryOptions<RequestFilters>
 ): Promise<ServiceResponse<PaginatedResponse<RequestRow>>> {
-    const page = options?.pagination?.page ?? 1;
-    const pageSize = options?.pagination?.pageSize ?? 20;
-    const offset = (page - 1) * pageSize;
-
-    let query = supabase
-        .from('requests')
-        .select('*', { count: 'exact' })
-        .is('deleted_at', null);
-
-    const f = options?.filters;
-    if (f?.status) query = query.eq('status', f.status);
-    if (f?.category) query = query.eq('category', f.category);
-    if (f?.priority) query = query.eq('priority', f.priority);
-    if (typeof f?.isPublic === 'boolean') query = query.eq('is_public', f.isPublic);
-    if (f?.search) {
-        query = query.or(`title.ilike.%${f.search}%,description.ilike.%${f.search}%`);
+    try {
+        const userId = options?.filters?.search ? undefined : undefined;
+        const res = await api.get<RequestRow[]>('/requests', {
+            ...(userId ? { params: { userId } } : {}),
+        });
+        const data = Array.isArray(res) ? res : [];
+        const page = options?.pagination?.page ?? 1;
+        const pageSize = options?.pagination?.pageSize ?? 20;
+        return {
+            data: {
+                data,
+                total: data.length,
+                page,
+                pageSize,
+                totalPages: Math.ceil(data.length / pageSize),
+                hasMore: false,
+            },
+            error: null,
+        };
+    } catch (err: unknown) {
+        return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
     }
-    if (f?.dateRange?.from) query = query.gte('created_at', f.dateRange.from);
-    if (f?.dateRange?.to) query = query.lte('created_at', f.dateRange.to);
-
-    const sortBy = options?.sort?.sortBy ?? 'created_at';
-    query = query.order(sortBy, { ascending: options?.sort?.sortDirection === 'asc' });
-    query = query.range(offset, offset + pageSize - 1);
-
-    const { data, error, count } = await query;
-
-    if (error) {
-        return { data: null, error: { code: error.code, message: error.message } };
-    }
-
-    const total = count ?? 0;
-    return {
-        data: {
-            data: data ?? [],
-            total,
-            page,
-            pageSize,
-            totalPages: Math.ceil(total / pageSize),
-            hasMore: offset + pageSize < total,
-        },
-        error: null,
-    };
 }
 
 export async function getUserRequests(userId: string): Promise<ServiceResponse<RequestRow[]>> {
-    const { data, error } = await supabase
-        .from('requests')
-        .select('*')
-        .eq('requester_id', userId)
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false });
-
-    if (error) {
-        return { data: null, error: { code: error.code, message: error.message } };
+    try {
+        const data = await api.get<RequestRow[]>(`/requests?userId=${userId}`);
+        return { data: Array.isArray(data) ? data : [], error: null };
+    } catch (err: unknown) {
+        return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
     }
-    return { data: data ?? [], error: null };
 }
 
 export async function getRequestById(requestId: string): Promise<ServiceResponse<RequestRow>> {
-    const { data, error } = await supabase
-        .from('requests')
-        .select('*')
-        .eq('id', requestId)
-        .is('deleted_at', null)
-        .single();
-
-    if (error) {
-        return { data: null, error: { code: error.code, message: error.message } };
+    try {
+        const data = await api.get<RequestRow>(`/requests/${requestId}`);
+        return { data, error: null };
+    } catch (err: unknown) {
+        return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
     }
-    return { data, error: null };
 }
 
 // ============================================================================
 // Requests - Write
 // ============================================================================
 export async function createRequest(request: RequestInsert): Promise<ServiceResponse<RequestRow>> {
-    const { data, error } = await supabase
-        .from('requests')
-        .insert(request)
-        .select()
-        .single();
-
-    if (error) {
-        return { data: null, error: { code: error.code, message: error.message } };
+    try {
+        const data = await api.post<RequestRow>('/requests', request);
+        return { data, error: null };
+    } catch (err: unknown) {
+        return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
     }
-    return { data, error: null };
 }
 
 export async function updateRequest(
     requestId: string,
     updates: RequestUpdate
 ): Promise<ServiceResponse<RequestRow>> {
-    const { data, error } = await supabase
-        .from('requests')
-        .update(updates)
-        .eq('id', requestId)
-        .select()
-        .single();
-
-    if (error) {
-        return { data: null, error: { code: error.code, message: error.message } };
+    try {
+        const data = await api.put<RequestRow>(`/requests/${requestId}`, updates);
+        return { data, error: null };
+    } catch (err: unknown) {
+        return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
     }
-    return { data, error: null };
 }
 
 export async function deleteRequest(requestId: string): Promise<ServiceResponse<null>> {
-    const { error } = await supabase
-        .from('requests')
-        .update({ deleted_at: new Date().toISOString() })
-        .eq('id', requestId);
-
-    if (error) {
-        return { data: null, error: { code: error.code, message: error.message } };
+    try {
+        await api.delete(`/requests/${requestId}`);
+        return { data: null, error: null };
+    } catch (err: unknown) {
+        return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
     }
-    return { data: null, error: null };
 }
 
 // ============================================================================

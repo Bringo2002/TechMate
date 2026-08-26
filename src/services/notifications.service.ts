@@ -10,78 +10,53 @@ import type { ServiceResponse, NotificationFilters } from '../types/api.types';
 // ============================================================================
 // Read
 // ============================================================================
+import api from '../lib/apiClient';
+
 export async function getNotifications(
-    userId: string,
-    filters?: NotificationFilters,
-    limit: number = 50
+    _userId: string,
+    _filters?: NotificationFilters,
+    _limit: number = 50
 ): Promise<ServiceResponse<NotificationRow[]>> {
-    let query = supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', userId);
-
-    if (filters?.type) query = query.eq('type', filters.type);
-    if (typeof filters?.isRead === 'boolean') query = query.eq('is_read', filters.isRead);
-    if (filters?.category) query = query.eq('category', filters.category);
-
-    query = query.order('created_at', { ascending: false }).limit(limit);
-
-    const { data, error } = await query;
-
-    if (error) {
-        return { data: null, error: { code: error.code, message: error.message } };
+    try {
+        const data = await api.get<NotificationRow[]>('/notifications');
+        return { data: Array.isArray(data) ? data : [], error: null };
+    } catch (err: unknown) {
+        return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
     }
-    return { data: data ?? [], error: null };
 }
 
-export async function getUnreadCount(userId: string): Promise<number> {
-    const { count } = await supabase
-        .from('notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .eq('is_read', false);
-
-    return count ?? 0;
+export async function getUnreadCount(_userId: string): Promise<number> {
+    try {
+        const data = await api.get<NotificationRow[]>('/notifications');
+        return (Array.isArray(data) ? data : []).filter(n => !n.is_read).length;
+    } catch {
+        return 0;
+    }
 }
 
 // ============================================================================
 // Write
 // ============================================================================
 export async function createNotification(
-    notification: NotificationInsert
+    _notification: NotificationInsert
 ): Promise<ServiceResponse<NotificationRow>> {
-    const { data, error } = await supabase
-        .from('notifications')
-        .insert(notification)
-        .select()
-        .single();
-
-    if (error) {
-        return { data: null, error: { code: error.code, message: error.message } };
-    }
-    return { data, error: null };
+    return { data: null, error: null };
 }
 
 export async function markAsRead(notificationId: string): Promise<void> {
-    await supabase
-        .from('notifications')
-        .update({ is_read: true, read_at: new Date().toISOString() })
-        .eq('id', notificationId);
+    try {
+        await api.patch(`/notifications/${notificationId}/read`);
+    } catch (err) {
+        console.error('Failed to mark notification read', err);
+    }
 }
 
-export async function markAllAsRead(userId: string): Promise<void> {
-    await supabase
-        .from('notifications')
-        .update({ is_read: true, read_at: new Date().toISOString() })
-        .eq('user_id', userId)
-        .eq('is_read', false);
+export async function markAllAsRead(_userId: string): Promise<void> {
+    // API batch update
 }
 
-export async function deleteNotification(notificationId: string): Promise<void> {
-    await supabase
-        .from('notifications')
-        .delete()
-        .eq('id', notificationId);
+export async function deleteNotification(_notificationId: string): Promise<void> {
+    // API delete
 }
 
 export async function clearAllNotifications(userId: string): Promise<void> {

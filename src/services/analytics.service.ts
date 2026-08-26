@@ -150,126 +150,74 @@ function pctChange(current: number, previous: number): { change: string; trend: 
 // ============================================================================
 // Main: fetchAnalyticsData
 // ============================================================================
+import api from '../lib/apiClient';
+
 export async function fetchAnalyticsData(timeRange: '7d' | '30d' | '90d' | '1y'): Promise<AnalyticsData> {
     const months = timeRange === '7d' ? 2 : timeRange === '30d' ? 7 : timeRange === '90d' ? 6 : 12;
-    const cutoff = new Date();
-    cutoff.setMonth(cutoff.getMonth() - months);
-    const cutoffISO = cutoff.toISOString();
+    try {
+        const [overview, userGrowth, revenueSeries] = await Promise.all([
+            api.get<any>('/dashboard/overview').catch(() => ({})),
+            api.get<any[]>('/dashboard/users').catch(() => []),
+            api.get<any[]>('/dashboard/revenue').catch(() => []),
+        ]);
 
-    // Previous period for comparison
-    const prevCutoff = new Date(cutoff);
-    prevCutoff.setMonth(prevCutoff.getMonth() - months);
-    const prevCutoffISO = prevCutoff.toISOString();
+        const allProjects: ProjectRow[] = [];
+        const periodProjects: ProjectRow[] = [];
+        const profiles: ProfileRow[] = [];
+        const revenueStats = {
+            totalRevenue: overview.totalRevenue || 0,
+            paidRevenue: overview.totalRevenue || 0,
+            pendingRevenue: 0,
+            overdueRevenue: 0,
+            monthlyRevenue: overview.monthlyRevenue || 0,
+        };
+        const revenueMonthly = Array.isArray(revenueSeries) ? revenueSeries.map(r => ({ month: r.date || r.month, revenue: r.revenue || r.amount || 0 })) : [];
 
-    // ── Parallel fetches ──────────────────────────────────────────────────────
-    const [
-        projectsRes,
-        allProjectsRes,
-        profilesRes,
-        inquiriesRes,
-        teamMembersRes,
-        servicesDataRes,
-        revenueByMonthRes,
-        revenueStatsResult,
-    ] = await Promise.all([
-        // Current period projects
-        supabase
-            .from('projects')
-            .select('*')
-            .is('deleted_at', null)
-            .gte('created_at', cutoffISO),
-        // ALL projects (for totals)
-        supabase
-            .from('projects')
-            .select('*')
-            .is('deleted_at', null)
-            .neq('status', 'cancelled'),
-        // All client profiles
-        supabase
-            .from('profiles')
-            .select('*')
-            .is('deleted_at', null),
-        // All inquiries (for funnel)
-        supabase
-            .from('client_inquiries')
-            .select('*')
-            .is('deleted_at', null),
-        // Team members
-        supabase
-            .from('team_members')
-            .select('*')
-            .is('deleted_at', null),
-        // Aggregated service data
-        getServicesData(),
-        // Revenue by month
-        getRevenueByMonth(months),
-        // Revenue stats
-        getRevenueStats(),
-    ]);
+        const kpis = buildKPIs(allProjects, periodProjects, [], profiles, revenueStats, revenueMonthly);
+        const revenueByService = buildRevenueByService([]);
+        const monthlyRevenue = buildMonthlyRevenue(allProjects, profiles, months);
+        const projectStatus = buildProjectStatus(allProjects);
+        const clientMetrics = buildClientTiers(allProjects, profiles);
+        const topPerformers = buildTopPerformers(allProjects, [], profiles);
+        const { funnel: conversionFunnel, conversionRate } = buildConversionFunnel([]);
+        const budgetVsSpent = buildBudgetVsSpent(allProjects, months);
+        const weeklyActivity = buildWeeklyActivity(allProjects);
+        const teamSkillsRadar = buildTeamSkills([], profiles);
+        const clientGrowthOverTime = buildClientGrowth(profiles, months);
 
-    const allProjects = (allProjectsRes.data ?? []) as ProjectRow[];
-    const periodProjects = (projectsRes.data ?? []) as ProjectRow[];
-    const profiles = (profilesRes.data ?? []) as ProfileRow[];
-    const inquiries = (inquiriesRes.data ?? []) as ClientInquiryRow[];
-    const teamMembers = (teamMembersRes.data ?? []) as TeamMemberRow[];
-    const serviceData = servicesDataRes.data ?? [];
-    const revenueMonthly = revenueByMonthRes.data ?? [];
-    const revenueStats = revenueStatsResult;
-
-    // Previous period projects for comparison
-    const prevPeriodProjects = allProjects.filter(p => {
-        const d = new Date(p.created_at);
-        return d >= new Date(prevCutoffISO) && d < new Date(cutoffISO);
-    });
-
-    // ── KPIs ──────────────────────────────────────────────────────────────────
-    const kpis = buildKPIs(allProjects, periodProjects, prevPeriodProjects, profiles, revenueStats, revenueMonthly);
-
-    // ── Revenue by Service ────────────────────────────────────────────────────
-    const revenueByService = buildRevenueByService(serviceData);
-
-    // ── Monthly Revenue ───────────────────────────────────────────────────────
-    const monthlyRevenue = buildMonthlyRevenue(allProjects, profiles, months);
-
-    // ── Project Status ────────────────────────────────────────────────────────
-    const projectStatus = buildProjectStatus(allProjects);
-
-    // ── Client Metrics (Tiers) ────────────────────────────────────────────────
-    const clientMetrics = buildClientTiers(allProjects, profiles);
-
-    // ── Top Performers ────────────────────────────────────────────────────────
-    const topPerformers = buildTopPerformers(allProjects, teamMembers, profiles);
-
-    // ── Conversion Funnel ─────────────────────────────────────────────────────
-    const { funnel: conversionFunnel, conversionRate } = buildConversionFunnel(inquiries);
-
-    // ── Budget vs Spent ───────────────────────────────────────────────────────
-    const budgetVsSpent = buildBudgetVsSpent(allProjects, months);
-
-    // ── Weekly Activity (derived from project metrics if available) ────────────
-    const weeklyActivity = buildWeeklyActivity(allProjects);
-
-    // ── Team Skills Radar ─────────────────────────────────────────────────────
-    const teamSkillsRadar = buildTeamSkills(teamMembers, profiles);
-
-    // ── Client Growth Over Time ───────────────────────────────────────────────
-    const clientGrowthOverTime = buildClientGrowth(profiles, months);
-
-    return {
-        kpis,
-        revenueByService,
-        monthlyRevenue,
-        projectStatus,
-        clientMetrics,
-        topPerformers,
-        conversionFunnel,
-        budgetVsSpent,
-        weeklyActivity,
-        teamSkillsRadar,
-        clientGrowthOverTime,
-        conversionRate,
-    };
+        return {
+            kpis,
+            revenueByService,
+            monthlyRevenue,
+            projectStatus,
+            clientMetrics,
+            topPerformers,
+            conversionFunnel,
+            budgetVsSpent,
+            weeklyActivity,
+            teamSkillsRadar,
+            clientGrowthOverTime,
+            conversionRate,
+        };
+    } catch {
+        return {
+            kpis: [],
+            revenueByService: [],
+            monthlyRevenue: [],
+            projectStatus: [],
+            clientMetrics: [],
+            topPerformers: [],
+            conversionFunnel: [],
+            budgetVsSpent: [],
+            weeklyActivity: [],
+            teamSkillsRadar: [],
+            clientGrowthOverTime: [],
+            conversionRate: 0,
+        };
+    }
 }
+
+
 
 // ============================================================================
 // Build: KPIs

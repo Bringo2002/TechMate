@@ -118,28 +118,22 @@ export async function getCurrentUser(): Promise<ServiceResponse<ProfileRow>> {
 // ============================================================================
 // Update Operations
 // ============================================================================
+import api from '../lib/apiClient';
+
 export async function updateProfile(
-    userId: string,
+    _userId: string,
     updates: ProfileUpdate
 ): Promise<ServiceResponse<ProfileRow>> {
-    const { data, error } = await supabase
-        .from('profiles')
-        .update(updates)
-        .eq('id', userId)
-        .select()
-        .single();
-
-    if (error) {
-        return { data: null, error: { code: error.code, message: error.message } };
+    try {
+        const data = await api.put<ProfileRow>('/users/profile', updates);
+        return { data, error: null };
+    } catch (err: unknown) {
+        return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
     }
-    return { data, error: null };
 }
 
-export async function updateLastLogin(userId: string): Promise<void> {
-    await supabase
-        .from('profiles')
-        .update({ last_login_at: new Date().toISOString() })
-        .eq('id', userId);
+export async function updateLastLogin(_userId: string): Promise<void> {
+    // Handled automatically on auth on NestJS backend
 }
 
 // ============================================================================

@@ -87,20 +87,20 @@ export interface ServiceCategory {
     created_at: string;
 }
 
+import api from '../lib/apiClient';
+
 export async function getServiceCategories(): Promise<{ data: ServiceCategory[]; error: string | null }> {
     try {
-        const { data, error } = await supabase
-            .from('service_categories')
-            .select('*')
-            .eq('is_active', true)
-            .order('sort_order', { ascending: true });
-
-        if (error) throw error;
-
-        const categories: ServiceCategory[] = (data || []).map(item => ({
-            ...item,
-            icon: item.icon || 'Briefcase',
-            color: item.color || 'cyan'
+        const data = await api.get<any[]>('/services');
+        const categories: ServiceCategory[] = (Array.isArray(data) ? data : []).map((item, idx) => ({
+            id: item.id || `cat-${idx}`,
+            name: item.name || 'Service',
+            description: item.description || null,
+            icon: 'Briefcase',
+            color: 'cyan',
+            sort_order: idx,
+            is_active: item.isActive ?? true,
+            created_at: item.createdAt || new Date().toISOString(),
         }));
 
         return { data: categories, error: null };
