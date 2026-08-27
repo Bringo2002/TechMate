@@ -1,9 +1,10 @@
 // ============================================================================
 // Inquiries Service
 // API layer for client inquiry management (replaces marketplace requests)
+// Now backed by the NestJS API instead of Supabase.
 // ============================================================================
 
-import supabase from '../lib/supabaseClient';
+import api from '../lib/apiClient';
 import type {
     ClientInquiryRow,
     ClientInquiryWithClient,
@@ -14,67 +15,34 @@ import type {
 import type { ServiceResponse, ServiceError, InquiryFilters } from '../types/api.types';
 export type { InquiryFilters };
 
-// ============================================================================
-// Types
-// ============================================================================
-
-
-// Helper to format errors
 const formatError = (error: unknown): ServiceError => {
-    const err = error as Record<string, string | undefined>;
-    return {
-        code: err?.code || 'UNKNOWN',
-        message: err?.message || 'An unknown error occurred',
-        details: err?.details,
-        hint: err?.hint
-    };
+    const err = error as Error;
+    return { code: 'REQUEST_FAILED', message: err?.message || 'An unknown error occurred' };
 };
+
+function buildQuery(params: Record<string, string | undefined>): string {
+    const usable = Object.entries(params).filter(([, v]) => v !== undefined) as [string, string][];
+    if (usable.length === 0) return '';
+    return '?' + new URLSearchParams(usable).toString();
+}
 
 // ============================================================================
 // Query Functions
 // ============================================================================
 
-/**
- * Get all inquiries with optional filters (admin view)
- */
+/** Get all inquiries with optional filters (admin view) */
 export async function getInquiries(
     filters?: InquiryFilters
 ): Promise<ServiceResponse<ClientInquiryWithClient[]>> {
     try {
-        let query = supabase
-            .from('client_inquiries')
-            .select(`
-        *,
-        client:profiles!client_id(
-          id,
-          full_name,
-          email,
-          company,
-          avatar_url
-        )
-      `)
-            .is('deleted_at', null)
-            .order('created_at', { ascending: false });
-
-        // Apply filters
-        if (filters?.status) {
-            query = query.eq('status', filters.status);
-        }
-        if (filters?.assigned_to) {
-            query = query.eq('assigned_to', filters.assigned_to);
-        }
-        if (filters?.priority) {
-            query = query.eq('priority', filters.priority);
-        }
-        if (filters?.project_type) {
-            query = query.eq('project_type', filters.project_type);
-        }
-
-        const { data, error } = await query;
-
-        if (error) throw error;
-
-        return { data: (data as unknown) as ClientInquiryWithClient[], error: null };
+        const query = buildQuery({
+            status: filters?.status,
+            assigned_to: filters?.assigned_to,
+            priority: filters?.priority,
+            project_type: filters?.project_type,
+        });
+        const data = await api.get<ClientInquiryWithClient[]>(`/inquiries${query}`);
+        return { data: Array.isArray(data) ? data : [], error: null };
     } catch (error) {
         console.error('Error in getInquiries:', error);
         return { data: null, error: formatError(error) };
@@ -82,70 +50,35 @@ export async function getInquiries(
 }
 
 /**
- * Get single inquiry by ID with full details
+ * Get single inquiry by ID with full details.
+ *
+ * Two known gaps versus the old Supabase query, flagged rather than
+ * silently papered over:
+ *  - `assigned_team_member.internal_role` isn't returned — that column
+ *    doesn't exist on `profiles` in the real schema, so it never will
+ *    be unless it gets added there.
+ *  - The nested `proposals` array isn't populated yet — the Proposals
+ *    module hasn't been built. It'll start showing up once that lands.
  */
 export async function getInquiryById(
     inquiryId: string
 ): Promise<ServiceResponse<ClientInquiryWithClient>> {
     try {
-        const { data, error } = await supabase
-            .from('client_inquiries')
-            .select(`
-        *,
-        client:profiles!client_id(
-          id,
-          full_name,
-          email,
-          company,
-          phone,
-          avatar_url
-        ),
-        assigned_team_member:profiles!assigned_to(
-          id,
-          full_name,
-          email,
-          avatar_url,
-          internal_role
-        ),
-        proposals(
-          id,
-          proposal_number,
-          title,
-          status,
-          total_cost,
-          created_at
-        )
-      `)
-            .eq('id', inquiryId)
-            .is('deleted_at', null)
-            .single();
-
-        if (error) throw error;
-
-        return { data: (data as unknown) as ClientInquiryWithClient, error: null };
+        const data = await api.get<ClientInquiryWithClient>(`/inquiries/${inquiryId}`);
+        return { data, error: null };
     } catch (error) {
         console.error('Error in getInquiryById:', error);
         return { data: null, error: formatError(error) };
     }
 }
 
-/**
- * Get inquiries for a specific client
- */
+/** Get inquiries for a specific client */
 export async function getClientInquiries(
     clientId: string
 ): Promise<ServiceResponse<ClientInquiryRow[]>> {
     try {
-        const { data, error } = await supabase
-            .from('client_inquiries')
-            .select('*')
-            .eq('client_id', clientId)
-            .is('deleted_at', null)
-            .order('created_at', { ascending: false });
-
-        if (error) throw error;
-
-        return { data: data as ClientInquiryRow[], error: null };
+        const data = await api.get<ClientInquiryRow[]>(`/inquiries/client/${clientId}`);
+        return { data: Array.isArray(data) ? data : [], error: null };
     } catch (error) {
         console.error('Error in getClientInquiries:', error);
         return { data: null, error: formatError(error) };
@@ -156,50 +89,25 @@ export async function getClientInquiries(
 // Mutation Functions
 // ============================================================================
 
-/**
- * Create a new inquiry
- */
 export async function createInquiry(
     inquiryData: ClientInquiryInsert
 ): Promise<ServiceResponse<ClientInquiryRow>> {
     try {
-        // cast to any to avoid complex schema-driven never errors if some optional fields are missing
-        const { data, error } = await supabase
-            .from('client_inquiries')
-            .insert(inquiryData as any)
-            .select()
-            .single();
-
-        if (error) throw error;
-
-        return { data: data as ClientInquiryRow, error: null };
+        const data = await api.post<ClientInquiryRow>('/inquiries', inquiryData);
+        return { data, error: null };
     } catch (error) {
         console.error('Error in createInquiry:', error);
         return { data: null, error: formatError(error) };
     }
 }
 
-/**
- * Update an inquiry
- */
 export async function updateInquiry(
     inquiryId: string,
     updates: ClientInquiryUpdate
 ): Promise<ServiceResponse<ClientInquiryRow>> {
     try {
-        const { data, error } = await supabase
-            .from('client_inquiries')
-            .update({
-                ...updates,
-                updated_at: new Date().toISOString(),
-            } as any)
-            .eq('id', inquiryId)
-            .select()
-            .single();
-
-        if (error) throw error;
-
-        return { data: data as ClientInquiryRow, error: null };
+        const data = await api.put<ClientInquiryRow>(`/inquiries/${inquiryId}`, updates);
+        return { data, error: null };
     } catch (error) {
         console.error('Error in updateInquiry:', error);
         return { data: null, error: formatError(error) };
@@ -207,41 +115,17 @@ export async function updateInquiry(
 }
 
 /**
- * Update inquiry status
+ * Update inquiry status. The viewed_by_admin_at side effect (set the
+ * first time status moves to 'reviewing') now happens server-side —
+ * no need for the two-step read-then-write dance the Supabase version did.
  */
 export async function updateInquiryStatus(
     inquiryId: string,
     status: InquiryStatus
 ): Promise<ServiceResponse<ClientInquiryRow>> {
     try {
-        const updates: any = {
-            status,
-            updated_at: new Date().toISOString(),
-        };
-
-        // Set viewed_by_admin_at when status changes from 'new'
-        if (status === 'reviewing') {
-            const { data: inquiry } = await supabase
-                .from('client_inquiries')
-                .select('viewed_by_admin_at')
-                .eq('id', inquiryId)
-                .single();
-
-            if (inquiry && !(inquiry as Record<string, unknown>).viewed_by_admin_at) {
-                updates.viewed_by_admin_at = new Date().toISOString();
-            }
-        }
-
-        const { data, error } = await supabase
-            .from('client_inquiries')
-            .update(updates)
-            .eq('id', inquiryId)
-            .select()
-            .single();
-
-        if (error) throw error;
-
-        return { data: data as ClientInquiryRow, error: null };
+        const data = await api.put<ClientInquiryRow>(`/inquiries/${inquiryId}/status`, { status });
+        return { data, error: null };
     } catch (error) {
         console.error('Error in updateInquiryStatus:', error);
         return { data: null, error: formatError(error) };
@@ -249,88 +133,37 @@ export async function updateInquiryStatus(
 }
 
 /**
- * Assign inquiry to a team member
+ * Assign inquiry to a team member. The first_response_at side effect
+ * now happens server-side too.
  */
 export async function assignInquiry(
     inquiryId: string,
     userId: string
 ): Promise<ServiceResponse<ClientInquiryRow>> {
     try {
-        const updates: any = {
-            assigned_to: userId,
-            updated_at: new Date().toISOString(),
-        };
-
-        // Set first_response_at if not already set
-        const { data: inquiry } = await supabase
-            .from('client_inquiries')
-            .select('first_response_at')
-            .eq('id', inquiryId)
-            .single();
-
-        if (inquiry && !(inquiry as Record<string, unknown>).first_response_at) {
-            updates.first_response_at = new Date().toISOString();
-        }
-
-        const { data, error } = await supabase
-            .from('client_inquiries')
-            .update(updates)
-            .eq('id', inquiryId)
-            .select()
-            .single();
-
-        if (error) throw error;
-
-        return { data: data as ClientInquiryRow, error: null };
+        const data = await api.post<ClientInquiryRow>(`/inquiries/${inquiryId}/assign`, { userId });
+        return { data, error: null };
     } catch (error) {
         console.error('Error in assignInquiry:', error);
         return { data: null, error: formatError(error) };
     }
 }
 
-/**
- * Unassign inquiry from team member
- */
 export async function unassignInquiry(
     inquiryId: string
 ): Promise<ServiceResponse<ClientInquiryRow>> {
     try {
-        const { data, error } = await supabase
-            .from('client_inquiries')
-            .update({
-                assigned_to: null,
-                updated_at: new Date().toISOString(),
-            } as any)
-            .eq('id', inquiryId)
-            .select()
-            .single();
-
-        if (error) throw error;
-
-        return { data: data as ClientInquiryRow, error: null };
+        const data = await api.post<ClientInquiryRow>(`/inquiries/${inquiryId}/unassign`, {});
+        return { data, error: null };
     } catch (error) {
         console.error('Error in unassignInquiry:', error);
         return { data: null, error: formatError(error) };
     }
 }
 
-/**
- * Delete inquiry (soft delete)
- */
-export async function deleteInquiry(
-    inquiryId: string
-): Promise<ServiceResponse<boolean>> {
+export async function deleteInquiry(inquiryId: string): Promise<ServiceResponse<boolean>> {
     try {
-        const { error } = await supabase
-            .from('client_inquiries')
-            .update({
-                deleted_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-            } as any)
-            .eq('id', inquiryId);
-
-        if (error) throw error;
-
+        await api.delete(`/inquiries/${inquiryId}`);
         return { data: true, error: null };
     } catch (error) {
         console.error('Error in deleteInquiry:', error);
@@ -343,22 +176,18 @@ export async function deleteInquiry(
 // ============================================================================
 
 /**
- * Get inquiry statistics
- * @param userId - If provided, gets client-specific stats; if null, gets admin stats
+ * Get inquiry statistics.
+ * Calls the same get_inquiry_stats(p_user_id) Postgres function the old
+ * Supabase RPC call used — the backend calls it directly now instead of
+ * reimplementing the aggregation, so this keeps the exact same shape.
  */
 export async function getInquiryStats(
     userId?: string
 ): Promise<ServiceResponse<Record<string, unknown>>> {
     try {
-        // use unknown cast for the object to match the rpc definition which might be strict
-        const { data, error } = await supabase
-            .rpc('get_inquiry_stats', {
-                p_user_id: userId ?? null
-            } as unknown as Record<string, unknown>);
-
-        if (error) throw error;
-
-        return { data: data as Record<string, unknown>, error: null };
+        const query = userId ? `?user_id=${userId}` : '';
+        const data = await api.get<Record<string, unknown>>(`/inquiries/stats${query}`);
+        return { data, error: null };
     } catch (error) {
         console.error('Error in getInquiryStats:', error);
         return { data: null, error: formatError(error) };
@@ -370,63 +199,28 @@ export async function getInquiryStats(
 // ============================================================================
 
 /**
- * Subscribe to inquiry changes (real-time updates)
- * @param callback - Function called when inquiries change
- * @returns Unsubscribe function
+ * NOTE: Supabase realtime is gone along with the rest of Supabase, and
+ * this backend has no websocket/SSE layer yet. These are now no-op stubs
+ * rather than something that silently pretends to still work — any UI
+ * relying on live updates will need a manual refresh until a real
+ * realtime layer (websocket gateway, polling, or similar) gets built.
+ * Flagging this explicitly rather than faking a working subscription.
  */
 export function subscribeToInquiries(
-    callback: (payload: Record<string, unknown>) => void
+    _callback: (payload: Record<string, unknown>) => void
 ): () => void {
-    const subscription = supabase
-        .channel('client_inquiries_changes')
-        .on(
-            'postgres_changes',
-            {
-                event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
-                schema: 'public',
-                table: 'client_inquiries',
-            },
-            (payload) => {
-                console.log('Inquiry change detected:', payload);
-                callback(payload);
-            }
-        )
-        .subscribe();
-
-    // Return unsubscribe function
-    return () => {
-        subscription.unsubscribe();
-    };
+    console.warn(
+        '[inquiries.service] subscribeToInquiries: realtime is not implemented in the new backend yet — this is a no-op.'
+    );
+    return () => {};
 }
 
-/**
- * Subscribe to a specific inquiry
- * @param inquiryId - ID of the inquiry to watch
- * @param callback - Function called when the inquiry changes
- * @returns Unsubscribe function
- */
 export function subscribeToInquiry(
-    inquiryId: string,
-    callback: (payload: Record<string, unknown>) => void
+    _inquiryId: string,
+    _callback: (payload: Record<string, unknown>) => void
 ): () => void {
-    const subscription = supabase
-        .channel(`inquiry_${inquiryId}`)
-        .on(
-            'postgres_changes',
-            {
-                event: '*',
-                schema: 'public',
-                table: 'client_inquiries',
-                filter: `id=eq.${inquiryId}`,
-            },
-            (payload) => {
-                console.log('Inquiry updated:', payload);
-                callback(payload);
-            }
-        )
-        .subscribe();
-
-    return () => {
-        subscription.unsubscribe();
-    };
+    console.warn(
+        '[inquiries.service] subscribeToInquiry: realtime is not implemented in the new backend yet — this is a no-op.'
+    );
+    return () => {};
 }
