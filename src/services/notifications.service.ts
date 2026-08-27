@@ -1,16 +1,15 @@
 // ============================================================================
 // TechMate Notifications Service
-// CRUD and real-time subscriptions for notifications
+// CRUD for notifications — now backed by the NestJS API instead of Supabase.
 // ============================================================================
 
-import supabase from '../lib/supabaseClient';
 import type { NotificationRow, NotificationInsert } from '../types/database.types';
 import type { ServiceResponse, NotificationFilters } from '../types/api.types';
+import api from '../lib/apiClient';
 
 // ============================================================================
 // Read
 // ============================================================================
-import api from '../lib/apiClient';
 
 export async function getNotifications(
     _userId: string,
@@ -27,8 +26,8 @@ export async function getNotifications(
 
 export async function getUnreadCount(_userId: string): Promise<number> {
     try {
-        const data = await api.get<NotificationRow[]>('/notifications');
-        return (Array.isArray(data) ? data : []).filter(n => !n.is_read).length;
+        const result = await api.get<{ count: number }>('/notifications/unread-count');
+        return result?.count ?? 0;
     } catch {
         return 0;
     }
@@ -37,10 +36,24 @@ export async function getUnreadCount(_userId: string): Promise<number> {
 // ============================================================================
 // Write
 // ============================================================================
+
+/** Now actually wired — was a no-op stub before. */
 export async function createNotification(
-    _notification: NotificationInsert
+    notification: NotificationInsert
 ): Promise<ServiceResponse<NotificationRow>> {
-    return { data: null, error: null };
+    try {
+        const data = await api.post<NotificationRow>('/notifications', {
+            userId: notification.user_id,
+            title: notification.title,
+            message: notification.message ?? undefined,
+            type: notification.type ?? undefined,
+            category: notification.category ?? undefined,
+            link: notification.link ?? undefined,
+        });
+        return { data, error: null };
+    } catch (err: unknown) {
+        return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
+    }
 }
 
 export async function markAsRead(notificationId: string): Promise<void> {
@@ -51,45 +64,47 @@ export async function markAsRead(notificationId: string): Promise<void> {
     }
 }
 
+/** Now actually wired — was a no-op stub before. */
 export async function markAllAsRead(_userId: string): Promise<void> {
-    // API batch update
+    try {
+        await api.patch('/notifications/read-all');
+    } catch (err) {
+        console.error('Failed to mark all notifications read', err);
+    }
 }
 
-export async function deleteNotification(_notificationId: string): Promise<void> {
-    // API delete
+/** Now actually wired — was a no-op stub before. */
+export async function deleteNotification(notificationId: string): Promise<void> {
+    try {
+        await api.delete(`/notifications/${notificationId}`);
+    } catch (err) {
+        console.error('Failed to delete notification', err);
+    }
 }
 
-export async function clearAllNotifications(userId: string): Promise<void> {
-    await supabase
-        .from('notifications')
-        .delete()
-        .eq('user_id', userId);
+export async function clearAllNotifications(_userId: string): Promise<void> {
+    try {
+        await api.delete('/notifications');
+    } catch (err) {
+        console.error('Failed to clear notifications', err);
+    }
 }
 
 // ============================================================================
 // Real-time Subscription
 // ============================================================================
-export function subscribeToNotifications(
-    userId: string,
-    onNotification: (notification: NotificationRow) => void
-) {
-    const channel = supabase
-        .channel(`notifications:${userId}`)
-        .on(
-            'postgres_changes',
-            {
-                event: 'INSERT',
-                schema: 'public',
-                table: 'notifications',
-                filter: `user_id=eq.${userId}`,
-            },
-            (payload) => {
-                onNotification(payload.new as NotificationRow);
-            }
-        )
-        .subscribe();
 
-    return () => {
-        supabase.removeChannel(channel);
-    };
+/**
+ * NOTE: Supabase realtime is gone, and this backend has no websocket/SSE
+ * layer yet. No-op stub — same treatment as messages.service.ts and
+ * inquiries.service.ts.
+ */
+export function subscribeToNotifications(
+    _userId: string,
+    _onNotification: (notification: NotificationRow) => void
+): () => void {
+    console.warn(
+        '[notifications.service] subscribeToNotifications: realtime is not implemented in the new backend yet — this is a no-op.'
+    );
+    return () => {};
 }

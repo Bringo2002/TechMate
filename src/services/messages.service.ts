@@ -1,21 +1,11 @@
 // ============================================================================
 // TechMate Messages Service
-// Messaging with real-time subscriptions
+// Messaging — now backed by the NestJS API instead of Supabase.
 // ============================================================================
 
-import supabase from '../lib/supabaseClient';
 import type { MessageRow, MessageInsert, Json } from '../types/database.types';
 import type { ServiceResponse } from '../types/api.types';
-// ============================================================================
-// Conversations (aggregated contacts)
-// ============================================================================
-
-/** Lightweight shape for the profile columns we actually SELECT. */
-interface ContactProfile {
-    id: string;
-    full_name: string;
-    avatar_url: string | null;
-}
+import api from '../lib/apiClient';
 
 export interface ConversationSummary {
     contactId: string;
@@ -27,18 +17,23 @@ export interface ConversationSummary {
     isOnline: boolean;
 }
 
-import api from '../lib/apiClient';
+// ============================================================================
+// Conversations (aggregated contacts)
+// ============================================================================
 
+/**
+ * The backend's /messages/inbox now returns exactly the ConversationSummary
+ * shape (contactId/contactName/contactAvatar/lastMessage/lastMessageTime/
+ * unreadCount) computed server-side — no more guessing at fields
+ * (otherUser, item.unreadCount) that the old wrong-schema backend never
+ * actually returned. isOnline isn't tracked anywhere in the schema, so it
+ * defaults to false here, same as before.
+ */
 export async function getConversations(_userId: string): Promise<ServiceResponse<ConversationSummary[]>> {
     try {
-        const inbox = await api.get<any[]>('/messages/inbox');
+        const inbox = await api.get<Omit<ConversationSummary, 'isOnline'>[]>('/messages/inbox');
         const conversations: ConversationSummary[] = (Array.isArray(inbox) ? inbox : []).map(item => ({
-            contactId: item.otherUser?.id ?? item.senderId ?? item.receiverId,
-            contactName: item.otherUser?.name ?? 'User',
-            contactAvatar: item.otherUser?.avatarUrl ?? null,
-            lastMessage: item.content ?? '',
-            lastMessageTime: item.createdAt ?? '',
-            unreadCount: item.unreadCount ?? 0,
+            ...item,
             isOnline: false,
         }));
         return { data: conversations, error: null };
@@ -63,8 +58,10 @@ export async function getMessages(
 export async function sendMessage(message: MessageInsert): Promise<ServiceResponse<MessageRow>> {
     try {
         const data = await api.post<MessageRow>('/messages/send', {
-            receiverId: message.recipient_id,
+            recipientId: message.recipient_id,
             content: message.content,
+            subject: message.subject ?? undefined,
+            attachments: message.attachments ?? undefined,
         });
         return { data, error: null };
     } catch (err: unknown) {
@@ -72,23 +69,30 @@ export async function sendMessage(message: MessageInsert): Promise<ServiceRespon
     }
 }
 
-export async function markMessagesAsRead(_userId: string, _contactId: string): Promise<void> {
-    // Read receipts managed automatically on fetching conversation
+/** Now actually wired — the backend marks every unread message from this contact as read. */
+export async function markMessagesAsRead(_userId: string, contactId: string): Promise<void> {
+    try {
+        await api.patch(`/messages/conversation/${contactId}/read`);
+    } catch (err) {
+        console.error('Failed to mark conversation read', err);
+    }
 }
 
-export async function deleteMessage(_messageId: string): Promise<void> {
-    // Delete message endpoint
+export async function deleteMessage(messageId: string): Promise<void> {
+    try {
+        await api.delete(`/messages/${messageId}`);
+    } catch (err) {
+        console.error('Failed to delete message', err);
+    }
 }
 
-export async function getUnreadMessageCount(userId: string): Promise<number> {
-    const { count } = await supabase
-        .from('messages')
-        .select('*', { count: 'exact', head: true })
-        .eq('recipient_id', userId)
-        .eq('is_read', false)
-        .is('deleted_at', null);
-
-    return count ?? 0;
+export async function getUnreadMessageCount(_userId: string): Promise<number> {
+    try {
+        const result = await api.get<{ count: number }>('/messages/unread-count');
+        return result?.count ?? 0;
+    } catch {
+        return 0;
+    }
 }
 
 // ============================================================================
@@ -112,27 +116,20 @@ export async function startConversation(
 // ============================================================================
 // Real-time
 // ============================================================================
-export function subscribeToMessages(
-    userId: string,
-    onMessage: (message: MessageRow) => void
-) {
-    const channel = supabase
-        .channel(`messages:${userId}`)
-        .on(
-            'postgres_changes',
-            {
-                event: 'INSERT',
-                schema: 'public',
-                table: 'messages',
-                filter: `recipient_id=eq.${userId}`,
-            },
-            (payload) => {
-                onMessage(payload.new as MessageRow);
-            }
-        )
-        .subscribe();
 
-    return () => {
-        supabase.removeChannel(channel);
-    };
+/**
+ * NOTE: Supabase realtime is gone, and this backend has no websocket/SSE
+ * layer yet. No-op stub rather than something that silently pretends to
+ * still work — same treatment as inquiries.service.ts's subscriptions.
+ * Any UI relying on live message delivery needs a manual refresh or
+ * polling until a real realtime layer gets built.
+ */
+export function subscribeToMessages(
+    _userId: string,
+    _onMessage: (message: MessageRow) => void
+): () => void {
+    console.warn(
+        '[messages.service] subscribeToMessages: realtime is not implemented in the new backend yet — this is a no-op.'
+    );
+    return () => {};
 }
