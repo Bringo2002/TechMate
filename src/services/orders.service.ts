@@ -3,7 +3,6 @@
 // CRUD operations for orders and deliverables
 // ============================================================================
 
-import supabase from '../lib/supabaseClient';
 import type { OrderRow, OrderInsert, OrderUpdate, DeliverableRow } from '../types/database.types';
 import type {
     PaginatedResponse,
@@ -21,7 +20,7 @@ export async function getOrders(
     _options?: QueryOptions<OrderFilters>
 ): Promise<ServiceResponse<PaginatedResponse<OrderRow>>> {
     try {
-        const res = await api.get<OrderRow[]>('/bookings');
+        const res = await api.get<OrderRow[]>('/orders');
         const data = Array.isArray(res) ? res : [];
         return {
             data: {
@@ -39,9 +38,9 @@ export async function getOrders(
     }
 }
 
-export async function getUserOrders(_userId: string): Promise<ServiceResponse<OrderRow[]>> {
+export async function getUserOrders(userId: string): Promise<ServiceResponse<OrderRow[]>> {
     try {
-        const data = await api.get<OrderRow[]>('/bookings');
+        const data = await api.get<OrderRow[]>(`/orders?userId=${userId}`);
         return { data: Array.isArray(data) ? data : [], error: null };
     } catch (err: unknown) {
         return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
@@ -50,7 +49,7 @@ export async function getUserOrders(_userId: string): Promise<ServiceResponse<Or
 
 export async function getOrderById(orderId: string): Promise<ServiceResponse<OrderRow>> {
     try {
-        const data = await api.get<OrderRow>(`/bookings/${orderId}`);
+        const data = await api.get<OrderRow>(`/orders/${orderId}`);
         return { data, error: null };
     } catch (err: unknown) {
         return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
@@ -62,7 +61,7 @@ export async function getOrderById(orderId: string): Promise<ServiceResponse<Ord
 // ============================================================================
 export async function createOrder(order: OrderInsert): Promise<ServiceResponse<OrderRow>> {
     try {
-        const data = await api.post<OrderRow>('/bookings', order);
+        const data = await api.post<OrderRow>('/orders', order);
         return { data, error: null };
     } catch (err: unknown) {
         return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
@@ -74,7 +73,7 @@ export async function updateOrder(
     updates: OrderUpdate
 ): Promise<ServiceResponse<OrderRow>> {
     try {
-        const data = await api.put<OrderRow>(`/bookings/${orderId}`, updates);
+        const data = await api.put<OrderRow>(`/orders/${orderId}`, updates);
         return { data, error: null };
     } catch (err: unknown) {
         return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
@@ -90,7 +89,7 @@ export async function updateOrderStatus(
 
 export async function deleteOrder(orderId: string): Promise<ServiceResponse<null>> {
     try {
-        await api.delete(`/bookings/${orderId}`);
+        await api.delete(`/orders/${orderId}`);
         return { data: null, error: null };
     } catch (err: unknown) {
         return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
@@ -101,35 +100,22 @@ export async function deleteOrder(orderId: string): Promise<ServiceResponse<null
 // Deliverables
 // ============================================================================
 export async function getOrderDeliverables(orderId: string): Promise<ServiceResponse<DeliverableRow[]>> {
-    const { data, error } = await supabase
-        .from('deliverables')
-        .select('*')
-        .eq('order_id', orderId)
-        .is('deleted_at', null)
-        .order('created_at', { ascending: true });
-
-    if (error) {
-        return { data: null, error: { code: error.code, message: error.message } };
+    try {
+        const data = await api.get<DeliverableRow[]>(`/orders/${orderId}/deliverables`);
+        return { data: Array.isArray(data) ? data : [], error: null };
+    } catch (err: unknown) {
+        return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
     }
-    return { data: data ?? [], error: null };
 }
 
 // ============================================================================
 // Stats
 // ============================================================================
 export async function getOrderStats(userId?: string) {
-    let query = supabase.from('orders').select('status, spent, budget', { count: 'exact' }).is('deleted_at', null);
-    if (userId) query = query.eq('user_id', userId);
-
-    const { data, error } = await query;
-    if (error) return { total: 0, active: 0, completed: 0, totalSpent: 0, totalBudget: 0 };
-
-    const orders = data ?? [];
-    return {
-        total: orders.length,
-        active: orders.filter(o => o.status === 'in_progress' || o.status === 'review').length,
-        completed: orders.filter(o => o.status === 'completed').length,
-        totalSpent: orders.reduce((sum, o) => sum + (o.spent ?? 0), 0),
-        totalBudget: orders.reduce((sum, o) => sum + (o.budget ?? 0), 0),
-    };
+    const query = userId ? `/orders/stats?userId=${userId}` : '/orders/stats';
+    try {
+        return await api.get(query);
+    } catch {
+        return { total: 0, active: 0, completed: 0, totalSpent: 0, totalBudget: 0 };
+    }
 }
