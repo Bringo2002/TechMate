@@ -3,7 +3,6 @@
 // Full CRUD with pagination, filtering, and stats
 // ============================================================================
 
-import supabase from '../lib/supabaseClient';
 import type { ProjectRow, ProjectInsert, ProjectUpdate } from '../types/database.types';
 import type {
   PaginatedResponse,
@@ -21,7 +20,7 @@ export async function getProjects(
   _options?: QueryOptions<ProjectFilters>
 ): Promise<ServiceResponse<PaginatedResponse<ProjectRow>>> {
   try {
-    const res = await api.get<ProjectRow[]>('/services?all=true');
+    const res = await api.get<ProjectRow[]>('/projects');
     const data = Array.isArray(res) ? res : [];
     return {
       data: {
@@ -39,9 +38,9 @@ export async function getProjects(
   }
 }
 
-export async function getUserProjects(_userId: string): Promise<ServiceResponse<ProjectRow[]>> {
+export async function getUserProjects(userId: string): Promise<ServiceResponse<ProjectRow[]>> {
   try {
-    const data = await api.get<ProjectRow[]>('/services');
+    const data = await api.get<ProjectRow[]>(`/projects?userId=${userId}`);
     return { data: Array.isArray(data) ? data : [], error: null };
   } catch (err: unknown) {
     return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
@@ -50,7 +49,7 @@ export async function getUserProjects(_userId: string): Promise<ServiceResponse<
 
 export async function getProjectById(projectId: string): Promise<ServiceResponse<ProjectRow>> {
   try {
-    const data = await api.get<ProjectRow>(`/services/${projectId}`);
+    const data = await api.get<ProjectRow>(`/projects/${projectId}`);
     return { data, error: null };
   } catch (err: unknown) {
     return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
@@ -62,7 +61,7 @@ export async function getProjectById(projectId: string): Promise<ServiceResponse
 // ============================================================================
 export async function createProject(project: ProjectInsert): Promise<ServiceResponse<ProjectRow>> {
   try {
-    const data = await api.post<ProjectRow>('/services', project);
+    const data = await api.post<ProjectRow>('/projects', project);
     return { data, error: null };
   } catch (err: unknown) {
     return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
@@ -74,7 +73,7 @@ export async function updateProject(
   updates: ProjectUpdate
 ): Promise<ServiceResponse<ProjectRow>> {
   try {
-    const data = await api.put<ProjectRow>(`/services/${projectId}`, updates);
+    const data = await api.put<ProjectRow>(`/projects/${projectId}`, updates);
     return { data, error: null };
   } catch (err: unknown) {
     return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
@@ -90,7 +89,7 @@ export async function updateProjectStatus(
 
 export async function deleteProject(projectId: string): Promise<ServiceResponse<null>> {
   try {
-    await api.delete(`/services/${projectId}`);
+    await api.delete(`/projects/${projectId}`);
     return { data: null, error: null };
   } catch (err: unknown) {
     return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
@@ -101,23 +100,8 @@ export async function deleteProject(projectId: string): Promise<ServiceResponse<
 // Stats
 // ============================================================================
 export async function getProjectStats(userId?: string) {
-  let query = supabase.from('projects').select('status, budget, spent, health_score').is('deleted_at', null);
-  if (userId) query = query.eq('user_id', userId);
-
-  const { data } = await query;
-  const projects = data ?? [];
-
-  return {
-    total: projects.length,
-    active: projects.filter(p => p.status === 'active').length,
-    completed: projects.filter(p => p.status === 'completed').length,
-    planning: projects.filter(p => p.status === 'planning').length,
-    totalBudget: projects.reduce((s, p) => s + (p.budget ?? 0), 0),
-    totalSpent: projects.reduce((s, p) => s + (p.spent ?? 0), 0),
-    avgHealth: projects.length > 0
-      ? Math.round(projects.reduce((s, p) => s + (p.health_score ?? 0), 0) / projects.length)
-      : 0,
-  };
+  const query = userId ? `/projects/stats?userId=${userId}` : '/projects/stats';
+  return api.get(query);
 }
 
 // Backward compatibility
