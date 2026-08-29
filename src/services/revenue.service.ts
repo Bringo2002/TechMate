@@ -4,7 +4,7 @@
 // Sources: invoices, projects, service_categories
 // ============================================================================
 
-import supabase from '../lib/supabaseClient';
+import api from '../lib/apiClient';
 import authService from './authService';
 import type { InvoiceRow, ProjectRow } from '../types/database.types';
 import type { ServiceResponse } from '../types/api.types';
@@ -176,37 +176,19 @@ export async function fetchRevenueDashboard(
         const prevEnd = getPreviousPeriodEnd(timeRange);
 
         // Parallel fetch all needed data
-        const [invoicesRes, projectsRes, profilesRes, serviceCatsRes, revenueTargetRes] = await Promise.all([
-            supabase
-                .from('invoices')
-                .select('*')
-                .is('deleted_at', null)
-                .order('created_at', { ascending: false }),
-            supabase
-                .from('projects')
-                .select('*, profiles:user_id(email, full_name)')
-                .is('deleted_at', null)
-                .neq('status', 'cancelled'),
-            supabase
-                .from('profiles')
-                .select('id, email, full_name, company')
-                .is('deleted_at', null),
-            supabase
-                .from('service_categories')
-                .select('*')
-                .eq('is_active', true),
-            supabase
-                .from('revenue_targets')
-                .select('*')
-                .gte('period_end', new Date().toISOString())
-                .order('period_start', { ascending: false })
-                .limit(1),
+        const [allInvoices, allProjectsRaw, profiles, serviceCategories, revenueTarget] = await Promise.all([
+            api.get<InvoiceRow[]>('/invoices').catch(() => [] as InvoiceRow[]),
+            api.get<ProjectRow[]>('/projects').catch(() => [] as ProjectRow[]),
+            api.get<Array<{ id: string; email: string; full_name: string | null; company: string | null }>>('/users').catch(() => []),
+            api.get<Array<{ name: string; color?: string | null; icon?: string | null }>>('/service-categories/active').catch(() => []),
+            api.get<{ target_amount: number } | null>('/revenue-targets/current').catch(() => null),
         ]);
 
-        const allInvoices = (invoicesRes.data ?? []) as InvoiceRow[];
-        const allProjects = (projectsRes.data ?? []) as (ProjectRow & { profiles?: { email: string; full_name: string | null } | null })[];
-        const profiles = profilesRes.data ?? [];
-        const serviceCategories = serviceCatsRes.data ?? [];
+        // /projects doesn't eager-load the user relation, and the old
+        // Supabase query didn't need it here (profiles are joined
+        // separately below via profileMap) — cancelled projects are
+        // filtered client-side same as the old .neq('status','cancelled').
+        const allProjects = (allProjectsRaw ?? []).filter(p => p.status !== 'cancelled') as (ProjectRow & { profiles?: { email: string; full_name: string | null } | null })[];
 
         // Build profile lookup
         const profileMap = new Map(profiles.map(p => [p.id, p]));
@@ -221,7 +203,7 @@ export async function fetchRevenueDashboard(
         // ── Metrics ─────────────────────────────────────────────────────────
         const metrics = buildMetrics(
             allInvoices, periodInvoices, prevPeriodInvoices, allProjects,
-            periodStart, prevStart, prevEnd, revenueTargetRes.data?.[0]
+            periodStart, prevStart, prevEnd, revenueTarget
         );
 
         // ── Monthly Revenue ─────────────────────────────────────────────────
@@ -649,27 +631,23 @@ export async function updateProjectBudgetSpent(
     const { projectId, budget, spent, paymentStatus } = update;
 
     // Build update payload — only include fields that were provided
-    const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    const payload: Record<string, unknown> = {};
     if (budget !== undefined) payload.budget = budget;
     if (spent !== undefined) payload.spent = spent;
     if (paymentStatus !== undefined) payload.payment_status = paymentStatus;
 
-    const { data, error } = await supabase
-        .from('projects')
-        .update(payload)
-        .eq('id', projectId)
-        .select()
-        .single();
-
-    if (error) {
-        return { data: null, error: { code: error.code, message: error.message } };
+    let data: ProjectRow;
+    try {
+        data = await api.put<ProjectRow>(`/projects/${projectId}`, payload);
+    } catch (err: unknown) {
+        return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
     }
 
     // Log the activity
     try {
         const user = await authService.getMe();
         if (user) {
-            await supabase.from('activity_logs').insert({
+            await api.post('/activity-logs', {
                 user_id: user.id,
                 entity_type: 'project',
                 entity_id: projectId,
@@ -681,7 +659,7 @@ export async function updateProjectBudgetSpent(
         // Activity logging is non-critical
     }
 
-    return { data: data as ProjectRow, error: null };
+    return { data, error: null };
 }
 
 // ============================================================================
@@ -704,25 +682,18 @@ export async function batchUpdateProjectBudgets(
 
     for (const update of updates) {
         const { projectId, budget, spent, paymentStatus } = update;
-        const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
+        const payload: Record<string, unknown> = {};
         if (budget !== undefined) payload.budget = budget;
         if (spent !== undefined) payload.spent = spent;
         if (paymentStatus !== undefined) payload.payment_status = paymentStatus;
 
-        const { error } = await supabase
-            .from('projects')
-            .update(payload)
-            .eq('id', projectId);
-
-        if (error) {
-            failed++;
-            errors.push(`Project ${projectId}: ${error.message}`);
-        } else {
+        try {
+            await api.put(`/projects/${projectId}`, payload);
             succeeded++;
             // Log activity
             if (userId) {
                 try {
-                    await supabase.from('activity_logs').insert({
+                    await api.post('/activity-logs', {
                         user_id: userId,
                         entity_type: 'project',
                         entity_id: projectId,
@@ -731,6 +702,9 @@ export async function batchUpdateProjectBudgets(
                     });
                 } catch { /* non-critical */ }
             }
+        } catch (err) {
+            failed++;
+            errors.push(`Project ${projectId}: ${(err as Error).message}`);
         }
     }
 
@@ -800,30 +774,39 @@ export async function getProjectsForBudgetEdit(): Promise<ServiceResponse<Array<
     status: string;
     type: string;
 }>>> {
-    const { data, error } = await supabase
-        .from('projects')
-        .select('id, name, client, budget, spent, payment_status, status, type, user_id, profiles:user_id(full_name, email)')
-        .is('deleted_at', null)
-        .neq('status', 'cancelled')
-        .order('updated_at', { ascending: false });
-
-    if (error) {
-        return { data: null, error: { code: error.code, message: error.message } };
+    let projects: Record<string, unknown>[];
+    let users: Record<string, unknown>[];
+    try {
+        [projects, users] = await Promise.all([
+            api.get<Record<string, unknown>[]>('/projects'),
+            api.get<Record<string, unknown>[]>('/users').catch(() => []),
+        ]);
+    } catch (err: unknown) {
+        return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
     }
 
-    const projects = (data ?? []).map((p: Record<string, unknown>) => ({
-        id: p.id as string,
-        name: p.name as string,
-        client: (p.client as string) ||
-            ((p.profiles as { full_name: string | null; email: string } | null)?.full_name) ||
-            ((p.profiles as { full_name: string | null; email: string } | null)?.email) ||
-            'Unknown',
-        budget: Number(p.budget ?? 0),
-        spent: Number(p.spent ?? 0),
-        paymentStatus: (p.payment_status as string) || 'unpaid',
-        status: p.status as string,
-        type: p.type as string,
-    }));
+    // /projects doesn't eager-load the user relation — joined here
+    // client-side, same pattern buildRecentInvoices already uses below.
+    const userMap = new Map(users.map(u => [u.id, u]));
 
-    return { data: projects, error: null };
+    const result = (projects ?? [])
+        .filter((p: Record<string, unknown>) => p.status !== 'cancelled')
+        .sort((a: Record<string, unknown>, b: Record<string, unknown>) =>
+            new Date(b.updated_at as string).getTime() - new Date(a.updated_at as string).getTime()
+        )
+        .map((p: Record<string, unknown>) => {
+            const owner = userMap.get(p.user_id) as { full_name?: string | null; email?: string } | undefined;
+            return {
+                id: p.id as string,
+                name: p.name as string,
+                client: (p.client as string) || owner?.full_name || owner?.email || 'Unknown',
+                budget: Number(p.budget ?? 0),
+                spent: Number(p.spent ?? 0),
+                paymentStatus: (p.payment_status as string) || 'unpaid',
+                status: p.status as string,
+                type: p.type as string,
+            };
+        });
+
+    return { data: result, error: null };
 }
