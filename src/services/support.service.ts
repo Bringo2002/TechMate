@@ -1,31 +1,21 @@
-import supabase from '../lib/supabaseClient';
+import api from '../lib/apiClient';
 import type { SupportTicketRow, SupportTicketInsert } from '../types/database.types';
 import type { ServiceResponse } from '../types/api.types';
 
 export async function getUserTickets(userId: string): Promise<ServiceResponse<SupportTicketRow[]>> {
-    const { data, error } = await supabase
-        .from('support_tickets')
-        .select('*')
-        .eq('user_id', userId)
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false });
-
-    if (error) {
-        return { data: null, error: { code: error.code, message: error.message } };
+    try {
+        const data = await api.get<SupportTicketRow[]>(`/support-tickets/user/${userId}`);
+        return { data: Array.isArray(data) ? data : [], error: null };
+    } catch (err: unknown) {
+        return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
     }
-    return { data: (data as SupportTicketRow[]) ?? [], error: null };
 }
 
 export async function createTicket(ticket: SupportTicketInsert): Promise<ServiceResponse<SupportTicketRow>> {
-    // Casting to 'any' to bypass strict schema validation errors during build
-    const { data, error } = await supabase
-        .from('support_tickets')
-        .insert(ticket)
-        .select()
-        .single();
-
-    if (error) {
-        return { data: null, error: { code: error.code, message: error.message } };
+    try {
+        const data = await api.post<SupportTicketRow>('/support-tickets', ticket);
+        return { data, error: null };
+    } catch (err: unknown) {
+        return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
     }
-    return { data: data as SupportTicketRow, error: null };
 }
