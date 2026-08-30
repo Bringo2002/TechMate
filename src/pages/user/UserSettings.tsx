@@ -5,7 +5,7 @@ import {
   Bell, BellOff
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import supabase from '../../lib/supabaseClient';
+import api from '../../lib/apiClient';
 import type { UserSettingsInsert } from '../../types/database.types';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -89,27 +89,18 @@ const UserSettings: React.FC = () => {
     if (!user) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('user_settings')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        // PGRST116 = no rows returned, which means no settings saved yet
-        console.error('Failed to load settings:', error);
-      }
+      const data = await api.get<Record<string, unknown> | null>(`/user-settings/${user.id}`);
 
       if (data) {
-        const row = data as Record<string, unknown>;
+        const row = data;
         setSettings({
-          theme: row.theme || 'dark',
-          reduceMotion: row.reduce_motion ?? false,
-          highContrast: row.high_contrast ?? false,
-          autoSave: row.auto_save ?? true,
-          language: row.language || 'en-US',
-          notification_email: row.notification_email ?? true,
-          notification_push: row.notification_push ?? true,
+          theme: (row.theme as AppSettings['theme']) || 'dark',
+          reduceMotion: (row.reduce_motion as boolean) ?? false,
+          highContrast: (row.high_contrast as boolean) ?? false,
+          autoSave: (row.auto_save as boolean) ?? true,
+          language: (row.language as string) || 'en-US',
+          notification_email: (row.notification_email as boolean) ?? true,
+          notification_push: (row.notification_push as boolean) ?? true,
         });
       }
     } catch {
@@ -148,11 +139,7 @@ const UserSettings: React.FC = () => {
         notification_sms: false,
       };
 
-      const { error } = await supabase
-        .from('user_settings')
-        .upsert(settingsData as unknown as Record<string, unknown>);
-
-      if (error) throw error;
+      await api.put('/user-settings', settingsData);
 
       // Also save to localStorage for immediate theme/accessibility application
       localStorage.setItem('techmate_settings', JSON.stringify(settings));
