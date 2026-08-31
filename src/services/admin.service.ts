@@ -3,7 +3,7 @@
 // Dashboard metrics, analytics, and admin operations
 // ============================================================================
 
-import supabase from '../lib/supabaseClient';
+import api from '../lib/apiClient';
 import type { ProfileRow, ProjectRow, ProjectRowWithClient, OrderRow, InvoiceRow, RequestRow, SupportTicketRow, ActivityLogRowWithProfile } from '../types/database.types';
 import type {
     AdminDashboardMetrics,
@@ -16,46 +16,48 @@ import type {
 // Dashboard Metrics
 // ============================================================================
 export async function getAdminMetrics(): Promise<ServiceResponse<AdminDashboardMetrics>> {
-    const { data, error } = await supabase.rpc('get_admin_metrics');
-
-    if (error) {
-        return { data: null, error: { code: error.code, message: error.message } };
+    try {
+        const data = await api.get<AdminDashboardMetrics>('/admin-metrics/live');
+        return { data, error: null };
+    } catch (err: unknown) {
+        return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
     }
-    return { data: data as unknown as AdminDashboardMetrics, error: null };
 }
 
 // ============================================================================
 // Chart Data
 // ============================================================================
 export async function getUserGrowth(months: number = 12): Promise<ServiceResponse<GrowthDataPoint[]>> {
-    const { data, error } = await supabase.rpc('get_user_growth', { p_months: months });
-
-    if (error) {
-        return { data: null, error: { code: error.code, message: error.message } };
+    try {
+        const data = await api.get<GrowthDataPoint[]>(`/admin-metrics/user-growth?months=${months}`);
+        return { data: data ?? [], error: null };
+    } catch (err: unknown) {
+        return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
     }
-    return { data: (data ?? []) as GrowthDataPoint[], error: null };
 }
 
 export async function getRevenueByMonth(months: number = 12): Promise<ServiceResponse<RevenueDataPoint[]>> {
-    // Try RPC first
-    const { data, error } = await supabase.rpc('get_revenue_by_month', { p_months: months });
-
-    if (!error && data && (data as RevenueDataPoint[]).length > 0) {
-        return { data: data as RevenueDataPoint[], error: null };
+    // Try the real function first
+    try {
+        const data = await api.get<RevenueDataPoint[]>(`/admin-metrics/revenue-by-month?months=${months}`);
+        if (data && data.length > 0) {
+            return { data, error: null };
+        }
+    } catch {
+        // fall through to the projects-based fallback below
     }
 
-    // Fallback: derive from projects table
+    // Fallback: derive from projects
     const cutoff = new Date();
     cutoff.setMonth(cutoff.getMonth() - months);
 
-    const { data: projects, error: projError } = await supabase
-        .from('projects')
-        .select('budget, created_at, status')
-        .is('deleted_at', null)
-        .neq('status', 'cancelled')
-        .gte('created_at', cutoff.toISOString());
-
-    if (projError || !projects) {
+    let projects: Array<{ budget: number; created_at: string; status: string }>;
+    try {
+        const all = await api.get<Array<{ budget: number; created_at: string; status: string }>>('/projects');
+        projects = (all ?? []).filter(
+            p => p.status !== 'cancelled' && new Date(p.created_at) >= cutoff
+        );
+    } catch {
         return { data: [], error: null };
     }
 
@@ -85,17 +87,18 @@ export async function getRevenueByMonth(months: number = 12): Promise<ServiceRes
 // ============================================================================
 export async function getRevenueStats() {
     // 1. Try invoices first
-    const { data: invoices, error } = await supabase
-        .from('invoices')
-        .select('amount, tax_amount, status, paid_date, created_at')
-        .is('deleted_at', null)
-        .returns<InvoiceRow[]>();
+    let invoices: InvoiceRow[] = [];
+    try {
+        invoices = await api.get<InvoiceRow[]>('/invoices');
+    } catch {
+        invoices = [];
+    }
 
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-    if (!error && invoices && invoices.length > 0) {
-        const all = invoices as InvoiceRow[];
+    if (invoices.length > 0) {
+        const all = invoices;
         return {
             totalRevenue: all.reduce((s, i) => s + (i.amount ?? 0) + (i.tax_amount ?? 0), 0),
             paidRevenue: all.filter(i => i.status === 'paid').reduce((s, i) => s + (i.amount ?? 0) + (i.tax_amount ?? 0), 0),
@@ -106,14 +109,11 @@ export async function getRevenueStats() {
         };
     }
 
-    // 2. Fallback: derive revenue from projects table
-    const { data: projects, error: projError } = await supabase
-        .from('projects')
-        .select('budget, spent, status, payment_status, updated_at')
-        .is('deleted_at', null)
-        .neq('status', 'cancelled');
-
-    if (projError || !projects) {
+    // 2. Fallback: derive revenue from projects
+    let projects: Array<{ budget: number; spent: number; status: string; payment_status: string; updated_at: string }>;
+    try {
+        projects = await api.get('/projects');
+    } catch {
         return { totalRevenue: 0, paidRevenue: 0, pendingRevenue: 0, overdueRevenue: 0, monthlyRevenue: 0 };
     }
 
@@ -143,30 +143,36 @@ export async function getRevenueStats() {
 // Recent Activity
 // ============================================================================
 export async function getRecentProjects(limit: number = 10): Promise<ServiceResponse<ProjectRowWithClient[]>> {
-    const { data, error } = await supabase
-        .from('projects')
-        .select('*, profiles!user_id(email, full_name)')
-        .is('deleted_at', null)
-        .order('updated_at', { ascending: false })
-        .limit(limit);
-
-    if (error) {
-        return { data: null, error: { code: error.code, message: error.message } };
+    try {
+        const [projects, users] = await Promise.all([
+            api.get<ProjectRow[]>('/projects'),
+            api.get<Array<{ id: string; email: string; full_name: string | null }>>('/users').catch(() => []),
+        ]);
+        const userMap = new Map(users.map(u => [u.id, u]));
+        const withClient = (projects ?? [])
+            .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+            .slice(0, limit)
+            .map(p => ({ ...p, profiles: userMap.get(p.user_id) ?? null })) as unknown as ProjectRowWithClient[];
+        return { data: withClient, error: null };
+    } catch (err: unknown) {
+        return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
     }
-    return { data: (data ?? []) as ProjectRowWithClient[], error: null };
 }
 
 export async function getAllProjects(): Promise<ServiceResponse<ProjectRowWithClient[]>> {
-    const { data, error } = await supabase
-        .from('projects')
-        .select('*, profiles!user_id(email, full_name)')
-        .is('deleted_at', null)
-        .order('updated_at', { ascending: false });
-
-    if (error) {
-        return { data: null, error: { code: error.code, message: error.message } };
+    try {
+        const [projects, users] = await Promise.all([
+            api.get<ProjectRow[]>('/projects'),
+            api.get<Array<{ id: string; email: string; full_name: string | null }>>('/users').catch(() => []),
+        ]);
+        const userMap = new Map(users.map(u => [u.id, u]));
+        const withClient = (projects ?? [])
+            .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+            .map(p => ({ ...p, profiles: userMap.get(p.user_id) ?? null })) as unknown as ProjectRowWithClient[];
+        return { data: withClient, error: null };
+    } catch (err: unknown) {
+        return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
     }
-    return { data: (data ?? []) as ProjectRowWithClient[], error: null };
 }
 
 // ============================================================================
@@ -177,45 +183,42 @@ export async function getProjectById(projectId: string): Promise<ServiceResponse
         return { data: null, error: { code: 'MISSING_ID', message: 'Project ID is required' } };
     }
 
-    const { data, error } = await supabase
-        .from('projects')
-        .select('*, profiles:user_id(email, full_name)')
-        .eq('id', projectId)
-        .is('deleted_at', null)
-        .single();
-
-    if (error) {
-        return { data: null, error: { code: error.code, message: error.message } };
+    try {
+        const project = await api.get<ProjectRow>(`/projects/${projectId}`);
+        let owner: { id: string; email: string; full_name: string | null } | null = null;
+        try {
+            owner = await api.get(`/users/${project.user_id}`);
+        } catch {
+            // Owner lookup failing shouldn't fail the whole project fetch
+        }
+        return { data: { ...project, profiles: owner } as unknown as ProjectRowWithClient, error: null };
+    } catch (err: unknown) {
+        return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
     }
-    return { data: data as unknown as ProjectRowWithClient, error: null };
 }
 
 export async function getRecentOrders(limit: number = 10): Promise<ServiceResponse<OrderRow[]>> {
-    const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false })
-        .limit(limit);
-
-    if (error) {
-        return { data: null, error: { code: error.code, message: error.message } };
+    try {
+        const data = await api.get<OrderRow[]>('/orders');
+        const sorted = (data ?? [])
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            .slice(0, limit);
+        return { data: sorted, error: null };
+    } catch (err: unknown) {
+        return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
     }
-    return { data: data ?? [], error: null };
 }
 
 export async function getRecentUsers(limit: number = 10): Promise<ServiceResponse<ProfileRow[]>> {
-    const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false })
-        .limit(limit);
-
-    if (error) {
-        return { data: null, error: { code: error.code, message: error.message } };
+    try {
+        const data = await api.get<ProfileRow[]>('/users');
+        const sorted = (data ?? [])
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            .slice(0, limit);
+        return { data: sorted, error: null };
+    } catch (err: unknown) {
+        return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
     }
-    return { data: data ?? [], error: null };
 }
 
 /**
@@ -223,20 +226,20 @@ export async function getRecentUsers(limit: number = 10): Promise<ServiceRespons
  */
 export async function getAllClients(): Promise<ServiceResponse<ProfileRow[]>> {
     // 1. Fetch all profiles
-    const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('*')
-        .is('deleted_at', null);
-
-    if (profilesError) {
-        return { data: null, error: { code: profilesError.code, message: profilesError.message } };
+    let profiles: ProfileRow[];
+    try {
+        profiles = await api.get<ProfileRow[]>('/users');
+    } catch (err: unknown) {
+        return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
     }
 
-    // 2. Fetch all unique client_ids from inquiries to ensure we don't miss anyone
-    const { data: inquiries } = await supabase
-        .from('client_inquiries')
-        .select('client_id')
-        .is('deleted_at', null);
+    // 2. Fetch all inquiries to ensure we don't miss anyone who submitted one
+    let inquiries: Array<{ client_id: string }> = [];
+    try {
+        inquiries = await api.get<Array<{ client_id: string }>>('/inquiries');
+    } catch {
+        // Non-critical — proceeds with just the role-based filter below
+    }
 
     const inquiryClientIds = new Set((inquiries || []).map(i => i.client_id));
 
@@ -286,22 +289,29 @@ export interface ClientStats {
 }
 
 export async function getClientsWithStats(): Promise<ServiceResponse<ClientStats[]>> {
-    // Parallel fetch: profiles, projects, invoices (paid), businesses
-    const [profilesRes, projectsRes, invoicesRes, businessesRes] = await Promise.all([
-        supabase.from('profiles').select('*').is('deleted_at', null),
-        supabase.from('projects').select('*').is('deleted_at', null),
-        supabase.from('invoices').select('*').eq('status', 'paid').is('deleted_at', null),
-        supabase.from('businesses').select('*').eq('is_active', true).is('deleted_at', null),
-    ]);
+    // Parallel fetch: profiles, projects, invoices (paid), businesses (active)
+    let profiles: ProfileRow[];
+    let projects: ProjectRow[];
+    let invoices: InvoiceRow[];
+    let businesses: { id: string; owner_id: string; name: string; industry: string | null }[];
 
-    if (profilesRes.error) {
-        return { data: null, error: { code: profilesRes.error.code, message: profilesRes.error.message } };
+    try {
+        const [profilesData, projectsData, invoicesData, businessesData] = await Promise.all([
+            api.get<ProfileRow[]>('/users'),
+            api.get<ProjectRow[]>('/projects'),
+            api.get<InvoiceRow[]>('/invoices'),
+            api.get<{ id: string; owner_id: string; name: string; industry: string | null }[]>('/businesses'),
+        ]);
+        profiles = profilesData ?? [];
+        projects = projectsData ?? [];
+        // Backend doesn't support a status filter param on /invoices or
+        // an is_active filter on /businesses — filtered client-side here,
+        // same pattern used elsewhere in this codebase.
+        invoices = (invoicesData ?? []).filter(i => i.status === 'paid');
+        businesses = (businessesData ?? []).filter(b => (b as unknown as { is_active?: boolean }).is_active !== false);
+    } catch (err: unknown) {
+        return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
     }
-
-    const profiles = profilesRes.data ?? [];
-    const projects = (projectsRes.data ?? []) as ProjectRow[];
-    const invoices = (invoicesRes.data ?? []) as InvoiceRow[];
-    const businesses = (businessesRes.data ?? []) as { id: string; owner_id: string; name: string; industry: string | null }[];
 
     // Index projects by user_id
     const projectsByUser = new Map<string, ProjectRow[]>();
@@ -422,22 +432,32 @@ export async function getClientById(clientId: string): Promise<ServiceResponse<C
         return { data: null, error: { code: 'MISSING_ID', message: 'Client ID is required' } };
     }
 
-    // Parallel fetch
-    const [profileRes, projectsRes, invoicesRes, businessRes] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', clientId).is('deleted_at', null).single(),
-        supabase.from('projects').select('*').eq('user_id', clientId).is('deleted_at', null).order('updated_at', { ascending: false }),
-        supabase.from('invoices').select('*').eq('user_id', clientId).is('deleted_at', null).order('created_at', { ascending: false }),
-        supabase.from('businesses').select('*').eq('owner_id', clientId).eq('is_active', true).is('deleted_at', null).limit(1),
-    ]);
+    let p: ProfileRow;
+    let userProjects: ProjectRow[];
+    let userInvoices: InvoiceRow[];
+    let business: { id: string; owner_id: string; name: string; industry: string | null } | undefined;
 
-    if (profileRes.error) {
-        return { data: null, error: { code: profileRes.error.code, message: profileRes.error.message } };
+    try {
+        const [profile, allProjects, allInvoices, allBusinesses] = await Promise.all([
+            api.get<ProfileRow>(`/users/${clientId}`),
+            api.get<ProjectRow[]>(`/projects?userId=${clientId}`),
+            api.get<InvoiceRow[]>(`/invoices?userId=${clientId}`),
+            api.get<{ id: string; owner_id: string; name: string; industry: string | null }[]>('/businesses').catch(() => []),
+        ]);
+        p = profile;
+        userProjects = (allProjects ?? []).sort(
+            (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+        );
+        userInvoices = (allInvoices ?? []).sort(
+            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        // Backend has no ownerId filter param on /businesses — filtered client-side.
+        business = (allBusinesses as unknown as { owner_id: string; is_active?: boolean }[])
+            .find(b => b.owner_id === clientId && b.is_active !== false) as unknown as
+            { id: string; owner_id: string; name: string; industry: string | null } | undefined;
+    } catch (err: unknown) {
+        return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
     }
-
-    const p = profileRes.data as ProfileRow;
-    const userProjects = (projectsRes.data ?? []) as ProjectRow[];
-    const userInvoices = (invoicesRes.data ?? []) as InvoiceRow[];
-    const business = ((businessRes.data ?? []) as { id: string; owner_id: string; name: string; industry: string | null }[])[0];
 
     const activeProjects = userProjects.filter(pr => pr.status === 'active' || pr.status === 'in_progress');
     const completedProjects = userProjects.filter(pr => pr.status === 'completed');
@@ -502,78 +522,78 @@ export async function getClientById(clientId: string): Promise<ServiceResponse<C
 }
 
 export async function getRecentInvoices(limit: number = 10): Promise<ServiceResponse<InvoiceRow[]>> {
-    const { data, error } = await supabase
-        .from('invoices')
-        .select('*')
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false })
-        .limit(limit);
-
-    if (error) {
-        return { data: null, error: { code: error.code, message: error.message } };
+    try {
+        const data = await api.get<InvoiceRow[]>('/invoices');
+        const sorted = (data ?? [])
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            .slice(0, limit);
+        return { data: sorted, error: null };
+    } catch (err: unknown) {
+        return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
     }
-    return { data: data ?? [], error: null };
 }
 
 
 export async function getRecentActivity(limit: number = 10): Promise<ServiceResponse<ActivityLogRowWithProfile[]>> {
-    const { data, error } = await supabase
-        .from('activity_logs')
-        .select('*, profiles(full_name, avatar_url, email)')
-        .order('created_at', { ascending: false })
-        .limit(limit);
-
-    if (error) {
-        return { data: null, error: { code: error.code, message: error.message } };
+    try {
+        const [logs, users] = await Promise.all([
+            api.get<ActivityLogRowWithProfile[]>(`/activity-logs`),
+            api.get<Array<{ id: string; full_name: string | null; avatar_url: string | null; email: string }>>('/users').catch(() => []),
+        ]);
+        const userMap = new Map(users.map(u => [u.id, u]));
+        const withProfile = (logs ?? [])
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            .slice(0, limit)
+            .map(l => ({
+                ...l,
+                profiles: l.user_id ? userMap.get(l.user_id) ?? null : null,
+            })) as unknown as ActivityLogRowWithProfile[];
+        return { data: withProfile, error: null };
+    } catch (err: unknown) {
+        return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
     }
-    return { data: (data ?? []) as ActivityLogRowWithProfile[], error: null };
 }
 
 // ============================================================================
 // Open Items (tickets, requests)
 // ============================================================================
-export async function getOpenRequests(limit: number = 20): Promise<ServiceResponse<RequestRow[]>> {
-    const { data, error } = await supabase
-        .from('requests')
-        .select('*')
-        .eq('status', 'open')
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false })
-        .limit(limit);
-
-    if (error) {
-        return { data: null, error: { code: error.code, message: error.message } };
-    }
-    return { data: data ?? [], error: null };
+/**
+ * The "requests" table is a deprecated marketplace concept — the real
+ * schema's own comment on client_inquiries says it explicitly replaces
+ * this table, and no backend module was built for it (deliberately;
+ * see the ClientInquiries module's notes). Rather than fake a mapping
+ * onto ClientInquiries with mismatched status semantics (new/reviewing/
+ * discovery_call_scheduled/etc. vs. open/in_progress), this returns
+ * empty. If "open requests" needs real data, it should mean open
+ * ClientInquiries — that's a product decision, not something to guess
+ * silently here.
+ */
+export async function getOpenRequests(_limit: number = 20): Promise<ServiceResponse<RequestRow[]>> {
+    return { data: [], error: null };
 }
 
 export async function getOpenTickets(limit: number = 20): Promise<ServiceResponse<SupportTicketRow[]>> {
-    const { data, error } = await supabase
-        .from('support_tickets')
-        .select('*')
-        .in('status', ['open', 'in_progress'])
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false })
-        .limit(limit);
-
-    if (error) {
-        return { data: null, error: { code: error.code, message: error.message } };
+    try {
+        const data = await api.get<SupportTicketRow[]>('/support-tickets');
+        const openOnly = (data ?? [])
+            .filter(t => t.status === 'open' || t.status === 'in_progress')
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            .slice(0, limit);
+        return { data: openOnly, error: null };
+    } catch (err: unknown) {
+        return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
     }
-    return { data: data ?? [], error: null };
 }
 
 // ============================================================================
 // Service Categories
 // ============================================================================
 export async function getServiceCategories() {
-    const { data, error } = await supabase
-        .from('service_categories')
-        .select('*')
-        .eq('is_active', true)
-        .order('sort_order', { ascending: true });
-
-    if (error) return [];
-    return data ?? [];
+    try {
+        return await api.get('/service-categories/active');
+    } catch {
+        return [];
+    }
 }
 
 // ============================================================================
