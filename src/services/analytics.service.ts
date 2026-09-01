@@ -3,8 +3,8 @@
 // Aggregates real Supabase data for the Analytics dashboard page
 // ============================================================================
 
-import supabase from '../lib/supabaseClient';
 import type { ProjectRow, ProfileRow, TeamMemberRow, ClientInquiryRow } from '../types/database.types';
+import api from '../lib/apiClient';
 import { getRevenueByMonth, getRevenueStats } from './admin.service';
 import { getServicesData } from './dashboardService';
 
@@ -150,39 +150,57 @@ function pctChange(current: number, previous: number): { change: string; trend: 
 // ============================================================================
 // Main: fetchAnalyticsData
 // ============================================================================
-import api from '../lib/apiClient';
-
 export async function fetchAnalyticsData(timeRange: '7d' | '30d' | '90d' | '1y'): Promise<AnalyticsData> {
     const months = timeRange === '7d' ? 2 : timeRange === '30d' ? 7 : timeRange === '90d' ? 6 : 12;
     try {
-        const [overview, userGrowth, revenueSeries] = await Promise.all([
-            api.get<any>('/dashboard/overview').catch(() => ({})),
-            api.get<any[]>('/dashboard/users').catch(() => []),
-            api.get<any[]>('/dashboard/revenue').catch(() => []),
-        ]);
+        // The old /dashboard/* endpoints queried the abandoned Prisma
+        // "User"/"ServiceRequest"/"Payment" tables and are broken (doubly
+        // so now that User maps to profiles) — this now fetches the real
+        // data every build* function below actually needs, instead of
+        // silently passing empty arrays to all of them (which is what
+        // this function did before: every chart on this dashboard was
+        // rendering off zeroed data regardless of backend correctness).
+        const [allProjects, profiles, teamMembers, inquiries, revenueStats, revenueMonthlyResult, servicesResult] =
+            await Promise.all([
+                api.get<ProjectRow[]>('/projects').catch(() => [] as ProjectRow[]),
+                api.get<ProfileRow[]>('/users').catch(() => [] as ProfileRow[]),
+                api.get<TeamMemberRow[]>('/team-members').catch(() => [] as TeamMemberRow[]),
+                api.get<ClientInquiryRow[]>('/inquiries').catch(() => [] as ClientInquiryRow[]),
+                getRevenueStats(),
+                getRevenueByMonth(months),
+                getServicesData(),
+            ]);
 
-        const allProjects: ProjectRow[] = [];
-        const periodProjects: ProjectRow[] = [];
-        const profiles: ProfileRow[] = [];
-        const revenueStats = {
-            totalRevenue: overview.totalRevenue || 0,
-            paidRevenue: overview.totalRevenue || 0,
-            pendingRevenue: 0,
-            overdueRevenue: 0,
-            monthlyRevenue: overview.monthlyRevenue || 0,
-        };
-        const revenueMonthly = Array.isArray(revenueSeries) ? revenueSeries.map(r => ({ month: r.date || r.month, revenue: r.revenue || r.amount || 0 })) : [];
+        const revenueMonthly = (revenueMonthlyResult.data ?? []).map(r => ({ month: r.month, revenue: r.revenue }));
+        const serviceData = (servicesResult.data ?? []).map(s => ({
+            name: s.name,
+            revenue: s.revenue,
+            growth: s.growth,
+            color: s.color,
+            iconName: s.iconName,
+        }));
 
-        const kpis = buildKPIs(allProjects, periodProjects, [], profiles, revenueStats, revenueMonthly);
-        const revenueByService = buildRevenueByService([]);
+        // Period filtering: "current period" = last `months` months;
+        // "previous period" = the `months` months before that.
+        const now = new Date();
+        const periodStart = new Date(now.getFullYear(), now.getMonth() - months, 1);
+        const prevStart = new Date(now.getFullYear(), now.getMonth() - months * 2, 1);
+
+        const periodProjects = allProjects.filter(p => new Date(p.created_at) >= periodStart);
+        const prevPeriodProjects = allProjects.filter(
+            p => new Date(p.created_at) >= prevStart && new Date(p.created_at) < periodStart
+        );
+
+        const kpis = buildKPIs(allProjects, periodProjects, prevPeriodProjects, profiles, revenueStats, revenueMonthly);
+        const revenueByService = buildRevenueByService(serviceData);
         const monthlyRevenue = buildMonthlyRevenue(allProjects, profiles, months);
         const projectStatus = buildProjectStatus(allProjects);
         const clientMetrics = buildClientTiers(allProjects, profiles);
-        const topPerformers = buildTopPerformers(allProjects, [], profiles);
-        const { funnel: conversionFunnel, conversionRate } = buildConversionFunnel([]);
+        const topPerformers = buildTopPerformers(allProjects, teamMembers, profiles);
+        const { funnel: conversionFunnel, conversionRate } = buildConversionFunnel(inquiries);
         const budgetVsSpent = buildBudgetVsSpent(allProjects, months);
         const weeklyActivity = buildWeeklyActivity(allProjects);
-        const teamSkillsRadar = buildTeamSkills([], profiles);
+        const teamSkillsRadar = buildTeamSkills(teamMembers, profiles);
         const clientGrowthOverTime = buildClientGrowth(profiles, months);
 
         return {

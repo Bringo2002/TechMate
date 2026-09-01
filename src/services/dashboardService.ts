@@ -3,7 +3,7 @@
 // Aggregation functions for dashboard pages (Services, Analytics, etc.)
 // ============================================================================
 
-import supabase from '../lib/supabaseClient';
+import api from '../lib/apiClient';
 import type { ProjectRow, ProfileRow } from '../types/database.types';
 
 // ============================================================================
@@ -87,20 +87,22 @@ export interface ServiceCategory {
     created_at: string;
 }
 
-import api from '../lib/apiClient';
-
 export async function getServiceCategories(): Promise<{ data: ServiceCategory[]; error: string | null }> {
     try {
-        const data = await api.get<any[]>('/services');
-        const categories: ServiceCategory[] = (Array.isArray(data) ? data : []).map((item, idx) => ({
-            id: item.id || `cat-${idx}`,
-            name: item.name || 'Service',
-            description: item.description || null,
-            icon: 'Briefcase',
-            color: 'cyan',
-            sort_order: idx,
-            is_active: item.isActive ?? true,
-            created_at: item.createdAt || new Date().toISOString(),
+        const data = await api.get<Array<{
+            id: string; name: string; description: string | null; icon: string | null;
+            color: string | null; sort_order: number; is_active: boolean; created_at: string;
+        }>>('/service-categories/active');
+
+        const categories: ServiceCategory[] = (Array.isArray(data) ? data : []).map((item) => ({
+            id: item.id,
+            name: item.name,
+            description: item.description,
+            icon: item.icon || 'Briefcase',
+            color: item.color || 'cyan',
+            sort_order: item.sort_order,
+            is_active: item.is_active,
+            created_at: item.created_at,
         }));
 
         return { data: categories, error: null };
@@ -293,44 +295,42 @@ function generateInsights(
 export async function getServicesData(): Promise<{ data: ServiceData[]; error: string | null }> {
     try {
         // 1. Fetch all projects
-        const { data: projects, error: projError } = await supabase
-            .from('projects')
-            .select('*')
-            .is('deleted_at', null);
-
-        if (projError) {
-            return { data: [], error: projError.message };
+        let allProjects: ProjectRow[];
+        try {
+            allProjects = await api.get<ProjectRow[]>('/projects');
+        } catch (err) {
+            return { data: [], error: err instanceof Error ? err.message : 'Failed to fetch projects' };
         }
 
-        const allProjects = (projects ?? []) as ProjectRow[];
-
-        if (allProjects.length === 0) {
+        if (!allProjects || allProjects.length === 0) {
             return { data: [], error: null };
         }
 
         // 2. Fetch team profiles (developers, designers, technical leads)
-        const { data: teamProfiles } = await supabase
-            .from('profiles')
-            .select('*')
-            .in('user_type', ['developer', 'designer', 'technical_lead'])
-            .is('deleted_at', null);
+        // No backend filter param for user_type — filtered client-side,
+        // same pattern used elsewhere in this codebase.
+        let allProfiles: ProfileRow[] = [];
+        try {
+            allProfiles = await api.get<ProfileRow[]>('/users');
+        } catch {
+            // non-critical — team section will just be empty
+        }
+        const team = allProfiles.filter(p =>
+            ['developer', 'designer', 'technical_lead'].includes(p.user_type as string)
+        );
 
-        const team = (teamProfiles ?? []) as ProfileRow[];
-
-        // 3. Fetch client profiles for top clients
-        const clientIds = [...new Set(allProjects.map(p => p.user_id))];
-        const { data: clientProfiles } = await supabase
-            .from('profiles')
-            .select('id, full_name, email, company')
-            .in('id', clientIds);
-
+        // 3. Build client map from the same profiles fetch — no need for
+        // a second /users call filtered by id, we already have everyone.
+        const clientIds = new Set(allProjects.map(p => p.user_id));
         const clientMap = new Map<string, { name: string; company: string | null }>();
-        (clientProfiles ?? []).forEach((p: any) => {
-            clientMap.set(p.id, {
-                name: p.full_name || p.email?.split('@')[0] || 'Unknown',
-                company: p.company,
+        allProfiles
+            .filter(p => clientIds.has(p.id))
+            .forEach((p) => {
+                clientMap.set(p.id, {
+                    name: p.full_name || p.email?.split('@')[0] || 'Unknown',
+                    company: p.company,
+                });
             });
-        });
 
         // 4. Group projects by normalized service type
         const serviceGroups = new Map<string, { config: ServiceConfig; projects: ProjectRow[] }>();
