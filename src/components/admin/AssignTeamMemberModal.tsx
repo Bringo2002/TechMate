@@ -4,16 +4,16 @@
 // ============================================================================
 
 import React, { useState, useEffect } from 'react';
-import supabase from '../../lib/supabaseClient';
+import api from '../../lib/apiClient';
 import { assignInquiry, unassignInquiry } from '../../services/inquiries.service';
 
 interface TeamMember {
   id: string;
-  full_name: string;
+  full_name: string | null;
   email: string;
   user_type: string;
   internal_role?: string;
-  avatar_url?: string;
+  avatar_url?: string | null;
 }
 
 interface AssignTeamMemberModalProps {
@@ -47,17 +47,21 @@ export function AssignTeamMemberModal({
     setError(null);
 
     try {
-      const { data, error: err } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, user_type, internal_role, avatar_url')
-        .in('user_type', ['admin', 'technical_lead', 'developer'])
-        .eq('is_active', true)
-        .is('deleted_at', null)
-        .order('full_name');
+      // Backend's GET /users doesn't support multi-value user_type
+      // filters (only exact match) — fetch active users and filter
+      // client-side, same pattern used elsewhere in this codebase.
+      // 'technical_lead' dropped: it isn't a real UserType value
+      // (individual/business_owner/developer/admin), so it never
+      // matched anything anyway.
+      const result = await api.get<{ data: TeamMember[]; total: number }>(
+        '/users?isActive=true'
+      );
 
-      if (err) throw err;
+      const filtered = (result.data ?? [])
+        .filter(u => u.user_type === 'admin' || u.user_type === 'developer')
+        .sort((a, b) => (a.full_name ?? a.email).localeCompare(b.full_name ?? b.email));
 
-      setTeamMembers(data || []);
+      setTeamMembers(filtered);
     } catch (err: unknown) {
       console.error('Error loading team members:', err);
       setError('Failed to load team members');
@@ -194,13 +198,13 @@ export function AssignTeamMemberModal({
                       {member.avatar_url ? (
                         <img
                           src={member.avatar_url}
-                          alt={member.full_name}
+                          alt={member.full_name ?? member.email}
                           className="h-10 w-10 rounded-full object-cover flex-shrink-0"
                         />
                       ) : (
                         <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
                           <span className="text-sm font-semibold text-white">
-                            {member.full_name.split(' ').map(n => n[0]).join('')}
+                            {(member.full_name ?? member.email).split(' ').map(n => n[0]).join('')}
                           </span>
                         </div>
                       )}
@@ -208,7 +212,7 @@ export function AssignTeamMemberModal({
                       {/* Info */}
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">
-                          {member.full_name}
+                          {member.full_name ?? member.email}
                         </p>
                         <p className="text-xs text-gray-500 truncate">
                           {member.internal_role || member.user_type.replace('_', ' ')}
