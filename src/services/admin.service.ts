@@ -4,7 +4,7 @@
 // ============================================================================
 
 import api from '../lib/apiClient';
-import type { ProfileRow, ProjectRow, ProjectRowWithClient, OrderRow, InvoiceRow, RequestRow, SupportTicketRow, ActivityLogRowWithProfile } from '../types/database.types';
+import type { ProfileRow, ProjectRow, ProjectRowWithClient, OrderRow, InvoiceRow, RequestRow, SupportTicketRow, ActivityLogRowWithProfile, ServiceCategoryRow } from '../types/database.types';
 import type {
     AdminDashboardMetrics,
     GrowthDataPoint,
@@ -347,7 +347,7 @@ export async function getClientsWithStats(): Promise<ServiceResponse<ClientStats
 
     const clientStats: ClientStats[] = clientProfiles.map(p => {
         const userProjects = projectsByUser.get(p.id) ?? [];
-        const activeProjects = userProjects.filter(pr => pr.status === 'active' || pr.status === 'in_progress');
+        const activeProjects = userProjects.filter(pr => pr.status === 'active');
         const completedProjects = userProjects.filter(pr => pr.status === 'completed');
 
         // Health score: average of active projects, or 0
@@ -459,7 +459,7 @@ export async function getClientById(clientId: string): Promise<ServiceResponse<C
         return { data: null, error: { code: 'API_ERROR', message: (err as Error).message } };
     }
 
-    const activeProjects = userProjects.filter(pr => pr.status === 'active' || pr.status === 'in_progress');
+    const activeProjects = userProjects.filter(pr => pr.status === 'active');
     const completedProjects = userProjects.filter(pr => pr.status === 'completed');
 
     const healthScores = activeProjects.map(pr => Number(pr.health_score ?? 0)).filter(s => s > 0);
@@ -590,7 +590,7 @@ export async function getOpenTickets(limit: number = 20): Promise<ServiceRespons
 // ============================================================================
 export async function getServiceCategories() {
     try {
-        return await api.get('/service-categories/active');
+        return await api.get<ServiceCategoryRow[]>('/service-categories/active');
     } catch {
         return [];
     }

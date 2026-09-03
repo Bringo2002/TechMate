@@ -111,10 +111,18 @@ export async function getOrderDeliverables(orderId: string): Promise<ServiceResp
 // ============================================================================
 // Stats
 // ============================================================================
-export async function getOrderStats(userId?: string) {
+export interface OrderStats {
+    total: number;
+    active: number;
+    completed: number;
+    totalSpent: number;
+    totalBudget: number;
+}
+
+export async function getOrderStats(userId?: string): Promise<OrderStats> {
     const query = userId ? `/orders/stats?userId=${userId}` : '/orders/stats';
     try {
-        return await api.get(query);
+        return await api.get<OrderStats>(query);
     } catch {
         return { total: 0, active: 0, completed: 0, totalSpent: 0, totalBudget: 0 };
     }

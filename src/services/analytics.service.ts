@@ -541,7 +541,7 @@ function buildTopPerformers(projects: ProjectRow[], teamMembers: TeamMemberRow[]
                 const projectCount = stats?.projectCount || 0;
                 return {
                     name: tm.full_name,
-                    role: tm.role === 'technical_lead' ? 'Tech Lead' : tm.role === 'account_manager' ? 'Account Manager' : tm.department || tm.role,
+                    role: tm.role === 'tech_lead' ? 'Tech Lead' : tm.department || tm.role,
                     revenue: revenue > 0 ? revenue : undefined,
                     projects: projectCount > 0 ? projectCount : undefined,
                     onTime: stats && stats.totalCompleted > 0 ? Math.round((stats.completedOnTime / stats.totalCompleted) * 100) : undefined,

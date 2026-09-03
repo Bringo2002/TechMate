@@ -23,6 +23,8 @@ import * as invoicesService from '../../services/invoices.service';
 import type { InvoiceRow } from '../../types/database.types';
 import type { InvoiceStats } from '../../services/invoices.service';
 import Pagination from '../../components/Pagination';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // ============================================================================
 // STATUS HELPERS
@@ -114,43 +116,111 @@ export default function Billing() {
   // Reset page when filters change
   useEffect(() => { setCurrentPage(1); }, [searchQuery, statusFilter]);
 
-  // PDF download handler
+  // PDF download handler — real PDF via jsPDF + autoTable, not a
+  // plain-text file dressed up with box-drawing characters.
   const handleDownloadPdf = (invoice: InvoiceRow) => {
-    const content = [
-      '═══════════════════════════════════════════',
-      '                    INVOICE',
-      '═══════════════════════════════════════════',
-      '',
-      `Invoice #:     ${invoice.invoice_number}`,
-      `Date:          ${formatDate(invoice.created_at)}`,
-      `Due Date:      ${formatDate(invoice.due_date)}`,
-      `Status:        ${invoice.status.toUpperCase()}`,
-      '',
-      '───────────────────────────────────────────',
-      '',
-      `Subtotal:      ${formatCurrency(invoice.amount, invoice.currency)}`,
-      `Tax:           ${formatCurrency(invoice.tax_amount, invoice.currency)}`,
-      `Total:         ${formatCurrency(invoice.total_amount, invoice.currency)}`,
-      '',
-      '───────────────────────────────────────────',
-      '',
-      invoice.paid_date ? `Paid On:       ${formatDate(invoice.paid_date)}` : '',
-      invoice.payment_method ? `Method:        ${invoice.payment_method}` : '',
-      invoice.payment_reference ? `Reference:     ${invoice.payment_reference}` : '',
-      invoice.notes ? `\nNotes:\n${invoice.notes}` : '',
-      '',
-      '═══════════════════════════════════════════',
-      '          Thank you for your business!',
-      '═══════════════════════════════════════════',
-    ].filter(Boolean).join('\n');
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const statusConfig = getStatusConfig(invoice.status);
 
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${invoice.invoice_number}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+    // Header
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text('TechMate', 14, 20);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100);
+    doc.text('Innovative Tech Solutions', 14, 26);
+
+    doc.setFontSize(16);
+    doc.setTextColor(0);
+    doc.setFont('helvetica', 'bold');
+    doc.text('INVOICE', pageWidth - 14, 20, { align: 'right' });
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100);
+    doc.text(invoice.invoice_number ?? '—', pageWidth - 14, 26, { align: 'right' });
+
+    doc.setDrawColor(220);
+    doc.line(14, 32, pageWidth - 14, 32);
+
+    // Billed to / dates / status
+    doc.setTextColor(0);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text('BILLED TO', 14, 42);
+    doc.setFont('helvetica', 'normal');
+    doc.text(user?.name ?? 'Client', 14, 48);
+    doc.text(user?.email ?? '', 14, 53);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('DATE ISSUED', pageWidth - 70, 42);
+    doc.setFont('helvetica', 'normal');
+    doc.text(formatDate(invoice.created_at) ?? '—', pageWidth - 70, 48);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('DUE DATE', pageWidth - 30, 42);
+    doc.setFont('helvetica', 'normal');
+    doc.text(formatDate(invoice.due_date) ?? '—', pageWidth - 30, 48);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('STATUS', pageWidth - 70, 58);
+    doc.setFont('helvetica', 'normal');
+    doc.text(statusConfig.label.toUpperCase(), pageWidth - 70, 64);
+
+    // Line-item summary table. Invoices in this schema are aggregate
+    // (amount + tax_amount = total_amount), not itemized line-by-line —
+    // this table reflects that honestly rather than inventing fake
+    // line items to look more detailed than the data actually is.
+    autoTable(doc, {
+      startY: 74,
+      head: [['Description', 'Amount']],
+      body: [
+        ['Subtotal', formatCurrency(invoice.amount, invoice.currency)],
+        ['Tax', formatCurrency(invoice.tax_amount, invoice.currency)],
+      ],
+      foot: [['Total', formatCurrency(invoice.total_amount, invoice.currency)]],
+      theme: 'plain',
+      headStyles: { fillColor: [15, 15, 25], textColor: 255, fontStyle: 'bold' },
+      footStyles: { fillColor: [240, 240, 245], textColor: 0, fontStyle: 'bold', fontSize: 11 },
+      styles: { fontSize: 10, cellPadding: 4 },
+      columnStyles: { 1: { halign: 'right' } },
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let finalY = (doc as any).lastAutoTable?.finalY ?? 110;
+
+    // Payment info, if paid
+    if (invoice.paid_date || invoice.payment_method || invoice.payment_reference) {
+      finalY += 12;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text('PAYMENT DETAILS', 14, finalY);
+      doc.setFont('helvetica', 'normal');
+      let y = finalY + 6;
+      if (invoice.paid_date) { doc.text(`Paid on: ${formatDate(invoice.paid_date)}`, 14, y); y += 5; }
+      if (invoice.payment_method) { doc.text(`Method: ${invoice.payment_method}`, 14, y); y += 5; }
+      if (invoice.payment_reference) { doc.text(`Reference: ${invoice.payment_reference}`, 14, y); y += 5; }
+      finalY = y;
+    }
+
+    // Notes
+    if (invoice.notes) {
+      finalY += 8;
+      doc.setFont('helvetica', 'bold');
+      doc.text('NOTES', 14, finalY);
+      doc.setFont('helvetica', 'normal');
+      const noteLines = doc.splitTextToSize(invoice.notes, pageWidth - 28);
+      doc.text(noteLines, 14, finalY + 6);
+    }
+
+    // Footer
+    const pageHeight = doc.internal.pageSize.getHeight();
+    doc.setFontSize(9);
+    doc.setTextColor(150);
+    doc.text('Thank you for your business!', pageWidth / 2, pageHeight - 14, { align: 'center' });
+
+    doc.save(`${invoice.invoice_number ?? 'invoice'}.pdf`);
     toast.success(`Downloaded ${invoice.invoice_number}`);
   };
 

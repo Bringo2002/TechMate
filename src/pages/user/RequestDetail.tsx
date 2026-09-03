@@ -6,7 +6,7 @@ import {
   Palette, Code, Activity, Sparkles, AlertTriangle, Info
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import supabase from '../../lib/supabaseClient';
+import { getInquiryById } from '../../services/inquiries.service';
 import type { ClientInquiryRow } from '../../types/database.types';
 
 // ============================================================================
@@ -94,12 +94,7 @@ export default function RequestDetail() {
     setLoading(true);
     setError(null);
 
-    const { data, error: err } = await supabase
-      .from('client_inquiries')
-      .select('*')
-      .eq('id', requestId)
-      .is('deleted_at', null)
-      .single();
+    const { data, error: err } = await getInquiryById(requestId);
 
     if (err || !data) {
       setError(err?.message || 'Request not found');
@@ -107,7 +102,7 @@ export default function RequestDetail() {
       return;
     }
 
-    setInquiry(data as ClientInquiryRow);
+    setInquiry(data);
     setLoading(false);
   }, [requestId]);
 

@@ -99,9 +99,19 @@ export async function deleteProject(projectId: string): Promise<ServiceResponse<
 // ============================================================================
 // Stats
 // ============================================================================
-export async function getProjectStats(userId?: string) {
+export interface ProjectStats {
+  total: number;
+  active: number;
+  completed: number;
+  planning: number;
+  totalBudget: number;
+  totalSpent: number;
+  avgHealth: number;
+}
+
+export async function getProjectStats(userId?: string): Promise<ProjectStats> {
   const query = userId ? `/projects/stats?userId=${userId}` : '/projects/stats';
-  return api.get(query);
+  return api.get<ProjectStats>(query);
 }
 
 // Backward compatibility

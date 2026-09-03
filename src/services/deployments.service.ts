@@ -20,7 +20,6 @@ import type {
     DeploymentLogRow,
     DeploymentLogInsert,
     DeploymentApprovalRow,
-    DeploymentApprovalUpdate,
     DeploymentSearchResult,
     DeploymentHistoryResult,
 } from '../types/database.types';
