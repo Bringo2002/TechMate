@@ -126,6 +126,50 @@ async function apiFetch<T = unknown>(
   return res.json();
 }
 
+/**
+ * For multipart/FormData uploads (e.g. avatar upload). Deliberately
+ * separate from apiFetch: that function always sets
+ * Content-Type: application/json and JSON.stringify()s the body, which
+ * breaks FormData uploads (the browser needs to set its own
+ * multipart/form-data boundary header automatically). Reuses the same
+ * auth-token-and-401-refresh handling as apiFetch.
+ */
+async function apiUpload<T = unknown>(endpoint: string, formData: FormData): Promise<T> {
+  const headers: Record<string, string> = {};
+  const token = getAccessToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint}`;
+
+  let res = await fetch(url, { method: 'POST', headers, body: formData });
+
+  if (res.status === 401) {
+    if (!isRefreshing) {
+      isRefreshing = true;
+      refreshPromise = refreshAccessToken();
+    }
+    const newToken = await refreshPromise;
+    isRefreshing = false;
+    refreshPromise = null;
+
+    if (newToken) {
+      headers['Authorization'] = `Bearer ${newToken}`;
+      res = await fetch(url, { method: 'POST', headers, body: formData });
+    } else {
+      clearTokens();
+      window.dispatchEvent(new CustomEvent('auth:logout'));
+      throw new Error('Session expired. Please log in again.');
+    }
+  }
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(errorData.message || `Request failed: ${res.status}`);
+  }
+
+  return res.json();
+}
+
 // ── Convenience methods ──────────────────────────────────────────────────────
 
 export const api = {
@@ -143,6 +187,9 @@ export const api = {
 
   delete: <T = unknown>(endpoint: string, options?: ApiOptions) =>
     apiFetch<T>(endpoint, { ...options, method: 'DELETE' }),
+
+  upload: <T = unknown>(endpoint: string, formData: FormData) =>
+    apiUpload<T>(endpoint, formData),
 };
 
 export { API_BASE };

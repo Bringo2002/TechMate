@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import supabase from '../../lib/supabaseClient';
+import api from '../../lib/apiClient';
 import authService from '../../services/authService';
 import { getOrderStats } from '../../services/orders.service';
 import { 
@@ -89,11 +89,8 @@ const UserProfile: React.FC = () => {
       const orderStats = await getOrderStats(authUser.id);
 
       // Also count projects
-      const { count: projectCount } = await supabase
-        .from('projects')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', authUser.id)
-        .is('deleted_at', null);
+      const projects = await api.get<unknown[]>(`/projects?userId=${authUser.id}`).catch(() => []);
+      const projectCount = projects.length;
 
       setStats({
         totalOrders: orderStats.total,
@@ -123,23 +120,25 @@ const UserProfile: React.FC = () => {
         return;
       }
 
-      // Get profile data
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+      // Get full profile data from the real backend (includes fields
+      // authService.getMe() doesn't carry, like join date and verification)
+      const profileData = await api.get<{
+        full_name: string | null; avatar_url: string | null; website: string | null;
+        username: string | null; phone: string | null; company: string | null;
+        job_title: string | null; location: string | null; bio: string | null;
+        created_at: string; email_verified: boolean;
+      }>('/users/profile');
 
-      if (profileError && profileError.code !== 'PGRST116') {
-        throw profileError;
-      }
-
-      // Combine auth user data with profile table data
+      // Combine auth user data with full profile data. Previously this
+      // read user.user_metadata/created_at/email_confirmed_at — fields
+      // that only exist on Supabase's auth User shape, which no longer
+      // applies now that auth is self-hosted. join_date/is_verified now
+      // come from the real profile fields (created_at/email_verified).
       const mergedProfile: UserProfile = {
         id: user.id,
         email: user.email || '',
-        full_name: profileData?.full_name || user.user_metadata?.full_name || '',
-        avatar_url: profileData?.avatar_url || user.user_metadata?.avatar_url || null,
+        full_name: profileData?.full_name || '',
+        avatar_url: profileData?.avatar_url || null,
         website: profileData?.website || null,
         username: profileData?.username || null,
         phone: profileData?.phone || null,
@@ -147,8 +146,8 @@ const UserProfile: React.FC = () => {
         job_title: profileData?.job_title || null,
         location: profileData?.location || null,
         bio: profileData?.bio || null,
-        join_date: user.created_at,
-        is_verified: !!user.email_confirmed_at
+        join_date: profileData?.created_at,
+        is_verified: !!profileData?.email_verified
       };
 
       setProfile(mergedProfile);
@@ -176,38 +175,19 @@ const UserProfile: React.FC = () => {
       if (!profile) return;
       
       const file = e.target.files[0];
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `${profile.id}/${fileName}`;
 
       toast.loading('Uploading avatar...');
 
-      // 1. Upload to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file);
+      // Real multipart upload to the backend (multer-based), not
+      // Supabase Storage — the backend stores the file locally and
+      // returns its own URL; no separate "get public URL" step needed.
+      const form = new FormData();
+      form.append('avatar', file);
+      const { avatarUrl } = await api.upload<{ avatarUrl: string }>('/users/profile/avatar', form);
 
-      if (uploadError) throw uploadError;
-
-      // 2. Get Public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
-
-      // 3. Update Profile in DB
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({
-          avatar_url: publicUrl,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', profile.id);
-
-      if (updateError) throw updateError;
-
-      // 4. Update local state
-      setProfile(prev => prev ? { ...prev, avatar_url: publicUrl } : null);
-      setFormData(prev => ({ ...prev, avatar_url: publicUrl }));
+      // Update local state
+      setProfile(prev => prev ? { ...prev, avatar_url: avatarUrl } : null);
+      setFormData(prev => ({ ...prev, avatar_url: avatarUrl }));
       
       toast.dismiss();
       toast.success('Avatar updated!');
@@ -224,7 +204,6 @@ const UserProfile: React.FC = () => {
       
       if (!profile?.id) return;
 
-      // Save ALL editable fields to profiles table (single source of truth)
       const updates = {
         full_name: formData.full_name || null,
         website: formData.website || null,
@@ -234,15 +213,9 @@ const UserProfile: React.FC = () => {
         job_title: formData.job_title || null,
         location: formData.location || null,
         bio: formData.bio || null,
-        updated_at: new Date().toISOString(),
       };
 
-      const { error } = await supabase
-        .from('profiles')
-        .update(updates)
-        .eq('id', profile.id);
-
-      if (error) throw error;
+      await api.put('/users/profile', updates);
 
       setProfile(prev => prev ? { ...prev, ...formData } : null);
       setIsEditing(false);

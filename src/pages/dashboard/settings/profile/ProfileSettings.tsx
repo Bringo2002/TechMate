@@ -16,7 +16,7 @@ import {
   Building2,
   Key
 } from 'lucide-react';
-import supabase from '../../../../lib/supabaseClient';
+import { getUserById, updateProfile, deleteOwnAccount } from '../../../../services/users.service';
 import authService from '../../../../services/authService';
 import { DeleteAccountButton } from '../../../../components/Buttons/DeleteAccountButton';
 
@@ -103,15 +103,11 @@ export default function ProfileSettings() {
           return;
         }
 
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('full_name, email, company')
-          .eq('id', user.id)
-          .single();
+        const { data, error } = await getUserById(user.id);
 
-        if (error) {
+        if (error || !data) {
           console.error("Database Error:", error);
-          showNotif(`Failed to fetch profile data: ${error.message}`, "error");
+          showNotif(`Failed to fetch profile data: ${error?.message ?? 'Unknown error'}`, "error");
           return;
         }
 
@@ -222,17 +218,14 @@ export default function ProfileSettings() {
         throw new Error('No authenticated user found');
       }
 
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          full_name:  formData.fullName,
-          email: formData.email,
-          company: formData.company,
-        })
-        .eq('id', user.id);
+      const { error } = await updateProfile(user.id, {
+        full_name: formData.fullName,
+        email: formData.email,
+        company: formData.company,
+      });
 
       if (error) {
-        throw error;
+        throw new Error(error.message);
       }
 
       setOriginalData(formData);
@@ -278,8 +271,8 @@ export default function ProfileSettings() {
     try {
       setIsDeleting(true);
 
-      const { error } = await supabase.rpc('delete_own_account');
-      if (error) throw error;
+      const { error } = await deleteOwnAccount();
+      if (error) throw new Error(error.message);
 
       await authService.logout();
       window.location.href = '/goodbye';

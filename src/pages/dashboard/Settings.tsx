@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import supabase from '../../lib/supabaseClient';
+import { deleteOwnAccount } from '../../services/users.service';
 import authService from '../../services/authService';
 import {
   Settings, User, Bell, Shield, Clock, Users, Save, X, Check, Info, 
@@ -101,10 +101,10 @@ export default function AdminSettings() {
     try {
       setIsDeleting(true);
       
-      // Call the database function to delete the account
-      const { error } = await supabase.rpc('delete_own_account');
-      
-      if (error) throw error;
+      // Delete the account via the real API
+      const { error } = await deleteOwnAccount();
+
+      if (error) throw new Error(error.message);
   
       // Sign out and redirect
       await authService.logout();
