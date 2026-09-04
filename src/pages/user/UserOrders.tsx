@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import supabase from '../../lib/supabaseClient';
+import { getUserOrders } from '../../services/orders.service';
+import { getClientInquiries } from '../../services/inquiries.service';
 import authService from '../../services/authService';
 import { 
   Package, 
@@ -115,26 +116,15 @@ const UserOrders: React.FC = () => {
       if (!user) return;
 
       // Fetch orders
-      const { data: ordersData, error: ordersError } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (ordersError) throw ordersError;
+      const { data: ordersData, error: ordersError } = await getUserOrders(user.id);
+      if (ordersError) throw new Error(ordersError.message);
 
       // Fetch client inquiries (new project requests)
-      const { data: inquiriesData, error: inquiriesError } = await supabase
-        .from('client_inquiries')
-        .select('*')
-        .eq('client_id', user.id)
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false });
-
-      if (inquiriesError) throw inquiriesError;
+      const { data: inquiriesData, error: inquiriesError } = await getClientInquiries(user.id);
+      if (inquiriesError) throw new Error(inquiriesError.message);
 
       // Map both to a common shape
-      const ordersMapped: ProjectListItem[] = (ordersData ?? []).map((o: Record<string, unknown>) => ({
+      const ordersMapped: ProjectListItem[] = (ordersData ?? []).map((o) => ({
         id: o.id,
         title: o.title,
         type: o.type,
@@ -147,11 +137,11 @@ const UserOrders: React.FC = () => {
         updated_at: o.updated_at,
         health_score: o.health_score ?? 100,
         next_milestone: o.next_milestone,
-        metadata: o.metadata,
+        metadata: o.metadata as Record<string, unknown>,
         source: 'order'
       }));
 
-      const inquiriesMapped: ProjectListItem[] = (inquiriesData ?? []).map((i: Record<string, unknown>) => ({
+      const inquiriesMapped: ProjectListItem[] = (inquiriesData ?? []).map((i) => ({
         id: i.id,
         title: i.title,
         type: i.project_type, // maps to type field
@@ -164,7 +154,7 @@ const UserOrders: React.FC = () => {
         updated_at: i.updated_at,
         health_score: 100,
         next_milestone: undefined,
-        metadata: i.metadata,
+        metadata: i.metadata as Record<string, unknown>,
         source: 'inquiry'
       }));
 
