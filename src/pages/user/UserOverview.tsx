@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import supabase from '../../lib/supabaseClient';
+import { getUserById } from '../../services/users.service';
+import { getUserProjects } from '../../services/projectService';
+import { getUserOrders } from '../../services/orders.service';
+import { getClientInquiries } from '../../services/inquiries.service';
 import authService from '../../services/authService';
 import {
   Package,
@@ -155,22 +158,13 @@ const UserOverview: React.FC = () => {
         if (!user) throw new Error('User not found');
 
         // Profile
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-        setProfile(profileData);
+        const { data: profileData } = await getUserById(user.id);
+        setProfile(profileData as UserProfile | null);
 
         // ── Projects (primary data source) ──
-        const { data: projectsData } = await supabase
-          .from('projects')
-          .select('*')
-          .eq('user_id', user.id)
-          .is('deleted_at', null)
-          .order('created_at', { ascending: false });
+        const { data: projectsData } = await getUserProjects(user.id);
 
-        const projectsMapped: ProjectListItem[] = (projectsData ?? []).map((p: Record<string, unknown>) => {
+        const projectsMapped: ProjectListItem[] = (projectsData ?? []).map((p) => {
           // Map project status to display status
           const statusMap: Record<string, string> = {
             active: 'in_progress',
@@ -189,19 +183,15 @@ const UserOverview: React.FC = () => {
             budget: p.budget ?? 0,
             spent: p.spent ?? 0,
             due_date: p.deadline ?? null,
-            next_milestone: p.nextMilestone ?? null,
+            next_milestone: null, // projects have no next_milestone column — only orders do
             source: 'project' as const,
           };
         });
 
         // ── Orders ──
-        const { data: ordersData } = await supabase
-          .from('orders')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
+        const { data: ordersData } = await getUserOrders(user.id);
 
-        const ordersMapped: ProjectListItem[] = (ordersData ?? []).map((o: Record<string, unknown>) => ({
+        const ordersMapped: ProjectListItem[] = (ordersData ?? []).map((o) => ({
           id: o.id,
           title: o.title,
           type: o.type,
@@ -215,14 +205,9 @@ const UserOverview: React.FC = () => {
         }));
 
         // ── Inquiries ──
-        const { data: inquiriesData } = await supabase
-          .from('client_inquiries')
-          .select('*')
-          .eq('client_id', user.id)
-          .is('deleted_at', null)
-          .order('created_at', { ascending: false });
+        const { data: inquiriesData } = await getClientInquiries(user.id);
 
-        const inquiriesMapped: ProjectListItem[] = (inquiriesData ?? []).map((i: Record<string, unknown>) => ({
+        const inquiriesMapped: ProjectListItem[] = (inquiriesData ?? []).map((i) => ({
           id: i.id,
           title: i.title,
           type: i.project_type ?? 'other',
