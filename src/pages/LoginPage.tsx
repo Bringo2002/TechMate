@@ -16,6 +16,15 @@ const LoginPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const errorParam = params.get("error");
+    if (errorParam) {
+      toast.error(decodeURIComponent(errorParam));
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 

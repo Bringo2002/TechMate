@@ -44,18 +44,7 @@ export const useAuth = (): AuthHook => {
     return () => window.removeEventListener("auth:logout", handleForceLogout);
   }, [navigate]);
 
-  // Check for tokens from Google OAuth callback (query params)
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const accessToken = params.get("accessToken");
-    const refreshToken = params.get("refreshToken");
 
-    if (accessToken && refreshToken) {
-      setTokens(accessToken, refreshToken);
-      // Clean up URL
-      window.history.replaceState({}, "", window.location.pathname);
-    }
-  }, []);
 
   // 🔄 Check session on mount
   useEffect(() => {
