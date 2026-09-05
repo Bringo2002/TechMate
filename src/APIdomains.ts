@@ -1,4 +1,2 @@
-export const VITE_SUPABASE_URL = 'https://mpfezresklqemvvtixfv.supabase.co'
-export const VITE_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wZmV6cmVza2xxZW12dnRpeGZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg4OTU1MTcsImV4cCI6MjA3NDQ3MTUxN30.wlhZeeR6A0oCdQIBthL96y0mb4fyvBWfpRolloRoxNo'
 // GitHub Personal Access Token — set this to access private repos (leave empty for public only)
 export const VITE_GITHUB_TOKEN = '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'

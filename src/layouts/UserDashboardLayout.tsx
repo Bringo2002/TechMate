@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import supabase from '../lib/supabaseClient';
 import authService from '../services/authService';
+import * as ordersService from '../services/orders.service';
 import { NavLink } from 'react-router-dom';
 import { 
   Home, Package, User, HelpCircle, LogOut, MessageSquare, Bell, 
@@ -51,13 +51,10 @@ const UserDashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children
         const user = await authService.getMe();
         if (!user || !mounted) return;
 
-      const { data } = await supabase
-        .from('orders')
-        .select('id, title, progress, status')
-        .eq('user_id', user.id)
-        .in('status', ['in_progress', 'review'])
-        .order('updated_at', { ascending: false })
-        .limit(3);
+      const { data: allOrders } = await ordersService.getUserOrders(user.id);
+      const data = (allOrders || [])
+        .filter((o: any) => ['in_progress', 'review'].includes(o.status))
+        .slice(0, 3);
 
       if (mounted && data) {
         setActiveOrders(data);
@@ -67,88 +64,18 @@ const UserDashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children
 
     fetchActiveOrders();
 
-    // Real-time subscriptions for instant updates
-    const setupRealtime = async () => {
-      let user;
-      try {
-        user = await authService.getMe();
-      } catch { return; }
-      if (!user) return;
-
-      const notifChannel = supabase
-        .channel('sidebar-notifications')
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${user.id}`,
-        }, () => {
-          if (mounted) fetchCounts();
-        })
-        .subscribe();
-
-      const msgChannel = supabase
-        .channel('sidebar-messages')
-        .on('postgres_changes', {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `recipient_id=eq.${user.id}`,
-        }, () => {
-          if (mounted) fetchCounts();
-        })
-        .subscribe();
-
-      // Real-time order progress updates
-      const orderChannel = supabase
-        .channel('sidebar-orders')
-        .on('postgres_changes', {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'orders',
-          filter: `user_id=eq.${user.id}`,
-        }, (payload) => {
-          if (!mounted) return;
-          const updated = payload.new as {id: string; title: string; progress: number; status: string};
-
-          // Update the active orders list
-          setActiveOrders(prev => {
-            const exists = prev.find(o => o.id === updated.id);
-            if (exists) {
-              // Show toast if progress changed
-              if (updated.progress !== exists.progress) {
-                toast(`${updated.title}: ${updated.progress}% complete`, {
-                  icon: '🚀',
-                  style: { borderRadius: '12px', background: '#1a1a2e', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' },
-                });
-              }
-              return prev.map(o => o.id === updated.id
-                ? { ...o, progress: updated.progress, status: updated.status, title: updated.title }
-                : o
-              ).filter(o => ['in_progress', 'review'].includes(o.status));
-            }
-            // New active order
-            if (['in_progress', 'review'].includes(updated.status)) {
-              return [{ id: updated.id, title: updated.title, progress: updated.progress, status: updated.status }, ...prev].slice(0, 3);
-            }
-            return prev;
-          });
-        })
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(notifChannel);
-        supabase.removeChannel(msgChannel);
-        supabase.removeChannel(orderChannel);
-      };
-    };
-
-    const cleanupPromise = setupRealtime();
+    // Poll for updates every 15 seconds
+    const pollInterval = setInterval(() => {
+      if (mounted) {
+        fetchCounts();
+        fetchActiveOrders();
+      }
+    }, 15000);
 
     return () => {
       mounted = false;
       clearInterval(interval);
-      cleanupPromise.then(cleanup => cleanup?.());
+      clearInterval(pollInterval);
     };
   }, []);
 

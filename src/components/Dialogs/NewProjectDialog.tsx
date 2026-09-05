@@ -1,7 +1,7 @@
 // src/components/Dialogs/NewProjectDialog.tsx
 import { useState } from 'react';
 import { X, Loader2, DollarSign, Calendar, AlertCircle, Briefcase, Sparkles, Zap } from 'lucide-react';
-import supabase from '../../lib/supabaseClient';
+import { createProject } from '../../services/projectService';
 import authService from '../../services/authService';
 
 interface NewProjectDialogProps {
@@ -64,23 +64,18 @@ export default function NewProjectDialog({ onClose, onProjectCreated }: NewProje
       const user = await authService.getMe();
       if (!user) throw new Error('User not authenticated');
 
-      const { data, error } = await supabase
-        .from('projects')
-        .insert([{
-            user_id: user.id,
-            name: formData.name,
-            client: formData.client,
-            type: formData.type,
-            budget: parseFloat(formData.budget),
-            deadline: formData.deadline,
-            priority: formData.priority as any,
-            status: formData.status as any,
-            description: formData.description || null,
-          } as any])
-        .select()
-        .single();
-
-      if (error) throw new Error(`Supabase insert error: ${error.message}`);
+      const { data, error } = await createProject({
+        userId: user.id,
+        name: formData.name,
+        client: formData.client,
+        type: formData.type as any,
+        budget: parseFloat(formData.budget),
+        deadline: formData.deadline,
+        priority: formData.priority as any,
+        status: formData.status as any,
+        description: formData.description || null,
+      });
+      if (error) throw new Error(error);
 
       onProjectCreated(data);
       onClose();

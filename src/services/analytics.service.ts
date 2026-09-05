@@ -753,7 +753,6 @@ function normalizeSkillName(skill: string): string {
         'postgres': 'Database',
         'mongodb': 'Database',
         'mysql': 'Database',
-        'supabase': 'Database',
         'graphql': 'API',
         'rest': 'API',
         'nextjs': 'Next.js',

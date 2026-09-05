@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Globe, Smartphone, Cloud, Database, Brain, Rocket, Terminal, Sparkles, Briefcase, Server, ArrowLeft, Save, Loader2, Check } from 'lucide-react';
-import supabase from '../../lib/supabaseClient';
+import api from '../../lib/apiClient';
 import toast from 'react-hot-toast';
 
 const ICONS = [
@@ -458,32 +458,7 @@ const NewService = () => {
         sort_order: formData.sortOrder,
       };
 
-      // Insert the service — the supabase client handles auth headers
-      // automatically from the persisted session. No need for a separate
-      // getSession() call which only returns cached local data anyway.
-      const { data, error } = await supabase
-        .from('service_categories')
-        .insert(payload)
-        .select();
-
-      if (error) {
-        // Provide user-friendly messages for common Postgres errors
-        if (error.code === '23505') {
-          throw new Error(`A service named "${payload.name}" already exists.`);
-        }
-        if (error.code === '42501' || error.message?.includes('policy')) {
-          throw new Error('Permission denied. Only admins can add services.');
-        }
-        throw new Error(error.message || 'Database insert failed');
-      }
-
-      // Insert returned no rows — typically an RLS SELECT policy issue.
-      // The row IS in the DB if no error was thrown — treat as success.
-      if (!data || (Array.isArray(data) && data.length === 0)) {
-        toast.success('Service created!');
-        navigate('/dashboard/services');
-        return;
-      }
+      const data = await api.post('/service-categories', payload);
 
       toast.success('Service created successfully!');
       navigate('/dashboard/services');

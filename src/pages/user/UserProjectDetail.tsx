@@ -7,8 +7,10 @@ import {
   Package, XCircle, MessageSquare, Users, Zap, ChevronRight,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import supabase from '../../lib/supabaseClient';
 import authService from '../../services/authService';
+import { getProjectById } from '../../services/projectService';
+import api from '../../lib/apiClient';
+import { getUserById } from '../../services/users.service';
 import type { ProjectRow, Json } from '../../types/database.types';
 
 // ─── Currency formatter ───────────────────────────────────────────────────────
@@ -287,13 +289,7 @@ export default function UserProjectDetail() {
       }
 
       // Fetch project
-      const { data, error: fetchError } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('id', projectId)
-        .eq('user_id', user.id)
-        .is('deleted_at', null)
-        .single();
+      const { data, error: fetchError } = await getProjectById(projectId);
 
       if (!isMounted.current) return;
       if (fetchError || !data) {
@@ -305,13 +301,7 @@ export default function UserProjectDetail() {
       setProject(data as ProjectRow);
 
       // Fetch activity logs for this project
-      const { data: activityData } = await supabase
-        .from('activity_logs')
-        .select('id, action, changes, created_at, profiles:user_id(full_name, avatar_url)')
-        .eq('entity_type', 'project')
-        .eq('entity_id', projectId)
-        .order('created_at', { ascending: false })
-        .limit(10);
+      const activityData = await api.get<any[]>(`/activity-logs?entityType=project&entityId=${projectId}`);
 
       if (isMounted.current && activityData) {
         setActivities(activityData as unknown as ActivityItem[]);
@@ -322,10 +312,9 @@ export default function UserProjectDetail() {
       if ((data as ProjectRow).technical_lead_id) teamIds.add((data as ProjectRow).technical_lead_id!);
 
       if (teamIds.size > 0) {
-        const { data: teamData } = await supabase
-          .from('profiles')
-          .select('id, full_name, avatar_url, job_title')
-          .in('id', Array.from(teamIds));
+        const teamPromises = Array.from(teamIds).map(id => getUserById(id));
+        const teamResults = await Promise.all(teamPromises);
+        const teamData = teamResults.map(r => r.data).filter(Boolean);
 
         if (isMounted.current && teamData) {
           setTeamMembers(teamData.map((t: any) => ({

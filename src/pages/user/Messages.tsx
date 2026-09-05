@@ -27,7 +27,7 @@ import { useLocation } from 'react-router-dom';
 import * as messagesService from '../../services/messages.service';
 import type { ConversationSummary } from '../../services/messages.service';
 import type { MessageRow, ProfileRow, Json } from '../../types/database.types';
-import supabase from '../../lib/supabaseClient';
+import * as usersService from '../../services/users.service';
 
 // ============================================================================
 // TYPES
@@ -157,27 +157,14 @@ export default function Messages() {
     try {
       if (isAdmin) {
         // Admin: Load all non-admin users (clients)
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .is('deleted_at', null)
-          .neq('id', user.id)
-          .order('full_name', { ascending: true });
-
-        if (error) throw error;
-        setAvailableContacts(data || []);
+        const { data } = await usersService.getUsers({ filters: { isActive: true } });
+        const users = (data?.items || []).filter((u: any) => u.id !== user.id);
+        setAvailableContacts(users);
       } else {
         // User: Load admin/team profiles they can message
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .is('deleted_at', null)
-          .eq('role', 'admin')
-          .neq('id', user.id)
-          .order('full_name', { ascending: true });
-
-        if (error) throw error;
-        setAvailableContacts(data || []);
+        const { data } = await usersService.getUsers({ filters: { role: 'admin', isActive: true } });
+        const users = (data?.items || []).filter((u: any) => u.id !== user.id);
+        setAvailableContacts(users);
       }
     } catch {
       toast.error('Failed to load contacts');
@@ -329,26 +316,12 @@ export default function Messages() {
 
     setUploading(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const filePath = `${user.id}/${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('message-attachments')
-        .upload(filePath, file);
-
-      if (uploadError) {
-        // If bucket doesn't exist, fall back to inline display
-        toast.error('Upload failed — storage may not be configured');
-        return;
-      }
-
-      const { data: urlData } = supabase.storage
-        .from('message-attachments')
-        .getPublicUrl(filePath);
+      // Create a local object URL for preview (file uploads not yet supported on NestJS backend)
+      const objectUrl = URL.createObjectURL(file);
 
       setPendingAttachment({
         name: file.name,
-        url: urlData.publicUrl,
+        url: objectUrl,
         size: file.size,
         type: file.type,
       });

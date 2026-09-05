@@ -7,7 +7,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { AdminDashboardMetrics, GrowthDataPoint, RevenueDataPoint } from '../types/api.types';
 import type { ProjectRowWithClient, OrderRow, ProfileRow, RequestRow, ServiceCategoryRow, ActivityLogRowWithProfile } from '../types/database.types';
 import * as adminService from '../services/admin.service';
-import supabase from '../lib/supabaseClient';
 
 interface AdminDashboardData {
     metrics: AdminDashboardMetrics | null;
@@ -98,27 +97,13 @@ export function useAdmin(): AdminDashboardData {
     }, [fetchAll]);
 
     // ── Real-time subscription for live updates ──────────────────────────────
-    const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
     useEffect(() => {
-        const channel = supabase
-            .channel('admin-live-feed')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_logs' }, () => {
-                fetchAll();
-            })
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => {
-                fetchAll();
-            })
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'profiles' }, () => {
-                fetchAll();
-            })
-            .subscribe();
-
-        channelRef.current = channel;
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
+        // Poll for live updates every 30 seconds
+        const interval = setInterval(() => {
+            fetchAll();
+        }, 30000);
+        return () => clearInterval(interval);
     }, [fetchAll]);
 
     return {

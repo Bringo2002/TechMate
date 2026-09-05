@@ -13,7 +13,8 @@ import { motion } from 'framer-motion';
 import { BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../hooks/useAuth';
-import supabase from '../../lib/supabaseClient';
+import * as ordersService from '../../services/orders.service';
+import * as invoicesService from '../../services/invoices.service';
 import type { OrderRow, InvoiceRow } from '../../types/database.types';
 
 // ============================================================================
@@ -60,18 +61,8 @@ export default function Stats() {
     setLoading(true);
     try {
       const [ordersRes, invoicesRes] = await Promise.all([
-        supabase
-          .from('orders')
-          .select('*')
-          .eq('user_id', user.id)
-          .is('deleted_at', null)
-          .order('created_at', { ascending: true }),
-        supabase
-          .from('invoices')
-          .select('*')
-          .eq('user_id', user.id)
-          .is('deleted_at', null)
-          .order('created_at', { ascending: true }),
+        ordersService.getUserOrders(user.id),
+        invoicesService.getUserInvoices(user.id),
       ]);
 
       setOrders(ordersRes.data ?? []);

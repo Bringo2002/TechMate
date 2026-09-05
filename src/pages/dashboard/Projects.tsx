@@ -68,25 +68,10 @@ const daysRemaining = (deadline: string | null): number => {
 };
 
 // ─── Secure AI caller ─────────────────────────────────────────────────────────
-// IMPORTANT: All Gemini API calls go through your Supabase Edge Function,
-// never directly from the browser. This keeps your API key server-side.
-// Deploy this edge function at: supabase/functions/ai-insights/index.ts
-//
-// Deploy with:
-//   npx supabase functions deploy ai-insights
-//   npx supabase secrets set GEMINI_API_KEY=your-key-here
-// ─────────────────────────────────────
 
-import supabase from '../../lib/supabaseClient';
-
-async function callAI(system: string, messages: ChatMessage[], maxTokens = 1500): Promise<string> {
-  const { data, error } = await supabase.functions.invoke('ai-insights', {
-    body: { system, messages, max_tokens: maxTokens },
-  });
-  if (error) throw new Error(error.message);
-  const content = data?.content?.[0]?.text;
-  if (!content) throw new Error('Empty AI response');
-  return content;
+async function callAI(_system: string, _messages: ChatMessage[], _maxTokens = 1500): Promise<string> {
+  // AI insights not yet available on NestJS backend
+  throw new Error('AI insights are not yet available. This feature is coming soon.');
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
