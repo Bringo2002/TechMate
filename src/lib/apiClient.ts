@@ -12,16 +12,20 @@ const TOKEN_KEY = 'techmate_access_token';
 const REFRESH_KEY = 'techmate_refresh_token';
 
 export function getAccessToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token || token === 'undefined' || token === 'null') return null;
+  return token;
 }
 
 export function getRefreshToken(): string | null {
-  return localStorage.getItem(REFRESH_KEY);
+  const token = localStorage.getItem(REFRESH_KEY);
+  if (!token || token === 'undefined' || token === 'null') return null;
+  return token;
 }
 
 export function setTokens(accessToken: string, refreshToken: string): void {
-  localStorage.setItem(TOKEN_KEY, accessToken);
-  localStorage.setItem(REFRESH_KEY, refreshToken);
+  if (accessToken && accessToken !== 'undefined') localStorage.setItem(TOKEN_KEY, accessToken);
+  if (refreshToken && refreshToken !== 'undefined') localStorage.setItem(REFRESH_KEY, refreshToken);
 }
 
 export function clearTokens(): void {
@@ -56,8 +60,13 @@ async function refreshAccessToken(): Promise<string | null> {
     }
 
     const data = await res.json();
-    localStorage.setItem(TOKEN_KEY, data.accessToken);
-    return data.accessToken;
+    const newAccessToken = data.accessToken || data.access_token;
+    if (newAccessToken) {
+      localStorage.setItem(TOKEN_KEY, newAccessToken);
+      return newAccessToken;
+    }
+    clearTokens();
+    return null;
   } catch {
     clearTokens();
     return null;

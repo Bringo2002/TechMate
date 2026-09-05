@@ -96,7 +96,7 @@ export const useAuth = (): AuthHook => {
         setUser(data.user);
         setUserRole(data.user.role);
 
-        if (data.user.role === "ADMIN") navigate("/dashboard");
+        if (data.user.role?.toUpperCase() === "ADMIN") navigate("/dashboard");
         else navigate("/user");
       } catch (err: unknown) {
         throw new Error(handleAuthError(err));

@@ -27,9 +27,11 @@ interface MessageResponse {
 
 // Login user
 const login = async (email: string, password: string): Promise<AuthResponse> => {
-  const data = await api.post<AuthResponse>('/auth/login', { email, password }, { skipAuth: true });
-  setTokens(data.accessToken, data.refreshToken);
-  return data;
+  const data = await api.post<Record<string, any>>('/auth/login', { email, password }, { skipAuth: true });
+  const accessToken = data.accessToken || data.access_token;
+  const refreshToken = data.refreshToken || data.refresh_token;
+  setTokens(accessToken, refreshToken);
+  return { ...data, accessToken, refreshToken } as AuthResponse;
 };
 
 // Signup user
@@ -38,9 +40,11 @@ const signup = async (
   email: string,
   password: string
 ): Promise<AuthResponse> => {
-  const data = await api.post<AuthResponse>('/auth/register', { name, email, password }, { skipAuth: true });
-  setTokens(data.accessToken, data.refreshToken);
-  return data;
+  const data = await api.post<Record<string, any>>('/auth/register', { name, email, password }, { skipAuth: true });
+  const accessToken = data.accessToken || data.access_token;
+  const refreshToken = data.refreshToken || data.refresh_token;
+  setTokens(accessToken, refreshToken);
+  return { ...data, accessToken, refreshToken } as AuthResponse;
 };
 
 /* ========== PASSWORD RESET ========== */

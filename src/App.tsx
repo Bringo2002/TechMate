@@ -100,7 +100,7 @@ const ProtectedRoute: React.FC<{children: React.ReactNode; role?: string}> = ({ 
 
   if (loading) return <p className="text-center mt-20 text-white">Checking authentication...</p>;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (role && userRole !== role) return <Navigate to="/" replace />;
+  if (role && userRole?.toLowerCase() !== role.toLowerCase()) return <Navigate to="/" replace />;
 
   return <>{children}</>;
 };
